@@ -47,6 +47,7 @@ meta.update({
     "source_files": source_files,
 })
 def slim_rows(source):
+    """只打包前端真正读取的字段（见 template.html 实际引用）。"""
     return [
         {
             "id": r["id"],
@@ -54,16 +55,7 @@ def slim_rows(source):
             "family": r.get("family", ""),
             "meaning": r["meaning"],
             "forms": r.get("forms", []),
-            "freq": r["freq"],
-            "coverage": r["coverage"],
-            "en1_freq": r.get("en1_freq", 0),
-            "en1_coverage": r.get("en1_coverage", 0),
-            "weighted_coverage": r.get("weighted_coverage", r["coverage"]),
-            "book_rank": r.get("book_rank", 0),
-            "source_tier": r.get("source_tier", ""),
-            "band": r["band"],
             "priority": r.get("priority", ""),
-            "priority_rank": r.get("priority_rank", r["id"]),
         }
         for r in source
     ]
@@ -74,16 +66,6 @@ basic_slim = slim_rows(basic)
 insurance_slim = slim_rows(insurance)
 
 
-
-def finalize_html(html: str) -> str:
-    """Ensure optional UI guards survive template edits."""
-    if "if (!box) return;" not in html:
-        html = html.replace(
-            "function renderDisplayOpts() {\n  const box = $('displayOpts');",
-            "function renderDisplayOpts() {\n  const box = $('displayOpts');\n  if (!box) return;",
-            1,
-        )
-    return html
 
 template = (SOFT / "template.html").read_text(encoding="utf-8")
 payload = json.dumps(slim, ensure_ascii=False, separators=(",", ":"))
@@ -97,7 +79,6 @@ html = (
     .replace("__INSURANCE__", insurance_payload)
     .replace("__META__", json.dumps(meta, ensure_ascii=False, separators=(",", ":")))
 )
-html = finalize_html(html)
 OUT.write_text(html, encoding="utf-8", newline="\n")
 
 print(f"output={OUT}")

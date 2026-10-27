@@ -1,0 +1,88 @@
+pleasant	4	4	a. 愉快的, 可爱的, 活泼的, 亲切的
+recognize	4	4	vt. 认出, 认可, 承认, 公认, 识别, 赏识\nvi
+virtually	4	4	adv. 事实上
+weekly	4	4	n. 周刊, 周报\na. 每周的, 一周一次的, 周刊的\
+cotton	4	3	n. 棉花\nvi. 和谐, 有好感, 理解
+monthly	4	3	n. 月刊\na. 每月的, 每月一次的
+perception	4	3	n. 知觉, 感觉, 领悟力, 获取\n[医] 知觉
+plus	4	3	prep. 加上, 加, 外加\na. 正的, 附加的\nn
+romantic	4	3	a. 浪漫的, 风流的, 传奇性的, 夸大的, 空想的, 浪
+software	4	3	n. 软件\n[计] 软设备
+square	4	3	n. 正方形, 街区, 广场, 平方, 直角尺\na. 正方
+stone	4	3	n. 石头, 宝石, 果核, 纪念碑, 结石\nvt. 投扔
+truth	4	3	n. 事实, 实情\n[法] 真实, 真相, 事实
+voice	4	3	n. 声音, 嗓音, 嗓子, 愿望, 发言权, 表达, 喉舌
+addition	4	2	n. 加法, 增加的人(或物)\n[计] 加法
+dairy	4	2	n. 牛奶公司, 乳品店, 乳牛场
+gum	4	2	n. 树胶, 橡皮, 橡皮糖, 牙床, 老天\nvt. 涂以
+opt	4	2	vi. 选择
+skin	4	2	n. 皮肤, 皮\nvt. 剥皮, 在...植皮\nvi. 
+topic	4	2	n. 主题, 论题, 话题
+vocabulary	4	2	n. 词汇(量), 词汇表\n[计] 词表
+clip	4	1	n. 修剪, 夹子, 回形针, 剪下来的东西\nvt. 修剪
+couch	3	3	n. 长沙发, 睡椅, 卧榻\nvt. 横躺, 表达\nvi
+depression	3	3	n. 不景气, 消沉, 沮丧, 洼地\n[医] 抑郁[症],
+destructive	3	3	a. 毁灭性的, 破坏的, 有害的\n[医] 破坏的, 毁坏
+dozen	3	3	n. 打, 十二个\na. 一打的
+duration	3	3	n. 持续时间, 持续\n[计] 持续时间
+housework	3	3	n. 家事, 家务
+mobile	3	3	a. 移动的, 易变的, 机动的\nn. 活动物体
+obey	3	3	vt. 服从, 遵从, 顺从\nvi. 服从
+organize	3	3	vt. 组织, 有机化, 给予生机\nvi. 组织起来
+pain	3	3	n. 痛苦, 疼痛, 辛苦\nvt. 使痛苦, 痛苦\nvi
+possibly	3	3	adv. 可能, 也许
+realise	3	3	vt. 实现, 认识到, 体会到, 了解, 认清, 使显得逼
+skip	3	3	n. 跳跃, 跳读\nvi. 跳越, 跳读, 跳绳, 遗漏,
+somehow	3	3	adv. 不知何故
+speech	3	3	n. 演讲, 说话, 谈话, 言语, 引语, 民族语言\n[
+spirit	3	3	n. 精神, 心灵, 灵魂, 态度, 志气, 人格, 情绪,
+tip	3	3	n. 顶, 尖端, 梢, 末端, 倾斜, 垃圾场, 小费, 
+total	3	3	a. 全体的, 总的, 全然的\nvt. 计算...的总和,
+upon	3	3	prep. 在...之上, 迫近, 紧接着
+via	3	3	prep. 经由, 经过, 通过\n[医] 病毒灭活剂
+volume	3	3	n. 册, 卷, 体积, 容量, 大量, 许多, 份量, 音
+weak	3	3	a. 不牢固的, 弱的, 虚弱的, 软弱的, 无力的, 无权
+battery	3	2	n. 电池, 殴打\n[化] 蓄电池
+commute	3	2	vt. 交换, 折偿, 减轻\nvi. 代偿, 经常乘车来往
+cross	3	2	n. 十字架, 十字架形物件, 交叉, 十字标, 交叉路, 
+dangerous	3	2	a. 危险的\n[法] 危险的, 危害的
+dose	3	2	n. 剂量, 服用量\nvt. 给药, (用药)医治\nvi
+erase	3	2	vt. 抹去, 擦掉\n[计] 清洗; 擦除; 抹除; DO
+lag	3	2	n. 落后, 囚犯, 迟延, 桶板, 防护套\na. 最后的
+lever	3	2	n. 杠杆, 似杠杆之工具\nvt. 撬开\nvi. 使用杠
+mechanical	3	2	a. 机械的, 机械性的, 力学的\n[医] 机械的, 力学
+momentum	3	2	n. 动力, 动量\n[化] 动量
+monitor	3	2	n. 监督器, 级长, 监听员, 班长, 监视器, 告诫物\
+narrow	3	2	n. 狭窄部分, 隘路\na. 狭窄的, 仔细的, 有限的,
+native	3	2	n. 本地人, 土产, 当地人\na. 本国的, 与生俱来的
+neighborhood	3	2	n. 附近, 邻近
+net	3	2	n. 网, 网状物, 罗网, 净利, 净价\na. 净的, 
+outdoor	3	2	a. 户外的, 屋外的, 露天的
+percentage	3	2	n. 百分比, 比率, 部分, 可能性\n[计] 百分比
+permanent	3	2	a. 永久的, 不变的, 固定的, 持久的\nn. 烫发\n
+pollute	3	2	vt. 污染, 弄脏, 玷污\n[化] 污染
+realm	3	2	n. 王国, 领土, 领域\n[计] 领域
+request	3	2	n. 请求, 需要, 申请书\nvt. 请求, 要求, 邀请
+satisfaction	3	2	n. 满足, 满意, 快事, 赔偿, 赎罪, 报仇的机会\n
+session	3	2	n. 期间, 开庭期, 会议, 学期\n[计] 会话, 对话
+shore	3	2	n. 海岸, 海滨, 斜撑柱\nvt. 把...送上岸, 支
+signature	3	2	n. 签字, 识别标志, 调号\n[计] 签名附件
+silver	3	2	n. 银, 银币, 银器\na. 银的, 银制的, 银器的\
+sink	3	2	n. 藏垢的场所, 沟渠, 污水槽\nvi. 下沉, 沉没,
+slim	3	2	a. 瘦的, 苗条的, 微小的, 稀少的, 微薄的\nvi.
+smart	3	2	a. 聪明的, 漂亮的, 刺痛的, 剧烈的, 敏捷的, 巧妙
+stage	3	2	n. 阶段, 舞台, 场所, 戏剧, 站, 驿站, 级, 层
+stereotype	3	2	n. 铅版, 陈规, 老套\nvt. 使用铅版, 把...印
+toy	3	2	n. 玩具, 小玩艺儿, 小型的东西, 消遣\na. 供玩耍
+usual	3	2	a. 平常的, 通常的
+wise	3	2	a. 明智的, 慎虑的, 聪明的, 博学的, 狡猾的, 机灵
+ideology	3	1	n. 思想体系, 意识形态, 观念学, 空论\n[医] 观念
+legacy	3	1	n. 祖先传下来之物, 遗赠物\n[经] 遗产, 遗赠物
+lottery	3	1	n. 奖券, 彩票, 运气\n[经] 抽彩给奖法
+poem	3	1	n. 诗, 诗般美的事物
+route	3	1	n. 路径, 途径, 路线\nvt. 确定路线, 按规定路线
+shock	3	1	n. 震动, 冲突, 震惊, 冲击, 突击, 禾束堆, 休克
+straw	3	1	n. 稻草, 麦管, 吸管, 一文不值的东西, 草帽\na.
+turbine	3	1	n. 涡轮机\n[化] 涡轮机
+verbal	3	1	a. 用言辞的, 言语的, 口头的, 逐字的, 动词的\n[
+victory	3	1	n. 胜利, 战胜, 克服

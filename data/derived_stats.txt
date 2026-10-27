@@ -1,0 +1,12 @@
+WordNet 派生词关系导出统计
+总词条数: 25093
+总关系对数(无向，去重): 15883
+总关系对数(有向，含双向): 31766
+
+抽样词完整派生列表:
+care (1): caring
+fine (1): fineness
+form (2): formation, formative
+take (2): taker, taking
+act (5): actable, acting, action, actor, actuate
+nation (0): (无)

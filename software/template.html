@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>考研英语二核心词汇</title>
+<style>
+:root{
+  --bg:#f4f6f3;--card:#fff;--ink:#17201d;--muted:#66736e;--line:#dde4df;
+  --brand:#0f766e;--brand-soft:#e5f4f1;--ok:#15803d;--warn:#b45309;--bad:#b91c1c;
+  --s:#b42318;--s-soft:#fee4e2;--a:#b45309;--a-soft:#fff2df;
+  --b:#0f766e;--b-soft:#e5f4f1;--c:#59636f;--c-soft:#edf0f2;
+  --shadow:0 1px 3px rgba(0,0,0,.05),0 14px 36px rgba(20,40,32,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#101513;--card:#19201d;--ink:#e9efeb;--muted:#94a39c;--line:#2a3530;
+    --brand:#55d6c9;--brand-soft:#14332f;--ok:#68d391;--warn:#f1b25b;--bad:#f87171;
+    --s:#ff8a80;--s-soft:#3b1d1c;--a:#f1b25b;--a-soft:#3b2b16;
+    --b:#55d6c9;--b-soft:#14332f;--c:#b2bcc6;--c-soft:#252d33;
+    --shadow:0 1px 3px rgba(0,0,0,.35),0 18px 40px rgba(0,0,0,.24)}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100dvh;
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overflow:hidden}
+header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);z-index:10;flex-shrink:0}
+.brand{font-weight:800;color:var(--brand);font-size:15px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.spacer{flex:1}
+.tabs{display:flex;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px;flex-shrink:0}
+.tab{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;padding:5px 10px;border-radius:999px;cursor:pointer}
+.tab.active{background:var(--brand);color:#fff}
+@media (prefers-color-scheme:dark){.tab.active{color:#0b1714}}
+.undo-bar{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(76px + env(safe-area-inset-bottom));background:var(--ink);color:var(--bg);
+  border-radius:12px;padding:10px 12px 10px 14px;display:flex;gap:12px;align-items:center;
+  font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.3);z-index:60;max-width:92vw}
+.undo-bar button{border:0;background:var(--brand);color:#fff;border-radius:8px;
+  padding:7px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.storage-warn{padding:8px 14px;background:var(--bad);color:#fff;font-size:12.5px;line-height:1.5;flex-shrink:0}
+.deck-bar{display:flex;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--line);
+  background:var(--card);flex-shrink:0;z-index:9}
+.deck-label{font-size:12px;color:var(--muted);white-space:nowrap}
+.deck-select{min-width:0;flex:1;border:1px solid color-mix(in srgb,var(--brand) 35%,var(--line));
+  background:var(--brand-soft);color:var(--ink);border-radius:10px;padding:7px 9px;font:inherit;font-size:12.5px;font-weight:700}
+.deck-meta{font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 14px 10px;display:flex}
+.view{display:flex;flex-direction:column;gap:10px;width:100%;min-height:0;flex:1}
+.hidden{display:none!important}
+.study-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:center;flex-shrink:0}
+.position{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.position b{color:var(--ink);font-size:14px}
+.meaning-toggle{justify-self:end;border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));background:var(--card);
+  color:var(--brand);font:inherit;font-size:12.5px;font-weight:750;border-radius:999px;padding:7px 10px;cursor:pointer;
+  white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
+@media (prefers-color-scheme:dark){.meaning-toggle[aria-pressed="true"]{color:#0b1714}}
+.chapter-select{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;
+  padding:7px 4px;font:inherit;font-size:12px;max-width:82px;flex-shrink:0;cursor:pointer}
+.progress{width:100%;height:20px;flex-shrink:0;margin:0;cursor:pointer;accent-color:var(--brand);touch-action:none}
+.shuffle-btn{border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:10px;
+  font:inherit;font-size:12px;padding:6px;cursor:pointer;flex-shrink:0}
+.shuffle-btn:active{border-color:var(--brand);color:var(--brand)}
+.card{position:relative;flex:1;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:22px;
+  box-shadow:var(--shadow);padding:36px 18px 40px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:12px;overflow:hidden;touch-action:none;user-select:none}
+.card::after{content:"";position:absolute;inset:auto -25% -45% -25%;height:60%;background:radial-gradient(circle,var(--brand-soft),transparent 68%);opacity:.65;pointer-events:none}
+.card>*{position:relative;z-index:1}
+.badges{position:absolute;top:10px;left:10px;display:flex;gap:5px;align-items:center;z-index:2}
+.weight-badge{font-size:11px;font-weight:800;color:var(--bad);
+  background:color-mix(in srgb,var(--bad) 15%,transparent);border-radius:999px;
+  padding:4px 7px;line-height:1.1;min-width:20px;text-align:center}
+@keyframes pulseW{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
+.weight-badge.pulse{animation:pulseW .45s ease}
+.priority{font-size:11px;font-weight:700;border-radius:999px;padding:4px 8px;line-height:1.1;letter-spacing:.02em}
+.priority.s{color:var(--s);background:var(--s-soft)}
+.priority.a{color:var(--a);background:var(--a-soft)}
+.priority.b{color:var(--b);background:var(--b-soft)}
+.priority.c{color:var(--c);background:var(--c-soft)}
+.word{font-size:clamp(40px,11vw,64px);line-height:1.05;font-weight:800;letter-spacing:-.025em;word-break:break-word;max-width:100%}
+.rule{height:1px;width:min(210px,70%);background:var(--line)}
+.forms-box{width:min(100%,460px)}
+.forms{color:var(--muted);font-size:clamp(12.5px,3.5vw,14.5px);font-weight:500;line-height:1.5;overflow-wrap:anywhere}
+.family-note{font-size:12px;color:var(--muted);font-weight:600;margin-top:-4px}
+.meaning{font-size:clamp(23px,6.5vw,32px);line-height:1.35;font-weight:650;max-width:30ch;min-height:1.35em}
+.meaning-placeholder{font-size:12px;color:var(--muted);font-weight:400;opacity:.75}
+.swipe-hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;
+  font-size:11px;color:var(--muted);opacity:.8;pointer-events:none}
+.nav-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;flex-shrink:0}
+.nav-btn{border:1px solid var(--line);background:var(--card);color:var(--muted);font:inherit;font-size:13px;border-radius:12px;padding:9px 10px;cursor:pointer}
+.nav-btn:disabled{opacity:.35;cursor:default}
+.word-id{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex-shrink:0}
+.btn{border:0;border-radius:14px;padding:13px 8px;font:inherit;font-size:15px;font-weight:750;color:#fff;background:var(--brand);cursor:pointer}
+.btn:active{transform:scale(.98)}
+.btn.bad{background:var(--bad)}.btn.mid{background:var(--warn)}.btn.good{background:var(--ok)}
+.empty{min-height:50vh;align-items:center;justify-content:center;text-align:center;color:var(--muted);background:var(--card);
+  border:1px solid var(--line);border-radius:22px;padding:30px;display:flex;flex-direction:column;gap:10px}
+.empty strong{color:var(--ink);font-size:21px}
+.list-head{display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.search{flex:1;min-width:160px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;font-size:14px;outline:none}
+.search:focus{border-color:var(--brand)}
+.filters{display:flex;gap:5px;overflow:auto}
+.filter{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;white-space:nowrap;cursor:pointer}
+.filter.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.list-wrap{flex:1;min-height:0;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;-webkit-overflow-scrolling:touch}
+.word-list{list-style:none;margin:0;padding:0}
+.word-list li{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--line)}
+.word-list li:last-child{border-bottom:0}
+.list-no{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.list-word{font-weight:750;font-size:15px}
+.list-meaning{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.restore-btn{border:1px solid var(--line);background:transparent;color:var(--brand);border-radius:8px;padding:4px 8px;font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
+.list-priority{font-size:11px;font-weight:800;border-radius:999px;padding:4px 7px;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 7px;text-align:center}
+.stat b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;display:flex;flex-direction:column;gap:12px}
+.panel-title{font-size:13px;color:var(--muted)}
+.daily{display:flex;gap:7px;flex-wrap:wrap}
+.daily button{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:6px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+.daily button.active{color:var(--brand);border-color:var(--brand);background:var(--brand-soft);font-weight:700}
+.note{font-size:12.5px;line-height:1.7;color:var(--muted)}
+.note b{color:var(--ink)}
+.danger{border:1px solid color-mix(in srgb,var(--bad) 38%,var(--line));background:transparent;color:var(--bad);border-radius:12px;padding:10px;font:inherit;font-size:13px;cursor:pointer}
+@media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:15px 13px}.meaning-toggle{font-size:12px}}
+@media (max-height:620px){
+  header{padding:6px 10px}main{padding:6px 10px 7px}.view{gap:6px}
+  .card{padding:9px 12px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
+  .forms{font-size:11.5px}
+  .deck-bar{padding:5px 9px}.family-note{font-size:11px}
+  .meaning{font-size:clamp(18px,5vh,24px)}.rule{margin:0}.swipe-hint{display:none}
+  .nav-btn{padding:6px 8px}.actions .btn{padding:9px 6px;font-size:14px}
+}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">英语二词汇</span><span class="spacer"></span>
+  <div class="tabs">
+    <button class="tab active" id="tabStudy">学习</button>
+    <button class="tab" id="tabList">词表</button>
+    <button class="tab" id="tabStat">统计</button>
+  </div>
+</header>
+<div class="storage-warn hidden" id="storageWarn">进度保存失败：浏览器存储已满或处于隐私模式，刷新后可能丢失。</div>
+<div class="deck-bar">
+  <label class="deck-label" for="deckSelect">当前词库</label>
+  <select class="deck-select" id="deckSelect" aria-label="选择背诵词库">
+    <option value="core">阶段一 · 核心词</option>
+    <option value="derivative">阶段二 · 核心派生</option>
+    <option value="foundation">基础词自测</option>
+    <option value="insurance">高/中频保险库</option>
+    <option value="mastered">已认识</option>
+  </select>
+  <span class="deck-meta" id="deckMeta"></span>
+</div>
+<main>
+  <section class="view" id="viewStudy">
+    <div class="study-head">
+      <div class="position" id="position">第 <b>1</b> / 1 个</div>
+      <select class="chapter-select" id="chapterSelect" aria-label="跳转章节"></select>
+    </div>
+    <input class="progress" id="progressBar" type="range" min="0" max="0" value="0" step="1" aria-label="进度，可拖动跳转">
+    <article class="card" id="card">
+      <div class="badges">
+        <span class="priority b" id="priorityBadge">B 次重点</span>
+        <span class="weight-badge hidden" id="weightBadge"></span>
+      </div>
+      <div class="word" id="word">加载中</div>
+      <div class="family-note hidden" id="familyNote"></div>
+      <div class="forms-box hidden" id="formsBox">
+        <div class="forms" id="forms"></div>
+      </div>
+      <div class="rule"></div>
+      <div class="meaning" id="meaning"></div>
+      <div class="swipe-hint">左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）</div>
+    </article>
+    <div class="nav-row">
+      <button class="nav-btn" id="prevWord">← 上一个</button>
+      <span class="word-id" id="wordId">优先级 #1</span>
+      <button class="nav-btn" id="nextWord">下一个 →</button>
+    </div>
+    <button class="shuffle-btn" id="shuffleChapter">↻ 打乱本章顺序</button>
+    <div class="empty hidden" id="done">
+      <strong id="doneTitle">本章过完了</strong>
+      <span id="doneHint">还有没掌握的词，可以再过一轮。</span>
+      <button class="btn" id="doneAction">再过一轮</button>
+    </div>
+  </section>
+
+  <section class="view hidden" id="viewList">
+    <div class="list-head">
+      <input class="search" id="searchInput" type="search" placeholder="搜索单词或中文释义">
+      <div class="filters" id="filters">
+        <button class="filter active" data-priority="all">全部</button>
+        <button class="filter" data-priority="S">S</button>
+        <button class="filter" data-priority="A">A</button>
+        <button class="filter" data-priority="B">B</button>
+        <button class="filter" data-priority="C">C</button>
+        <button class="filter" data-priority="mastered">已掌握</button>
+      </div>
+    </div>
+    <div class="list-wrap"><ol class="word-list" id="wordList"></ol></div>
+  </section>
+
+  <section class="view hidden" id="viewStat">
+    <div class="stats">
+      <div class="stat"><b id="sTotal">0</b><span>总词数</span></div>
+      <div class="stat"><b id="sLearned">0</b><span>学过</span></div>
+      <div class="stat"><b id="sMastered">0</b><span>掌握</span></div>
+      <div class="stat"><b id="sDue">0</b><span>待学</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">背诵优先级</div>
+      <div class="note">
+        <b>S 必背</b> → <b>A 重点</b> → <b>B 次重点</b><br>右滑（不认识）会给这个词加权重，卡片上显示「错 N 次」；点「打乱本章」时权重越高越可能排前面，但不会强制置顶。<br>
+        系统已综合英语二（主）、英语一（低权重）、词书分层和五书共识，按优先级从高到低排好。你不需要自己再看次数、覆盖套数和频段。
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">进度备份</div>
+      <div class="daily">
+        <button id="exportProgress">导出进度</button>
+        <button id="importProgress">导入进度</button>
+      </div>
+      <div class="note">换手机、清缓存前先导出。导入会覆盖当前进度。</div>
+      <input type="file" id="importFile" accept=".json" class="hidden">
+    </div>
+    <div class="panel"><button class="danger" id="resetAll">清空全部学习记录</button></div>
+  </section>
+</main>
+<div class="undo-bar hidden" id="undoBar">
+  <span id="undoText">已认识</span>
+  <button id="undoBtn">撤销</button>
+</div>
+<script>
+const WORDS = __DATA__;
+const DERIVATIVES = __DERIVATIVES__;
+const BASIC = __BASIC__;
+const INSURANCE = __INSURANCE__;
+const DATA_META = __META__;
+const LS_STATE = 'ky_words_v1';
+const LS_CONF = 'ky_conf_v1';
+const INTERVALS = [0, 1, 3, 7, 15, 30];
+const DAY = 864e5;
+const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+let storageWarned = false;
+const save = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    if (!storageWarned) {
+      storageWarned = true;
+      const el = document.getElementById('storageWarn');
+      if (el) el.classList.remove('hidden');
+    }
+  }
+};
+const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+const $ = id => document.getElementById(id);
+let state = load(LS_STATE, {});
+let conf = Object.assign({ deck: 'core' }, load(LS_CONF, {}));
+delete conf.autoShow;   // 旧版本遗留的全局开关，彻底废弃
+const DECKS = {
+  core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', words: WORDS },
+  derivative: { label: '阶段二 · 核心派生', note: '阶段二 · 核心派生：只收词族中高频、词性或语义有明显变化的成员。', words: DERIVATIVES },
+  foundation: { label: '基础词自测', note: '基础词自测：专门检查你以为会、实际可能不会的熟词。', words: BASIC },
+  insurance: { label: '高/中频保险库', note: '高/中频保险库：收入闪过中未进主线的词，只用于补漏，不建议一开始通背。', words: INSURANCE },
+  mastered: { label: '已认识', note: '左滑认识的词都收进这里，不会被删除。去「词表」页点「恢复」可以放回原词库。', words: [] }
+};
+let activeDeck = Object.prototype.hasOwnProperty.call(DECKS, conf.deck) ? conf.deck : 'core';
+const ALL_WORDS = (() => {
+  const seen = new Set(), list = [];
+  for (const w of [...WORDS, ...DERIVATIVES, ...BASIC, ...INSURANCE]) {
+    if (!seen.has(w.word)) { seen.add(w.word); list.push(w); }
+  }
+  return list;
+})();
+const deckWords = () => (activeDeck === 'mastered'
+  ? ALL_WORDS.filter(w => isMastered(w))
+  : DECKS[activeDeck].words);
+let queue = [];
+let idx = 0;
+let revealed = false;
+let dragging = false;
+let chapterData = load('ky_chapter_v1', {});
+let curChapter = 0;
+let priorityFilter = 'all';
+let searchText = '';
+
+function priorityClass(priority) {
+  return (priority || 'C').charAt(0).toLowerCase();
+}
+function setPriority(el, priority) {
+  el.className = 'priority ' + priorityClass(priority);
+  el.textContent = priority || 'C 补充';
+}
+function isMastered(word) {
+  const st = state[word.word];
+  return !!(st && st.mastered);
+}
+function weightOf(word) {
+  const st = state[word.word];
+  return st ? (st.w || 0) : 0;
+}
+// 加权洗牌：权重只提高「靠前」的概率，不是强制置顶
+// 权重 0/1/4 进前 25% 的概率约 23%/32%/53%（基准 25%）
+function shuffleByWeight(list) {
+  const arr = list.map(word => ({
+    word,
+    key: Math.pow(Math.random(), 1 / (1 + weightOf(word) * 0.5))
+  }));
+  arr.sort((a, b) => b.key - a.key);
+  return arr.map(x => x.word);
+}
+function chapterSlice(ch) {
+  const start = ch * CHAPTER_SIZE;
+  return deckWords().slice(start, start + CHAPTER_SIZE);
+}
+function chapterKey(ch) { return activeDeck + ':' + ch; }
+function savePos() {
+  const key = chapterKey(curChapter);
+  if (!chapterData[key]) return;
+  chapterData[key].pos = idx;
+  chapterData[key].posWord = idx < queue.length ? queue[idx].word : null;
+  chapterData[key].done = queue.length > 0 && idx >= queue.length;
+  save('ky_chapter_v1', chapterData);
+}
+function loadChapter(ch, reshuffle) {
+  curChapter = ch;
+  const key = chapterKey(ch);
+  const now = todayTs();
+  // 未掌握的照常出现；已掌握但到了 7 天复习期的，也重新出现
+  const pending = chapterSlice(ch).filter(w => {
+    if (!isMastered(w)) return true;
+    const st = state[w.word];
+    return !!(st && st.due && st.due <= now);
+  });
+  let rec = chapterData[key];
+  if (!rec || reshuffle || !Array.isArray(rec.order)) {
+    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0 };
+    save('ky_chapter_v1', chapterData);
+  }
+  const byName = new Map(pending.map(w => [w.word, w]));
+  const seen = new Set();
+  const ordered = [];
+  for (const name of rec.order) {
+    if (byName.has(name) && !seen.has(name)) { ordered.push(byName.get(name)); seen.add(name); }
+  }
+  for (const w of pending) if (!seen.has(w.word)) ordered.push(w);
+  queue = ordered;
+  if (rec.done && queue.length) {
+    idx = queue.length;                       // 保持「已过完」状态
+  } else if (rec.posWord) {
+    const j = queue.findIndex(w => w.word === rec.posWord);
+    idx = j >= 0 ? j : 0;                     // 按词定位，队列变短也不会错位
+  } else {
+    idx = Math.min(Math.max(rec.pos || 0, 0), Math.max(queue.length - 1, 0));
+  }
+  revealed = false;
+  renderStudy();
+}
+function renderStudy() {
+  const total = queue.length;
+  const current = total ? Math.min(idx + 1, total) : 0;
+  $('position').innerHTML = `第 <b>${current}</b> / ${total} 个`;
+  $('progressBar').max = String(Math.max(total, 1));
+  if (!dragging) $('progressBar').value = String(Math.min(idx, total));
+  if (!total || idx >= total) {
+    $('card').classList.add('hidden');
+    document.querySelector('.nav-row').classList.add('hidden');
+    $('done').classList.remove('hidden');
+    if (activeDeck === 'mastered') {
+      $('doneTitle').textContent = '这里是已认识的词';
+      $('doneHint').textContent = '共 ' + deckWords().length + ' 个。去「词表」页点「恢复」可以放回原词库。';
+      $('doneAction').textContent = '去看词表';
+      $('doneAction').dataset.mode = 'list';
+      return;
+    }
+    const left = chapterSlice(curChapter).filter(w => !isMastered(w)).length;
+    $('doneTitle').textContent = left ? '本轮过完了' : '这一章全部掌握';
+    $('doneHint').textContent = left
+      ? '还剩 ' + left + ' 个没掌握，可以再过一轮。'
+      : '可以打乱顺序重背一遍。';
+    $('doneAction').textContent = left ? '再过一轮' : '打乱重背';
+    $('doneAction').dataset.mode = left ? 'again' : 'reshuffle';
+    return;
+  }
+  $('card').classList.remove('hidden');
+  document.querySelector('.nav-row').classList.remove('hidden');
+  $('done').classList.add('hidden');
+  const word = queue[idx];
+  $('word').textContent = word.word;
+  const family = word.family || '';
+  $('familyNote').textContent = family ? '词族：' + family : '';
+  $('familyNote').classList.toggle('hidden', !family);
+  const forms = Array.isArray(word.forms) ? word.forms.filter(Boolean) : [];
+  $('forms').textContent = forms.join(' / ');
+  $('formsBox').classList.toggle('hidden', forms.length === 0);
+  setPriority($('priorityBadge'), word.priority);
+  const wt = weightOf(word);
+  const wb = $('weightBadge');
+  wb.textContent = wt > 0 ? String(wt) : '';
+  wb.classList.toggle('hidden', wt === 0);
+  const slice = chapterSlice(curChapter);
+  const done = slice.filter(w => isMastered(w)).length;
+  $('wordId').textContent = '本章 ' + done + '/' + slice.length;
+  const show = revealed;
+  const meaning = $('meaning');
+  if (show) {
+    meaning.className = 'meaning';
+    meaning.textContent = word.meaning || '（暂无释义）';
+  } else {
+    meaning.className = 'meaning meaning-placeholder';
+    meaning.textContent = '点一下看释义';
+  }
+  $('chapterSelect').value = String(currentChapter());
+  $('prevWord').disabled = idx <= 0;
+  $('nextWord').disabled = idx >= total - 1;
+}
+function navigate(delta) {
+  if (!queue.length || idx >= queue.length) return;
+  const next = idx + delta;
+  if (next < 0 || next >= queue.length) return;
+  idx = next;
+  revealed = false;
+  savePos();
+  renderStudy();
+}
+function toggleMeaning() {
+  revealed = !revealed;
+  renderStudy();
+}
+// 左滑 = 认识：标记掌握，之后不再出现
+// 右滑 = 不认识：权重 +1，下次重排越靠前
+function mark(word, known) {
+  if (!word) return;
+  const st = state[word.word] || { w: 0, mastered: false, seen: 0 };
+  st.seen = (st.seen || 0) + 1;
+  if (known) { st.mastered = true; st.due = todayTs() + 7 * DAY; }
+  else { st.w = (st.w || 0) + 1; st.mastered = false; st.due = 0; }
+  state[word.word] = st;
+  save(LS_STATE, state);
+  if (known) {
+    showUndo(word);
+    // 移出当前队列：进度条总数同步减少，下一个词自动顶上原位
+    queue = queue.filter(w => w.word !== word.word);
+    if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
+    revealed = false;
+    savePos();
+    renderStudy();
+  } else {
+    if (activeDeck === 'mastered') {                   // 已掌握库里取消掌握 -> 立即移出列表
+      queue = queue.filter(w => w.word !== word.word);
+      if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
+      revealed = false;
+      savePos();
+      renderStudy();
+    }
+    if (navigator.vibrate) navigator.vibrate(22);
+    // 实时反馈：当前词还在屏幕上，直接把权重亮出来并闪一下
+    if (queue[idx] && queue[idx].word === word.word) {
+      const wb = $('weightBadge');
+      wb.textContent = String(st.w);
+      wb.classList.remove('hidden');
+      wb.classList.remove('pulse');
+      void wb.offsetWidth;
+      wb.classList.add('pulse');
+    }
+  }
+  updateStats();
+}
+function updateStats() {
+  let learned = 0, mastered = 0;
+  for (const word of deckWords()) {
+    const st = state[word.word];
+    if (!st) continue;
+    learned += 1;
+    if (st.mastered) mastered += 1;
+  }
+  $('sTotal').textContent = deckWords().length;
+  $('sLearned').textContent = learned;
+  $('sMastered').textContent = mastered;
+  $('sDue').textContent = deckWords().length - mastered;
+}
+function renderList() {
+  const list = $('wordList');
+  const q = searchText.trim().toLowerCase();
+  const fragment = document.createDocumentFragment();
+  const inMasteredDeck = activeDeck === 'mastered';
+  for (const word of deckWords()) {
+    const mastered = isMastered(word);
+    if (!inMasteredDeck) {
+      if (priorityFilter === 'mastered') {
+        if (!mastered) continue;
+      } else {
+        if (mastered) continue;
+        const p = (word.priority || 'C').charAt(0);
+        if (priorityFilter !== 'all' && p !== priorityFilter) continue;
+      }
+    }
+    if (q && !word.word.includes(q) && !word.meaning.toLowerCase().includes(q) && !(word.forms || []).some(form => form.includes(q)) && !(word.family || '').includes(q)) continue;
+    const li = document.createElement('li');
+    const no = document.createElement('span'); no.className = 'list-no'; no.textContent = '#' + word.id;
+    const main = document.createElement('div');
+    const w = document.createElement('div'); w.className = 'list-word'; w.textContent = word.word;
+    const m = document.createElement('div'); m.className = 'list-meaning'; m.textContent = word.meaning;
+    main.append(w, m);
+    if (word.family) {
+      const fm = document.createElement('div'); fm.className = 'list-meaning'; fm.textContent = '词族：' + word.family;
+      main.append(fm);
+    }
+    if (word.forms && word.forms.length) {
+      const f = document.createElement('div'); f.className = 'list-meaning'; f.textContent = word.forms.join(' / ');
+      main.append(f);
+    }
+    let badge;
+    if (mastered) {
+      const owner = deckOfWord(word.word);
+      badge = document.createElement('button');
+      badge.className = 'restore-btn';
+      badge.textContent = '恢复';
+      badge.title = owner ? (DECKS[owner].label + ' 第' + (Math.floor(ownerIndex(owner, word.word) / CHAPTER_SIZE) + 1) + '章') : '';
+      badge.onclick = () => {
+        const st = state[word.word];
+        if (st) { st.mastered = false; state[word.word] = st; save(LS_STATE, state); }
+        if (owner) {
+          const ch = Math.floor(ownerIndex(owner, word.word) / CHAPTER_SIZE);
+          const ck = owner + ':' + ch;
+          if (chapterData[ck]) chapterData[ck].done = false;   // 清掉「已过完」，恢复的词才会出现
+          switchDeck(owner);
+          loadChapter(ch);
+        } else {
+          renderList(); updateStats(); loadChapter(curChapter);
+        }
+      };
+    } else {
+      badge = document.createElement('span');
+      badge.className = 'list-priority priority ' + priorityClass(word.priority);
+      badge.textContent = word.priority;
+    }
+    li.append(no, main, badge);
+    fragment.append(li);
+  }
+  list.replaceChildren(fragment);
+}
+function deckOfWord(name) {
+  for (const key of ['core', 'derivative', 'foundation', 'insurance']) {
+    if (DECKS[key].words.some(w => w.word === name)) return key;
+  }
+  return null;
+}
+function ownerIndex(deckKey, name) {
+  return DECKS[deckKey].words.findIndex(w => w.word === name);
+}
+function updateDeckMeta() {
+  const words = deckWords();
+  $('deckSelect').value = activeDeck;
+  $('deckMeta').textContent = words.length + ' 词';
+}
+function switchDeck(value) {
+  if (!Object.prototype.hasOwnProperty.call(DECKS, value)) return;
+  savePos();
+  activeDeck = value;
+  conf.deck = value;
+  save(LS_CONF, conf);
+  loadChapter(0);
+  renderChapters();
+  updateStats();
+  updateDeckMeta();
+  if (!$('viewList').classList.contains('hidden')) renderList();
+}
+function switchView(name) {
+  for (const v of ['Study','List','Stat']) $('view' + v).classList.toggle('hidden', v !== name);
+  document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.id === 'tab' + name));
+  if (name === 'List') renderList();
+  if (name === 'Stat') updateStats();
+}
+const CHAPTER_SIZE = 200;
+function chapterCount() { return Math.ceil(deckWords().length / CHAPTER_SIZE); }
+function currentChapter() { return curChapter; }
+function renderChapters() {
+  const sel = $('chapterSelect');
+  sel.replaceChildren();
+  for (let i = 0; i < chapterCount(); i++) {
+    const start = i * CHAPTER_SIZE + 1;
+    const end = Math.min((i + 1) * CHAPTER_SIZE, deckWords().length);
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = '第' + (i + 1) + '章';
+    opt.title = start + '-' + end;
+    sel.append(opt);
+  }
+  sel.value = String(currentChapter());
+}
+function gotoChapter(i) {
+  savePos();
+  conf.chapter = i;
+  save(LS_CONF, conf);
+  loadChapter(i);
+}
+let undoTimer = null, undoWord = null;
+function showUndo(word) {
+  undoWord = word;
+  $('undoText').textContent = '已认识：' + word.word;
+  $('undoBar').classList.remove('hidden');
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => { $('undoBar').classList.add('hidden'); undoWord = null; }, 5000);
+}
+function doUndo() {
+  const word = undoWord;
+  if (!word) return;
+  const st = state[word.word];
+  if (st) { st.mastered = false; st.due = 0; state[word.word] = st; save(LS_STATE, state); }
+  queue.splice(Math.min(idx, queue.length), 0, word);
+  $('undoBar').classList.add('hidden');
+  clearTimeout(undoTimer);
+  undoWord = null;
+  revealed = false;
+  savePos();
+  renderStudy();
+  updateStats();
+}
+$('undoBtn').onclick = doUndo;
+let touchStart = null;
+const card = $('card');
+card.addEventListener('touchstart', event => {
+  if (event.touches.length !== 1) return;
+  const t = event.touches[0];
+  touchStart = { x: t.clientX, y: t.clientY, time: Date.now(), moved: false };
+}, { passive: true });
+card.addEventListener('touchmove', event => {
+  if (!touchStart || event.touches.length !== 1) return;
+  const t = event.touches[0];
+  const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+  if (Math.abs(dx) > 12 || Math.abs(dy) > 12) touchStart.moved = true;
+  const absX = Math.abs(dx), absY = Math.abs(dy);
+  if (absX > absY) {
+    // 横向：跟手位移 + 颜色提示，同时阻止浏览器横向手势
+    event.preventDefault();
+    const shift = Math.max(-130, Math.min(130, dx));
+    card.style.transition = 'none';
+    card.style.transform = 'translateX(' + shift + 'px)';
+    card.style.opacity = String(1 - Math.min(absX / 420, 0.28));
+    card.style.borderColor = absX > 30 ? (dx < 0 ? 'var(--ok)' : 'var(--bad)') : '';
+  } else if (absY > 10) {
+    event.preventDefault();
+  }
+}, { passive: false });
+card.addEventListener('touchend', event => {
+  if (!touchStart || event.changedTouches.length !== 1) { touchStart = null; return; }
+  const t = event.changedTouches[0];
+  const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+  const elapsed = Date.now() - touchStart.time;
+  const moved = touchStart.moved;
+  const startX = touchStart.x;
+  touchStart = null;
+  if (!moved && elapsed < 600) {
+    card.style.transform = ''; card.style.opacity = ''; card.style.borderColor = ''; card.style.transition = '';
+    toggleMeaning();
+    return;
+  }
+  const absX = Math.abs(dx), absY = Math.abs(dy);
+  const word = queue[idx];
+  if (word && absX >= 34 && absX >= absY && startX > 26) {
+    if (dx < 0) {
+      // 左滑：跟手 → 130ms 滑出 → 切下一词
+      card.style.transition = 'transform .13s ease-out, opacity .13s ease-out';
+      card.style.transform = 'translateX(-110%)';
+      card.style.opacity = '0';
+      setTimeout(() => {
+        card.style.transition = 'none';
+        card.style.transform = '';
+        card.style.opacity = '';
+        card.style.borderColor = '';
+        mark(word, true);
+        requestAnimationFrame(() => { card.style.transition = ''; });
+      }, 130);
+    } else {
+      // 右滑：回弹 + 权重 +1，停在当前词
+      card.style.transition = 'transform .16s ease, opacity .16s ease, border-color .16s ease';
+      card.style.transform = '';
+      card.style.opacity = '';
+      card.style.borderColor = 'var(--bad)';
+      setTimeout(() => { card.style.borderColor = ''; card.style.transition = ''; }, 260);
+      mark(word, false);
+    }
+    return;
+  }
+  // 纵向翻词：先弹回再翻
+  card.style.transition = 'transform .16s ease, opacity .16s ease, border-color .16s ease';
+  card.style.transform = ''; card.style.opacity = ''; card.style.borderColor = '';
+  setTimeout(() => { card.style.transition = ''; }, 200);
+  if (absY >= 34 && absY > absX) navigate(dy < 0 ? 1 : -1);
+}, { passive: true });
+card.addEventListener('touchcancel', () => {
+  touchStart = null;
+  card.style.transition = 'transform .16s ease, opacity .16s ease, border-color .16s ease';
+  card.style.transform = '';
+  card.style.opacity = '';
+  card.style.borderColor = '';
+  setTimeout(() => { card.style.transition = ''; }, 220);
+}, { passive: true });
+$('progressBar').oninput = event => {
+  if (!queue.length) return;
+  idx = Math.min(Math.max(Number(event.target.value), 0), queue.length - 1);
+  revealed = false;
+  dragging = true;
+  renderStudy();
+};
+$('progressBar').onchange = event => {
+  dragging = false;
+  savePos();
+};
+$('shuffleChapter').onclick = () => {
+  const slice = chapterSlice(curChapter);
+  if (slice.every(w => isMastered(w))) {
+    if (!confirm('本章已全部掌握。打乱会清空掌握记录、重新背一遍，继续？')) return;
+    for (const w of slice) if (state[w.word]) state[w.word].mastered = false;
+    save(LS_STATE, state);
+  }
+  loadChapter(curChapter, true);
+  updateStats();
+};
+$('prevWord').onclick = () => navigate(-1);
+$('nextWord').onclick = () => navigate(1);
+$('doneAction').onclick = () => {
+  const mode = $('doneAction').dataset.mode;
+  if (mode === 'list') { switchView('List'); return; }
+  if (mode === 'reshuffle') {
+    // 整章已掌握：清掉掌握标记，按权重重新洗牌重背
+    for (const w of chapterSlice(curChapter)) {
+      if (state[w.word]) state[w.word].mastered = false;
+    }
+    save(LS_STATE, state);
+  }
+  loadChapter(curChapter, true);
+  updateStats();
+};
+$('tabStudy').onclick = () => switchView('Study');
+$('tabList').onclick = () => switchView('List');
+$('tabStat').onclick = () => switchView('Stat');
+let searchTimer = null;
+$('searchInput').oninput = event => {
+  searchText = event.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderList, 120);
+};
+document.querySelectorAll('.filter').forEach(button => {
+  button.onclick = () => {
+    priorityFilter = button.dataset.priority;
+    document.querySelectorAll('.filter').forEach(b => b.classList.toggle('active', b === button));
+    renderList();
+  };
+});
+$('exportProgress').onclick = () => {
+  const dump = {
+    v: 1,
+    exported: new Date().toISOString(),
+    state,
+    chapterData,
+    conf: { deck: conf.deck, chapter: conf.chapter || 0 }
+  };
+  const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kaoyan-progress-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+};
+$('importProgress').onclick = () => $('importFile').click();
+$('importFile').onchange = event => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (d.state && typeof d.state === 'object') { state = d.state; save(LS_STATE, state); }
+      if (d.chapterData && typeof d.chapterData === 'object') { chapterData = d.chapterData; save('ky_chapter_v1', chapterData); }
+      if (d.conf) {
+        if (d.conf.deck && DECKS[d.conf.deck]) { activeDeck = d.conf.deck; conf.deck = d.conf.deck; }
+        conf.chapter = d.conf.chapter || 0;
+        save(LS_CONF, conf);
+      }
+      updateDeckMeta();
+      renderChapters();
+      loadChapter(conf.chapter || 0);
+      updateStats();
+      alert('进度已导入');
+    } catch (e) {
+      alert('文件格式不对，导入失败');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+};
+$('resetAll').onclick = () => {
+  if (!confirm('确定清空全部学习记录？此操作不可恢复。')) return;
+  state = {};
+  save(LS_STATE, state);
+  chapterData = {};
+  save('ky_chapter_v1', chapterData);
+  loadChapter(curChapter, true);
+  updateStats();
+};
+window.addEventListener('keydown', event => {
+  if (event.repeat) return;
+  const active = document.activeElement;
+  if (active && (['INPUT','TEXTAREA','SELECT'].includes(active.tagName) || active.isContentEditable)) return;
+  if ($('viewStudy').classList.contains('hidden')) return;
+  if (event.code === 'Space') { event.preventDefault(); toggleMeaning(); return; }
+  if (event.key === 'ArrowUp') { event.preventDefault(); navigate(-1); return; }
+  if (event.key === 'ArrowDown') { event.preventDefault(); navigate(1); return; }
+  if (event.key === 'ArrowLeft') { event.preventDefault(); const w = queue[idx]; if (w) mark(w, true); return; }
+  if (event.key === 'ArrowRight') { event.preventDefault(); const w = queue[idx]; if (w) mark(w, false); return; }
+});
+updateDeckMeta();
+loadChapter(conf.chapter || 0);
+renderChapters();
+updateStats();
+$('chapterSelect').onchange = event => gotoChapter(Number(event.target.value));
+$('deckSelect').onchange = event => switchDeck(event.target.value);
+</script>
+</body>
+</html>

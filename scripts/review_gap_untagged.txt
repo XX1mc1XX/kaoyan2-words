@@ -1,0 +1,26 @@
+les	56	12		词形还原错误（less），且 less 属基础词
+don't	38	13		缩略形式（含撇号），不单独收录
+you're	26	9		缩略形式（含撇号），不单独收录
+tech	24	6		口语缩略（technology），非考点
+doesn't	23	12		缩略形式（含撇号），不单独收录
+quickly	18	10		无大纲标签，非考研核心词
+can't	18	9		缩略形式（含撇号），不单独收录
+you'll	17	7		缩略形式（含撇号），不单独收录
+they're	16	7		缩略形式（含撇号），不单独收录
+app	16	3		缩写（application），非考点
+won't	15	10		缩略形式（含撇号），不单独收录
+cannot	13	8		纯功能词
+aren't	11	7		缩略形式（含撇号），不单独收录
+didn't	10	5		缩略形式（含撇号），不单独收录
+isn't	10	5		缩略形式（含撇号），不单独收录
+we're	8	8		缩略形式（含撇号），不单独收录
+center	8	7	ielts	美式拼写，词表已有 centre/central
+fast-food	8	2		极基础复合词
+tum	7	6		疑似 OCR/拼写噪声，非规范词汇
+pas	6	5		词形还原错误（pass），词表已收 pass
+euro	6	1		货币专名
+fbr	6	1		缩写，非考试词汇
+shopper	5	4		无大纲标签，非考研核心词
+wouldn't	5	4		缩略形式（含撇号），不单独收录
+specie	5	2		词形还原错误，实际为 species，已按 species 补入
+ifs	5	1		缩写，非考试词汇

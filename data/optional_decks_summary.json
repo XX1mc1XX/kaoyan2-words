@@ -1,0 +1,13 @@
+{
+  "basic_total": 349,
+  "insurance_total": 1456,
+  "insurance_priorities": {
+    "B 次重点": 243,
+    "A 重点": 2,
+    "C 补漏": 1211
+  },
+  "insurance_english_2": 502,
+  "insurance_english_1_only": 344,
+  "insurance_no_english_evidence": 610,
+  "note": "基础自测用于检验被默认视为已掌握的熟词；保险库保留闪过高/中频中未进入主线的词，仅作补漏。"
+}

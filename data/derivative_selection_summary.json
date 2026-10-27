@@ -1,0 +1,18 @@
+{
+  "total": 128,
+  "book_high_mid": 2670,
+  "book_derivative_notes": 436,
+  "priorities": {
+    "S 必背": 25,
+    "A 重点": 39,
+    "B 次重点": 64
+  },
+  "with_forms": 12,
+  "with_english_2": 49,
+  "english_1_only": 79,
+  "weights": {
+    "english_2": 1.0,
+    "english_1": 0.35
+  },
+  "note": "阶段二可选词库；只收词族中高频、词性或语义明显变化的核心派生词。"
+}

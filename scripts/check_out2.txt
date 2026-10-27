@@ -1,0 +1,106 @@
+forms命中主词: 同库 575 跨库 363
+跨库示例 [('words', 'create', 'creature', 'insurance'), ('words', 'create', 'creation', 'derivatives'), ('words', 'follow', 'following', 'insurance'), ('words', 'concern', 'concerning', 'insurance'), ('words', 'lead', 'leader', 'basic'), ('words', 'limit', 'limited', 'insurance'), ('words', 'economy', 'economist', 'derivatives'), ('words', 'end', 'endless', 'insurance'), ('words', 'end', 'ending', 'insurance'), ('words', 'interest', 'interesting', 'insurance'), ('words', 'influence', 'influential', 'derivatives'), ('words', 'decision', 'decide', 'basic'), ('words', 'information', 'inform', 'insurance'), ('words', 'growth', 'grow', 'basic'), ('words', 'health', 'healthy', 'basic'), ('words', 'encourage', 'encouragement', 'derivatives'), ('words', 'drive', 'driver', 'insurance'), ('words', 'measure', 'measurement', 'derivatives'), ('words', 'assume', 'assumption', 'derivatives'), ('words', 'law', 'lawyer', 'basic')]
+同库示例 [('words', 'social', 'socially', 'words'), ('words', 'create', 'creative', 'words'), ('words', 'benefit', 'beneficial', 'words'), ('words', 'present', 'presence', 'words'), ('words', 'government', 'govern', 'words'), ('words', 'require', 'requirement', 'words'), ('words', 'consider', 'consideration', 'words'), ('words', 'clear', 'clarity', 'words'), ('words', 'tend', 'tendency', 'words'), ('words', 'researcher', 'research', 'words'), ('words', 'limit', 'limitation', 'words'), ('words', 'power', 'powerful', 'words'), ('words', 'improve', 'improvement', 'words'), ('words', 'state', 'statement', 'words'), ('words', 'define', 'definition', 'words')]
+forms数量 words: {0: 137, 1: 284, 2: 239, 3: 397, 4: 211, 5: 74} 空forms 137
+forms数量 derivatives: {0: 116, 1: 12} 空forms 116
+forms数量 basic: {0: 234, 1: 97, 2: 15, 3: 3} 空forms 234
+forms数量 insurance: {0: 1153, 1: 275, 2: 24, 3: 4} 空forms 1153
+低相似forms 38 [('words', 'clear', 'clarity'), ('words', 'lead', 'led'), ('words', 'drive', 'drove'), ('words', 'industry', 'diligent'), ('words', 'rise', 'rose'), ('words', 'ability', 'able'), ('words', 'trial', 'try'), ('words', 'bear', 'bore'), ('words', 'bear', 'born'), ('words', 'seek', 'sought'), ('words', 'arise', 'arose'), ('words', 'stick', 'stuck'), ('words', 'clarity', 'clear'), ('words', 'depict', 'picture'), ('words', 'sue', 'suit'), ('words', 'sue', 'suing'), ('words', 'cling', 'clung'), ('words', 'bid', 'bade'), ('words', 'ride', 'rode'), ('basic', 'think', 'thought'), ('basic', 'find', 'found'), ('basic', 'example', 'exemplary'), ('basic', 'move', 'motion'), ('basic', 'day', 'daily'), ('basic', 'try', 'trial'), ('basic', 'able', 'ability'), ('basic', 'death', 'die'), ('basic', 'flight', 'flee'), ('basic', 'die', 'death'), ('insurance', 'evaluate', 'value')]
+
+不在ky2的条目 1038 其中freq>0 0
+freq>0但缺lemma示例 []
+可经top_form映射到lemma的 31 [('bit', ['bite']), ('complicated', ['complicate']), ('rent', ['rend']), ('biased', ['bias']), ('data', ['datum']), ('limited', ['limit']), ('mess', ['mes']), ('related', ['relate']), ('writing', ['write']), ('blessing', ['bless']), ('born', ['bear']), ('drawing', ['draw']), ('underlying', ['underlie']), ('unexpected', ['unexpect']), ('alleged', ['allege'])]
+freq分布 {0: 1038, 1: 547, 2: 350, 3: 240, 4: 171, 5: 122, 6: 110, 7: 80, 8: 67, 9: 56, 10: 46, 11: 39}
+words freq=0: 0 / 1342
+derivatives freq=0: 79 / 128
+basic freq=0: 5 / 349
+insurance freq=0: 954 / 1456
+
+=== 4 释义30抽样 ===
+insurance	endless	无止境的
+words	minute	分钟；微小的
+insurance	amid	…中间；…当中
+insurance	engaging	迷人的
+words	overturn	推翻
+words	tempt	引诱
+insurance	childhood	童年；幼年
+basic	dinner	正餐
+insurance	microscope	显微镜
+insurance	dizzy	头晕的；眼花的
+insurance	ridiculous	荒谬的；可笑的
+words	decent	体面的
+insurance	archaeology	考古学
+words	qualify	取得资格
+insurance	instruct	t. 指示
+insurance	hook	钩；钩状物
+insurance	related	相关的；有联系的
+derivatives	adherence	坚持；遵守
+basic	kill	杀死
+insurance	fibre	纤维
+insurance	unfold	展开；打开
+insurance	ahead	前面；前
+words	intellectual	智力的；知识分子
+words	domain	领域
+insurance	deer	鹿
+insurance	desk	书桌；办公桌
+derivatives	technological	技术的
+insurance	farewell	告别
+words	recession	经济衰退
+insurance	chalk	粉笔；粉笔,白垩
+含多义分隔 1333 [('words', 'social', '社会的；社交的'), ('words', 'follow', '跟随；遵循'), ('words', 'benefit', '益处；受益'), ('words', 'concern', '担忧；涉及'), ('words', 'issue', '问题；发行'), ('words', 'present', '目前的；呈现'), ('words', 'require', '需要；要求'), ('words', 'consider', '考虑；认为')]
+含括号 0 []
+含词性标注 0 []
+
+=== 6 basic 20抽样 ===
+advise	建议	freq=4
+happiness	幸福	freq=11
+title	标题	freq=12
+bunch	一束	freq=1
+ask	问	freq=24
+student	学生	freq=94
+play	玩耍	freq=16
+reason	原因	freq=29
+part	成员	freq=35
+question	怀疑	freq=14
+lesson	课	freq=9
+correct	正确的	freq=2
+destroy	破坏	freq=2
+start	开始	freq=32
+favourite	最喜爱的	freq=1
+burn	燃烧	freq=3
+walk	步行	freq=10
+dear	昂贵的	freq=1
+athlete	运动员	freq=1
+understand	理解	freq=22
+basic freq min/max/median 0 191 9
+basic freq<=5 [('date', 5, '日期'), ('describe', 5, '描述'), ('divide', 5, '分开'), ('fight', 5, '斗争'), ('immediately', 5, '立即'), ('love', 5, '爱'), ('certainly', 5, '当然'), ('difficulty', 5, '困难'), ('forget', 5, '忘记'), ('advise', 4, '建议'), ('belong', 4, '属于'), ('cook', 4, '烹调'), ('dinner', 4, '正餐'), ('directly', 4, '直接地'), ('elsewhere', 4, '在别处'), ('enter', 4, '进入'), ('friendly', 4, '友好的'), ('beauty', 5, '美'), ('couple', 5, '一对'), ('death', 5, '死亡')]
+basic freq<=5 count 139
+basic 长词(>10) [('comfortable', '舒适的'), ('immediately', '立即'), ('electricity', '电'), ('businessman', '商人'), ('translation', '翻译')]
+basic 含派生后缀 [('give', '给'), ('live', '居住'), ('action', '行动'), ('question', '怀疑'), ('section', '部分'), ('happiness', '幸福'), ('advise', '建议'), ('electricity', '电'), ('option', '选择'), ('basically', '基本上'), ('collection', '收集'), ('curious', '好奇的'), ('relaxation', '放松'), ('vacation', '假期'), ('direction', '方向'), ('translation', '翻译')]
+
+=== 8 覆盖率 ===
+ecdict ky大纲词 4801 tag分布top [('gre', 7504), ('toefl', 6974), ('cet6', 5407), ('ielts', 5040), ('ky', 4801), ('cet4', 3849), ('gk', 3677), ('zk', 1603)]
+四库并集 3275 ky2词 5476 ky2∩大纲 2358 ky2中非大纲 3118
+覆盖 ky2∩大纲: 1677 71.1%
+缺失词数 672 top20:
+   ('accord', 69, 15, 'according')
+   ('activity', 41, 7, 'activities')
+   ('might', 39, 13, 'might')
+   ('art', 38, 5, 'art')
+   ('rather', 36, 13, 'rather')
+   ('percent', 31, 12, 'percent')
+   ('rat', 29, 1, 'rats')
+   ('against', 22, 10, 'against')
+   ('skill', 22, 9, 'skills')
+   ('toward', 21, 12, 'toward')
+   ('team', 21, 6, 'team')
+   ('role', 20, 11, 'role')
+   ('task', 20, 7, 'tasks')
+   ('wood', 20, 2, 'wood')
+   ('adult', 19, 8, 'adults')
+   ('plastic', 19, 3, 'plastic')
+   ('area', 17, 10, 'areas')
+   ('datum', 17, 7, 'data')
+   ('guilt', 17, 2, 'guilt')
+   ('although', 16, 7, 'although')
+全部缺失(非proper)top20 [('the', 2368, False), ('be', 1739, False), ('to', 1586, False), ('of', 1241, False), ('and', 958, False), ('it', 827, False), ('in', 811, False), ('that', 766, False), ('have', 495, False), ('for', 469, False), ('they', 410, False), ('you', 389, False), ('on', 331, False), ('as', 303, False), ('with', 282, False), ('can', 280, False), ('i', 274, False), ('more', 250, False), ('but', 239, False), ('not', 238, False)]

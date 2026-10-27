@@ -1,0 +1,60 @@
+=== 1 跨库重复 ===
+总唯一词 3275 重复词 0
+组合分布 {}
+库内重复 words: 0 []
+库内重复 derivatives: 0 []
+库内重复 basic: 0 []
+库内重复 insurance: 0 []
+重复示例: []
+
+=== 2 forms 里的词本身是主词 ===
+冲突总数 938 涉及词条 839
+示例: [('words', 'social', 'socially', ['words']), ('words', 'create', 'creative', ['words']), ('words', 'create', 'creature', ['insurance']), ('words', 'create', 'creation', ['derivatives']), ('words', 'follow', 'following', ['insurance']), ('words', 'benefit', 'beneficial', ['words']), ('words', 'concern', 'concerning', ['insurance']), ('words', 'present', 'presence', ['words']), ('words', 'government', 'govern', ['words']), ('words', 'require', 'requirement', ['words']), ('words', 'consider', 'consideration', ['words']), ('words', 'clear', 'clarity', ['words']), ('words', 'lead', 'leader', ['basic']), ('words', 'tend', 'tendency', ['words']), ('words', 'researcher', 'research', ['words']), ('words', 'limit', 'limitation', ['words']), ('words', 'limit', 'limited', ['insurance']), ('words', 'power', 'powerful', ['words']), ('words', 'improve', 'improvement', ['words']), ('words', 'state', 'statement', ['words'])]
+疑似非该词变形的 forms 190 [('words', 'government', 'govern', '政府'), ('words', 'decision', 'decide', '决定'), ('words', 'information', 'inform', '信息'), ('words', 'critical', 'crisis', '关键的；批评的'), ('words', 'scientist', 'science', '科学家'), ('words', 'attention', 'attend', '注意'), ('words', 'available', 'avail', '可获得的'), ('words', 'industry', 'diligent', '行业'), ('words', 'responsibility', 'responsible', '责任'), ('words', 'rise', 'rose', '上升'), ('words', 'development', 'develop', '发展'), ('words', 'competition', 'compete', '竞争'), ('words', 'significant', 'signify', '重要的；显著的'), ('words', 'comprehension', 'comprehend', '理解'), ('words', 'ability', 'able', '能力'), ('words', 'requirement', 'require', '要求'), ('words', 'application', 'apply', '申请；应用'), ('words', 'sensitive', 'sense', '敏感的'), ('words', 'commission', 'commit', '委员会；佣金'), ('words', 'solution', 'solve', '解决办法')]
+
+=== 3 freq vs ky2 count ===
+endure             freq=1 ky2count=1
+undergraduate      freq=4 ky2count=4
+efficiency         freq=14 ky2count=14
+candle             freq=0 ky2count=MISSING
+transaction        freq=1 ky2count=1
+evolution          freq=1 ky2count=1
+reviewer           freq=1 ky2count=1
+relatively         freq=3 ky2count=3
+jet                freq=1 ky2count=1
+exception          freq=4 ky2count=4
+coin               freq=2 ky2count=2
+bolt               freq=0 ky2count=MISSING
+donor              freq=0 ky2count=MISSING
+relationship       freq=7 ky2count=7
+repeal             freq=0 ky2count=MISSING
+grocery            freq=3 ky2count=3
+effort             freq=20 ky2count=20
+account            freq=14 ky2count=14
+cultivate          freq=5 ky2count=5
+compensation       freq=2 ky2count=2
+全量: 有对应lemma 2237, 其中freq不一致 0 (0.0%), 真题无此lemma 1038
+不一致示例 []
+
+=== 5 优先级 ===
+words {'S': 323, 'A': 483, 'B': 536}
+  rank min=1 max=1342 n=1342 重复=0 缺失=0
+  rank 是否随数组递增: True
+derivatives {'S': 25, 'A': 39, 'B': 64}
+  rank min=1 max=128 n=128 重复=0 缺失=0
+  rank 是否随数组递增: True
+basic {'C': 349}
+  rank min=1 max=349 n=349 重复=0 缺失=0
+  rank 是否随数组递增: True
+insurance {'B': 243, 'A': 2, 'C': 1211}
+  rank min=1 max=1456 n=1456 重复=0 缺失=0
+  rank 是否随数组递增: True
+S级总数 348
+S级抽样: [('note', '注意', 12, 37.052), ('measure', '措施；衡量', 16, 41.667), ('profit', '利润', 12, 34.852), ('technological', '技术的', 3, 15.072), ('policy', '政策', 27, 47.566), ('financial', '金融的', 19, 46.197), ('order', '秩序；命令', 11, 32.188), ('choice', '选择', 15, 44.518), ('advice', '建议', 10, 35.718), ('solution', '解决办法', 12, 31.652), ('boost', '提高', 17, 47.012), ('class', '阶级', 22, 32.608), ('achieve', '实现', 13, 40.011), ('face', '面对', 28, 48.494), ('influence', '影响', 18, 45.056), ('subject', '主题；科目', 5, 34.133), ('key', '关键的；钥匙', 15, 34.418), ('demand', '要求；需求', 17, 46.412), ('continue', '继续', 12, 38.852), ('economic', '经济的', 31, 44.573)]
+
+=== 7 异常数据 ===
+words: 空释义0[] 单字母0[] 数字0[] 连字符0[] 大写0[] >200[] 非法字符0[] 乱码0[]
+derivatives: 空释义0[] 单字母0[] 数字0[] 连字符0[] 大写0[] >200[] 非法字符0[] 乱码0[]
+basic: 空释义0[] 单字母0[] 数字0[] 连字符0[] 大写0[] >200[] 非法字符0[] 乱码0[]
+insurance: 空释义0[] 单字母0[] 数字0[] 连字符3['e-mail', 'living-room', 'brother-in-law'] 大写0[] >200[] 非法字符0[] 乱码0[]
+释义>40字符 0 []

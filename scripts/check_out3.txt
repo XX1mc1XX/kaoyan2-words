@@ -1,0 +1,100 @@
+ecdict loaded 770611
+
+=== 4 释义结构异常 ===
+词性标注残留 122 [('insurance', 'explain', 't. 解释'), ('insurance', 'book', '书；t. 预订'), ('insurance', 'draw', 't.&i. 画'), ('insurance', 'earn', 't. 挣得'), ('insurance', 'eat', 't.&i. 吃'), ('insurance', 'carry', 't. 携带'), ('insurance', 'announce', 't. 宣布'), ('insurance', 'fill', 't. 填满'), ('insurance', 'hit', 't. 打'), ('insurance', 'drink', 't.&i. 喝'), ('insurance', 'curb', 't. 遏制，抑制'), ('insurance', 'invite', 't. 邀请'), ('insurance', 'count', 't.&i. 数'), ('insurance', 'undermine', 't. 逐渐削弱'), ('insurance', 'hurt', 't.&i. 弄疼')]
+释义含英文 168 [('insurance', 'even', 'd. 甚至'), ('insurance', 'around', 'd. 到处'), ('insurance', 'instead', 'd. 代替'), ('insurance', 'far', 'd. 远'), ('insurance', 'explain', 't. 解释'), ('insurance', 'book', '书；t. 预订'), ('insurance', 'behind', '/d. 在……后面'), ('insurance', 'fast', '/d. 快的'), ('insurance', 'draw', 't.&i. 画'), ('insurance', 'earn', 't. 挣得'), ('insurance', 'eventually', 'd. 最后'), ('insurance', 'eat', 't.&i. 吃'), ('insurance', 'carry', 't. 携带'), ('insurance', 'announce', 't. 宣布'), ('insurance', 'fill', 't. 填满')]
+重复义项 43 [('insurance', 'car', '汽车；汽车，轿车'), ('insurance', 'freedom', '自由；自由,自主'), ('insurance', 'factory', '工厂；工厂，制造厂'), ('insurance', 'cancer', '癌；癌,癌瘤,癌肿'), ('insurance', 'breakfast', '早餐；早饭,早餐'), ('insurance', 'cabbage', '卷心菜；洋白菜,卷心菜'), ('insurance', 'metal', '金属；金属,金属制品'), ('insurance', 'king', '国王；君主,国王'), ('insurance', 'forehead', '前额；额,前额'), ('insurance', 'regarding', '关于；关于，至于'), ('insurance', 'coal', '煤；煤,煤块'), ('insurance', 'rainbow', '彩虹；虹,彩虹'), ('insurance', 'cake', '蛋糕；蛋糕，糕饼'), ('insurance', 'bullet', '子弹；子弹,枪弹'), ('insurance', 'chalk', '粉笔；粉笔,白垩')]
+省略号/开头标点 17 [('words', 'unlike', '与……不同'), ('words', 'except', '除……之外'), ('words', 'contradict', '反驳；与…矛盾'), ('words', 'prone', '易于……的'), ('derivatives', 'resistant', '抵抗的；耐…的'), ('derivatives', 'characterize', '以…为特征；描述'), ('insurance', 'label', '标签；把…称为'), ('insurance', 'liable', '易于……的；有责任的'), ('insurance', 'beyond', '超出；除……之外'), ('insurance', 'behind', '/d. 在……后面'), ('insurance', 'besides', '除…之外'), ('insurance', 'alongside', '…旁边；…并肩'), ('insurance', 'beneath', '…下方；下方'), ('insurance', 'beside', '……旁边'), ('insurance', 'amid', '…中间；…当中')]
+结尾标点 0 []
+与ecdict重合低/过短 2204
+   (0.0, 'basic', 'bit', '一点', 'n. 少量, 马嚼子, 辅币\\nvt. 给马上嚼子, 控制\\nbite的过去式和')
+   (0.0, 'basic', 'certainly', '当然', 'adv. 确定地')
+   (0.0, 'basic', 'gym', '健身房', 'n. +体育馆, 体育训练, 体育课, 体操')
+   (0.0, 'basic', 'move', '改变位置', 'n. 移动, 迁居, 步骤\\nvt. 移动, 开动, 感动, 搬(家)\\nvi.')
+   (0.0, 'basic', 'part', '成员', 'n. 部分, 局部, 零件, 要素, 等分, 职责, 角色, 部位\\nvt. 分')
+   (0.0, 'basic', 'read', '识字', 'v. 读, 阅读, 理解\\na. 有学问的\\nn. 读取, 阅读\\n[计] 读取')
+   (0.0, 'derivatives', 'consequently', '因此', 'adv. 所以')
+   (0.0, 'derivatives', 'disruption', '颠覆；扰乱', 'n. 分裂, 崩溃, 瓦解')
+   (0.0, 'insurance', 'album', '专辑；相册', 'n. 粘贴簿, 唱片套\\n[医] 白色物')
+   (0.0, 'insurance', 'ali', '其他的', '[计] 异步线路接口')
+   (0.0, 'insurance', 'amb', '行走', '高级内存缓冲器（Advanced Memory Buffer）')
+   (0.0, 'insurance', 'auct', '增加', '导管')
+   (0.0, 'insurance', 'blouse', '女式衬衫', 'n. 宽松的上衣')
+   (0.0, 'insurance', 'bol', '抛', '[医] 溴二乙麦角酰胺')
+   (0.0, 'insurance', 'bor', '居民', 'abbr. 掉电复位, 欠压复位（Brown-out Reset）；资源清单（B')
+   (0.0, 'insurance', 'bord', '边', 'n. 巷道；矿房')
+   (0.0, 'insurance', 'cas', '发生', 'abbr. 中国科学院（Chinese Academy of Sciences）')
+   (0.0, 'insurance', 'cens', '评价', 'abbr. censor （书刊、邮电等的）审查员; 检查员; censorsh')
+   (0.0, 'insurance', 'cip', '拿；取', '[计] 汉字交换程序, 通信中断程序')
+   (0.0, 'insurance', 'cit', '引用；唤起', '加利福尼亚工学院')
+   (0.0, 'insurance', 'colon', '殖民', 'n. 冒号, 结肠\\n[医] 结肠')
+   (0.0, 'insurance', 'compass', '罗盘；圆规', 'n. 指南针, 范围, 音域\\nvt. 包围, 达到, 图谋, 理解')
+   (0.0, 'insurance', 'countryside', '农村', 'n. 乡下地方, 乡下居民')
+   (0.0, 'insurance', 'cret', '创造', ' [医][=Committee on Residency Education a')
+   (0.0, 'insurance', 'cult', '耕种', 'n. 膜拜, 礼拜式, 祭仪, 一群信徒\\n[医] 迷信, 巫术')
+   (0.0, 'insurance', 'cur', '注意；关心', 'n. 恶狗, 杂狗')
+   (0.0, 'insurance', 'curr', '流；跑', 'vi. 发咕咕声, 低语')
+   (0.0, 'insurance', 'defy', '违抗；抵制', 'vt. 藐视, 挑衅, 使落空\\nn. 挑战')
+   (0.0, 'insurance', 'dens', '密', '[医] 牙, 齿')
+   (0.0, 'insurance', 'ending', '结局；结尾', 'n. 终止, 终了, 收场\\n[医] 末梢')
+   (0.0, 'insurance', 'fault', '缺点；缺陷', 'n. 过错, 故障, 毛病\\nvt. 挑剔\\nvi. 产生断层, 弄错\\n[计]')
+   (0.0, 'insurance', 'gown', '长袍；礼服', 'n. 睡衣, 法衣, 大学全体师生\\nvt. 使穿睡衣')
+   (0.0, 'insurance', 'hail', 't. 称颂', 'n. 冰雹, 致敬, 欢呼, 招呼\\nvt. 向...欢呼, 致敬, 招呼, 使')
+   (0.0, 'insurance', 'hello', '你好；问候', 'interj. 喂, 嘿')
+   (0.0, 'insurance', 'hurt', 't.&i. 弄疼', 'n. 伤害, 创伤, 损害\\nv. 伤害, (使)伤心, 危害, 刺痛')
+
+=== 5 优先级 ===
+words {'S': 323, 'A': 483, 'B': 536} score range 12.555 61.262
+  S: n=323 score 31.01-61.26 freq中位13
+  A: n=483 score 22.41-30.96 freq中位4
+  B: n=536 score 12.55-22.38 freq中位2
+  minS 31.011 maxA 30.957
+derivatives {'S': 25, 'A': 39, 'B': 64} score range 3.032 21.06
+  S: n=25 score 11.78-21.06 freq中位2
+  A: n=39 score 8.54-11.65 freq中位0
+  B: n=64 score 3.03-8.53 freq中位0
+  minS 11.782 maxA 11.65
+insurance {'B': 243, 'A': 2, 'C': 1211}
+S中freq<=2: [('analysis', 0, 0, 17.05), ('economist', 2, 2, 16.714), ('diversity', 2, 2, 16.529), ('humanity', 0, 0, 14.553), ('creation', 1, 1, 13.891), ('applicant', 1, 1, 13.605), ('entirely', 2, 2, 13.41), ('investigation', 1, 1, 13.191), ('ultimately', 2, 2, 13.142), ('publisher', 0, 0, 12.395), ('influential', 0, 0, 12.095), ('assumption', 0, 0, 11.835), ('constitution', 0, 0, 11.782)]
+S中freq<=2 count 13
+S中freq=0 6
+S中coverage<=2 17
+A中freq>=20 6 [('survey', 20), ('director', 20), ('opinion', 24), ('pattern', 20), ('labor', 22), ('jury', 26)]
+
+=== 6 basic ===
+basic tag 组合 top [(('gk', 'zk'), 105), (('gk', 'ielts', 'zk'), 66), (('cet4', 'cet6', 'gk', 'ky', 'zk'), 20), (('cet4', 'gk', 'ky', 'zk'), 18), (('cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'), 15), (('cet4', 'gk', 'ielts', 'ky', 'zk'), 10), (('cet4', 'cet6', 'gk', 'ielts', 'ky'), 9), (('cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'), 9), (('gk', 'toefl', 'zk'), 7), (('cet4', 'cet6', 'gk', 'ky'), 7)]
+basic 中无 zk/gk/cet4 标签 3 [('rip', '撕裂', ['cet6', 'gre', 'ielts', 'ky', 'toefl'], 2), ('relaxation', '放松', ['gre', 'ielts', 'toefl'], 2), ('afterwards', '后来', [], 1)]
+basic 抽查20个: [('essay', '文章', 1), ('let', '让', 10), ('fight', '斗争', 5), ('mail', '邮件', 1), ('correct', '正确的', 2), ('way', '方法', 81), ('friendship', '友谊', 3), ('play', '玩耍', 16), ('magazine', '杂志', 1), ('mean', '意指', 52), ('child', '儿童', 90), ('text', '文本', 52), ('brain', '大脑', 15), ('seat', '座位', 3), ('able', '能够的', 16), ('happiness', '幸福', 11), ('energetic', '精力充沛的', 2), ('least', '最少的', 26), ('bag', '袋子', 2), ('need', '需要', 112)]
+basic 释义<=4汉字 [('say', '说'), ('time', '时间'), ('people', '人'), ('make', '制作'), ('work', '工作'), ('new', '新的'), ('need', '需要'), ('year', '年'), ('good', '好的'), ('use', '使用'), ('change', '变化'), ('life', '生命'), ('get', '获得'), ('think', '想'), ('way', '方法'), ('find', '找到'), ('become', '变成'), ('help', '帮助'), ('like', '喜欢'), ('take', '拿'), ('feel', '感觉'), ('paragraph', '段'), ('world', '世界'), ('example', '例子'), ('home', '家'), ('learn', '学习'), ('mean', '意指'), ('high', '高的'), ('come', '来'), ('long', '长的')]
+
+=== 8 覆盖率 ===
+并集 3275 ky2∩大纲 2358 覆盖 1677 71.1%
+并集词形归一后 lemma 数 6015
+词形归一后覆盖 1761 74.7%
+归一后缺失 597 非功能词 597
+   ('accord', 69, 15, 'according', ['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'])
+   ('university', 41, 14, 'university', ['cet4', 'cet6', 'gk', 'ky', 'zk'])
+   ('activity', 41, 7, 'activities', ['cet4', 'gk', 'ielts', 'ky', 'zk'])
+   ('might', 39, 13, 'might', ['cet4', 'gk', 'ielts', 'ky', 'zk'])
+   ('rather', 36, 13, 'rather', ['cet4', 'cet6', 'gk', 'ky', 'zk'])
+   ('percent', 31, 12, 'percent', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'])
+   ('rat', 29, 1, 'rats', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'])
+   ('against', 22, 10, 'against', ['cet4', 'gk', 'ky', 'zk'])
+   ('skill', 22, 9, 'skills', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'])
+   ('toward', 21, 12, 'toward', ['cet4', 'gk', 'ky', 'zk'])
+   ('team', 21, 6, 'team', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'])
+   ('role', 20, 11, 'role', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'])
+   ('task', 20, 7, 'tasks', ['cet4', 'cet6', 'gk', 'ky', 'zk'])
+   ('wood', 20, 2, 'wood', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'])
+   ('adult', 19, 8, 'adults', ['cet4', 'gk', 'ielts', 'ky'])
+   ('plastic', 19, 3, 'plastic', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'])
+   ('area', 17, 10, 'areas', ['cet4', 'gk', 'ielts', 'ky', 'zk'])
+   ('although', 16, 7, 'although', ['cet4', 'gk', 'ky', 'zk'])
+   ('gene', 16, 1, 'genes', ['cet4', 'gre', 'ielts', 'ky'])
+   ('within', 15, 10, 'within', ['cet4', 'cet6', 'gk', 'ky'])
+   ('race', 15, 6, 'race', ['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'])
+   ('top', 15, 6, 'top', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'])
+   ('teenager', 15, 2, 'teenagers', ['cet4', 'cet6', 'gk', 'ky'])
+   ('record', 12, 10, 'record', ['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'])
+   ('recent', 12, 8, 'recent', ['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'])
+缺失lemma但其top_form在并集 0 []

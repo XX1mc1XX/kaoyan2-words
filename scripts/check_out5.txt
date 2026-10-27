@@ -1,0 +1,656 @@
+=== insurance 短词全表 (<=5) ===
+数量 564
+  spy    间谍           tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  bar    阻碍；酒吧        tags=['cet4', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=6
+  bay    海湾           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=6
+  aid    援助；帮助        tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=2
+  lip    嘴唇           tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=2
+  dip    下降；蘸         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=1 en1=0
+  bee    蜜蜂           tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=1
+  etc    等等           tags=[] freq=0 en1=1
+  fan    迷；狂热爱好者      tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=1
+  fur    毛皮           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  awe    敬畏           tags=['gre', 'ky', 'toefl'] freq=0 en1=0
+  bat    蝙蝠；球棒        tags=['cet4', 'gk', 'ky'] freq=0 en1=0
+  fog    雾            tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  fry    油炸           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  gun    枪            tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  jar    罐子           tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'toefl'] freq=0 en1=0
+  leg    腿            tags=['gk', 'zk'] freq=0 en1=0
+  mad    疯狂的          tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  ali    其他的          tags=[] freq=0 en1=0
+  amb    行走           tags=[] freq=0 en1=0
+  bol    抛            tags=[] freq=0 en1=0
+  bon    好            tags=[] freq=0 en1=0
+  bor    居民           tags=[] freq=0 en1=0
+  cas    发生           tags=[] freq=0 en1=0
+  cel    快速           tags=[] freq=0 en1=0
+  cip    拿；取          tags=[] freq=0 en1=0
+  cit    引用；唤起        tags=[] freq=0 en1=0
+  cur    注意；关心        tags=[] freq=0 en1=0
+  lab    实验室          tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  tra    拉            tags=[] freq=0 en1=0
+  typ    模式           tags=[] freq=0 en1=0
+  uni    一            tags=[] freq=0 en1=0
+  vit    生命           tags=[] freq=0 en1=0
+  viv    活            tags=[] freq=0 en1=0
+  voc    叫喊           tags=[] freq=0 en1=0
+  far    d. 远         tags=['gk', 'zk'] freq=24 en1=31
+  car    汽车；汽车，轿车     tags=['gk', 'zk'] freq=21 en1=5
+  eat    t.&i. 吃      tags=['gk', 'zk'] freq=17 en1=13
+  hit    t. 打         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=8 en1=6
+  era    时代；年代        tags=['cet4', 'cet6', 'ky', 'toefl'] freq=6 en1=8
+  eye    眼睛；眼光        tags=['gk', 'ielts', 'zk'] freq=6 en1=26
+  lie    i. 躺         tags=['gk', 'zk'] freq=7 en1=6
+  fun    乐趣；玩笑        tags=['gk', 'zk'] freq=5 en1=1
+  fix    t. 修理        tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=4 en1=4
+  boy    男孩；年少的儿子     tags=['gk', 'zk'] freq=5 en1=4
+  box    盒子；包厢        tags=['gk', 'zk'] freq=4 en1=2
+  hot    热的；辣的        tags=['gk', 'zk'] freq=3 en1=1
+  gas    气体；煤气        tags=['cet4', 'gk', 'ky'] freq=3 en1=0
+  fee    费用；酬金        tags=['cet4', 'gk', 'ielts', 'ky'] freq=1 en1=4
+  arm    手臂；袖子        tags=['gk', 'zk'] freq=3 en1=2
+  cap    帽子；盖子        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=3 en1=2
+  fly    苍蝇；i. 飞      tags=['gk', 'ielts', 'zk'] freq=4 en1=3
+  fat    脂肪；肥肉        tags=['gk', 'ky', 'zk'] freq=4 en1=6
+  bet    t.&i. 打赌     tags=['cet4', 'ielts', 'ky'] freq=3 en1=0
+  lay    t. 放置        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=2 en1=1
+  tag    标签；标牌        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=2 en1=1
+  van    无；有篷货车,行李车   tags=['cet4', 'cet6', 'ky'] freq=2 en1=5
+  eve    前夕；前夜        tags=['cet4', 'ky'] freq=1 en1=2
+  dig    t.&i. 挖      tags=['gk', 'zk'] freq=1 en1=4
+  dot    点；小圆点        tags=['cet4', 'gk', 'ielts', 'ky', 'toefl'] freq=2 en1=0
+  cow    母牛；奶牛        tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'zk'] freq=1 en1=2
+  egg    鸡蛋；卵         tags=['gk', 'zk'] freq=18 en1=0
+  bus    公共汽车         tags=['gk', 'ielts', 'zk'] freq=6 en1=0
+  dog    狗            tags=['gk', 'zk'] freq=4 en1=0
+  hat    帽子           tags=['gk', 'ielts', 'zk'] freq=2 en1=0
+  hen    母鸡           tags=['cet4', 'gk', 'ky', 'zk'] freq=2 en1=0
+  cat    猫            tags=['gk', 'zk'] freq=0 en1=2
+  ink    墨水；油墨        tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=2
+  pit    深洞；坑         tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  beg    t.&i. 请求     tags=['cet4', 'gk', 'ky', 'toefl'] freq=1 en1=0
+  cab    出租车；驾驶室      tags=['gk', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  ham    火腿；火腿,火腿肉    tags=['cet6', 'gk', 'ky', 'toefl', 'zk'] freq=1 en1=0
+  jam    果酱；拥挤        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=1 en1=0
+  jet    喷气式飞机        tags=['cet4', 'cet6', 'gk', 'ky'] freq=1 en1=0
+  pop    流行音乐         tags=['cet4', 'cet6', 'ielts', 'ky', 'zk'] freq=1 en1=0
+  bin    箱子；垃圾箱       tags=['gre', 'ky'] freq=0 en1=1
+  god    神；上帝         tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=1
+  inn    小旅馆；客栈       tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  jog    i. 慢跑        tags=['cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  kin    家属；亲属        tags=['cet6', 'gre', 'ielts', 'ky'] freq=0 en1=1
+  mat    垫子；席子,垫子     tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  bow    鞠躬；弓         tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  cup    杯子；奖杯        tags=['gk', 'ielts', 'zk'] freq=0 en1=0
+  dry    干的；干燥的       tags=['gk', 'zk'] freq=0 en1=0
+  fox    狐狸；狡猾的人      tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  guy    家伙；人         tags=['cet4', 'gre', 'ielts', 'ky'] freq=0 en1=0
+  ice    冰；表示性质，名词词性  tags=['gk', 'ielts', 'zk'] freq=0 en1=0
+  jaw    颌；下巴         tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  lap    膝上；一圈        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky'] freq=0 en1=0
+  lid    盖子；盖,盖子      tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  ray    光线；射线        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  rub    t.&i. 擦      tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  deem   认为；视为        tags=['cet6', 'ielts', 'ky', 'toefl'] freq=1 en1=3
+  tone   语气；基调        tags=['cet4', 'cet6', 'ky'] freq=2 en1=1
+  flee   逃走；逃离        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=1 en1=1
+  drug   药物；毒品        tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=1 en1=2
+  bare   赤裸的；仅有的      tags=['cet4', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  cast   投掷；投射        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=4
+  bury   埋葬；埋藏        tags=['cet4', 'gk', 'ky'] freq=0 en1=7
+  sway   动摇；影响        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  defy   违抗；抵制        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  evil   邪恶；罪恶        tags=['cet4', 'cet6', 'ky'] freq=1 en1=0
+  fare   车费           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=3
+  cold   寒冷的；感冒       tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=5
+  holy   神圣的          tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  rent   租金；租用        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  spur   激励；刺激        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  data   数据；资料        tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  mess   混乱；困境        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  coat   外套；涂层        tags=['cet4', 'gk', 'ky', 'toefl', 'zk'] freq=0 en1=2
+  fold   折叠           tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'toefl'] freq=0 en1=2
+  chip   芯片；碎片        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  exam   考试           tags=['ielts', 'zk'] freq=0 en1=4
+  comb   梳子；梳理        tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  dare   敢            tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=1
+  exit   出口；退出        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=1
+  lamp   灯            tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=0 en1=1
+  beam   光束；横梁        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  born   天生的；出生的      tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=0
+  crew   全体船员；工作人员    tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  hike   徒步旅行；猛涨      tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  cafe   咖啡馆          tags=['cet4', 'cet6', 'ielts', 'ky'] freq=0 en1=1
+  lone   孤独的          tags=['toefl'] freq=0 en1=1
+  arch   拱门；拱形        tags=['cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  bath   洗澡；浴缸        tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  bean   豆；豆类         tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  beer   啤酒           tags=['gk'] freq=0 en1=0
+  bell   钟；铃          tags=['gk', 'zk'] freq=0 en1=0
+  best   最好的          tags=['ielts'] freq=0 en1=0
+  bump   碰撞           tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  cock   公鸡           tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  corn   玉米；谷物        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  deer   鹿            tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  drum   鼓；圆桶         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  dust   灰尘；尘土        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  jazz   爵士乐          tags=['cet4', 'gk', 'gre', 'ky'] freq=0 en1=0
+  left   左边的          tags=['gk', 'zk'] freq=0 en1=0
+  lion   狮子           tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  maid   女仆           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  vari   变化           tags=[] freq=0 en1=0
+  zoom   猛增；放大        tags=['gk', 'ky'] freq=0 en1=0
+  auct   增加           tags=[] freq=0 en1=0
+  bord   边            tags=[] freq=0 en1=0
+  caut   谨慎的          tags=[] freq=0 en1=0
+  cens   评价           tags=[] freq=0 en1=0
+  chem   化学           tags=[] freq=0 en1=0
+  clar   清楚           tags=[] freq=0 en1=0
+  cosm   宇宙           tags=[] freq=0 en1=0
+  cred   相信           tags=[] freq=0 en1=0
+  cret   创造           tags=[] freq=0 en1=0
+  cult   耕种           tags=['gre', 'toefl'] freq=0 en1=0
+  curr   流；跑          tags=[] freq=0 en1=0
+  dens   密            tags=[] freq=0 en1=0
+  disk   磁盘；圆盘        tags=['cet4', 'cet6'] freq=0 en1=0
+  jeep   吉普车          tags=['gk'] freq=0 en1=0
+  trai   拉            tags=[] freq=0 en1=0
+  veal   覆盖           tags=['gk'] freq=0 en1=0
+  vers   转            tags=[] freq=0 en1=0
+  viol   暴力           tags=[] freq=0 en1=0
+  even   d. 甚至        tags=['gk', 'gre', 'ielts', 'toefl', 'zk'] freq=75 en1=71
+  back   背部；后         tags=['gk', 'ielts', 'zk'] freq=30 en1=18
+  late   迟的；晚的        tags=['gk', 'zk'] freq=28 en1=33
+  book   书；t. 预订      tags=['gk', 'ielts', 'zk'] freq=28 en1=30
+  care   照料；小心        tags=['gk', 'ielts', 'zk'] freq=15 en1=18
+  body   身体；主体        tags=['zk'] freq=9 en1=18
+  hand   手；指针         tags=['gk', 'ielts', 'zk'] freq=13 en1=11
+  fast   /d. 快的       tags=['gk', 'gre', 'zk'] freq=11 en1=8
+  head   头；头脑         tags=['gk', 'toefl', 'zk'] freq=9 en1=9
+  draw   t.&i. 画      tags=['gk', 'toefl', 'zk'] freq=7 en1=12
+  free   自由的；免费的      tags=['gk', 'zk'] freq=10 en1=15
+  earn   t. 挣得        tags=['cet4', 'gk', 'ky'] freq=8 en1=17
+  city   城市；都市        tags=['gk', 'ielts', 'zk'] freq=16 en1=21
+  path   小路；小径        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=8 en1=4
+  game   游戏；比赛        tags=['gk', 'zk'] freq=10 en1=6
+  drop   下降；降低        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=10 en1=5
+  full   满的；完全的       tags=['gk', 'zk'] freq=6 en1=5
+  fill   t. 填满        tags=['gk', 'zk'] freq=8 en1=4
+  hide   隐藏；躲藏        tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'toefl', 'zk'] freq=8 en1=7
+  flow   流动；涌出        tags=['cet4', 'gk', 'ky'] freq=8 en1=9
+  door   门；门口         tags=['gk', 'zk'] freq=9 en1=12
+  curb   t. 遏制，抑制     tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=3 en1=7
+  fire   火；火灾         tags=['gk', 'ielts', 'zk'] freq=14 en1=9
+  hurt   t.&i. 弄疼     tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=5 en1=3
+  crop   庄稼；作物        tags=['cet4', 'cet6', 'gk', 'ky'] freq=9 en1=3
+  main   主要的；最重要的     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=3 en1=9
+  hope   希望；t. 希望     tags=['gk', 'zk'] freq=2 en1=11
+  bite   t.&i. 咬      tags=['cet4', 'gk', 'ielts', 'ky', 'toefl'] freq=8 en1=5
+  diet   饮食；日常食物      tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=7 en1=5
+  hour   小时；钟点        tags=['gk', 'zk'] freq=6 en1=4
+  cent   分；分币         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=19 en1=3
+  miss   t. 错过        tags=['gk', 'zk'] freq=3 en1=7
+  cure   t. 治愈        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=2 en1=9
+  busy   忙的；繁忙的       tags=['gk', 'zk'] freq=7 en1=3
+  jump   t.&i. 跳      tags=['gk', 'zk'] freq=3 en1=6
+  leak   漏洞；泄漏        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=2 en1=3
+  bind   t. 捆绑        tags=['cet4', 'ielts', 'ky', 'toefl'] freq=1 en1=6
+  cool   凉的；冷静的       tags=['gk', 'zk'] freq=3 en1=2
+  lean   i. 倾斜        tags=['cet4', 'cet6', 'gre', 'ky', 'toefl'] freq=3 en1=3
+  june   六月           tags=['gk', 'ielts', 'zk'] freq=4 en1=3
+  file   文件；档案        tags=['cet4', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=5 en1=2
+  post   岗位；职位        tags=['gk', 'ielts', 'toefl', 'zk'] freq=2 en1=11
+  farm   农场；饲养场       tags=['gk', 'ielts', 'zk'] freq=23 en1=0
+  club   俱乐部；社团       tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=3 en1=3
+  loan   借款；贷款        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=3 en1=1
+  heat   热；热度         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=6 en1=3
+  fine   好的；晴朗的       tags=['gk', 'ielts', 'toefl', 'zk'] freq=2 en1=5
+  girl   女孩；女儿        tags=['gk', 'zk'] freq=9 en1=3
+  lift   t. 举起        tags=['cet4', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=4 en1=1
+  tiny   极小的；微小的      tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=1 en1=4
+  blow   t.&i. 吹      tags=['gk', 'toefl', 'zk'] freq=3 en1=1
+  mild   温和的；轻微的      tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=3 en1=0
+  bold   大胆的；黑体的      tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=2 en1=1
+  drag   t. 拖         tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=2 en1=1
+  fate   命运；天数        tags=['cet4', 'cet6', 'ky'] freq=2 en1=0
+  film   电影；胶片        tags=['gk', 'ielts', 'zk'] freq=3 en1=2
+  camp   营地；露营        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=2 en1=2
+  card   卡片；名片        tags=['gk', 'ielts', 'zk'] freq=5 en1=0
+  chew   t. 咀嚼        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=5 en1=0
+  blur   模糊；模糊不清      tags=['cet6', 'gre', 'ielts', 'ky'] freq=2 en1=1
+  wipe   t.&i. 擦      tags=['cet4', 'cet6', 'gk', 'ky'] freq=4 en1=0
+  army   军队；大群        tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=3 en1=2
+  flat   公寓；平的        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=3 en1=0
+  hail   t. 称颂        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=3 en1=0
+  hair   头发；毛         tags=['gk', 'zk'] freq=2 en1=2
+  hill   小山；山岗        tags=['gk', 'zk'] freq=2 en1=2
+  male   男子；男性的       tags=['cet4', 'gk', 'ielts', 'ky'] freq=2 en1=2
+  fish   鱼；鱼肉         tags=['gk', 'ielts', 'zk'] freq=4 en1=1
+  hunt   t.&i. 打猎     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=3
+  hall   大厅；礼堂        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=2 en1=3
+  lake   湖            tags=['gk', 'ielts', 'zk'] freq=3 en1=1
+  host   主人；节目主持人     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=6
+  rage   暴怒；狂怒        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  bone   骨头；骨骼        tags=['cet4', 'gk', 'ky'] freq=2 en1=1
+  chat   i. 聊天        tags=['gk', 'ielts', 'ky', 'toefl'] freq=2 en1=1
+  coin   硬币；t. 创造     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=2 en1=1
+  hate   t. 憎恨        tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=2 en1=1
+  belt   腰带；地带        tags=['cet4', 'gk', 'ky', 'toefl'] freq=1 en1=2
+  keen   热衷的；敏锐的      tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=1 en1=2
+  ally   同盟者，盟国       tags=['cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  fame   名声；声誉        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  blue   蓝色的；蓝色       tags=['gk', 'gre'] freq=2 en1=2
+  mask   面具；口罩        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=1 en1=1
+  bend   t.&i. 使弯曲    tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  boil   t.&i. 煮沸     tags=['cet4', 'gk', 'ielts', 'ky', 'toefl'] freq=1 en1=2
+  rock   岩石；石头        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=1 en1=2
+  edit   t. 编辑        tags=['cet6', 'ielts', 'ky'] freq=0 en1=2
+  gold   金；黄金         tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=2 en1=0
+  cell   细胞；小房间       tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=4
+  east   东方；东部        tags=['gk', 'zk'] freq=0 en1=4
+  gate   大门；登机口       tags=['gk', 'zk'] freq=3 en1=1
+  clue   线索；提示        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=3
+  boot   靴子；后备箱       tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=1
+  envy   t. 羡慕        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=1
+  pray   i.&t. 祈祷     tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  foot   脚；英尺         tags=['gk', 'ielts', 'zk'] freq=2 en1=1
+  hero   英雄；男主角       tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=2 en1=1
+  hole   洞；孔          tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=2 en1=1
+  mend   t. 修补        tags=['gk', 'gre', 'toefl', 'zk'] freq=0 en1=2
+  cash   现金；t. 兑现     tags=['cet4', 'gk', 'ielts', 'ky'] freq=1 en1=1
+  desk   书桌；办公桌       tags=['gk', 'ielts', 'zk'] freq=1 en1=1
+  edge   边缘；边         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=1 en1=1
+  fond   喜爱的；深情的      tags=['cet4', 'cet6', 'gk', 'ky'] freq=1 en1=1
+  glue   胶水；胶         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=1 en1=1
+  lend   t. 借出        tags=['gk', 'zk'] freq=1 en1=1
+  ring   戒指；环         tags=['gk', 'toefl', 'zk'] freq=1 en1=1
+  clap   t.&i. 拍手     tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=1 en1=0
+  iron   铁；熨斗         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=4
+  pool   水池；游泳池       tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=3
+  king   国王；君主,国王     tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=6
+  golf   高尔夫球         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=3 en1=0
+  mill   磨坊；工厂        tags=['cet4', 'cet6', 'gre', 'ky', 'toefl'] freq=3 en1=0
+  flag   旗；旗帜         tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl', 'zk'] freq=0 en1=3
+  dawn   黎明；开端        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  deed   行为；事迹        tags=['cet4', 'cet6', 'gk', 'gre', 'ky'] freq=0 en1=1
+  idle   空闲的；懒散的      tags=['cet4', 'cet6', 'gre', 'ielts', 'ky'] freq=0 en1=1
+  melt   t.&i. 融化     tags=['cet4', 'cet6', 'ky'] freq=0 en1=1
+  seal   海豹；印章        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  cage   笼子；鸟笼        tags=['cet4', 'cet6', 'gk', 'ky'] freq=2 en1=0
+  coal   煤；煤,煤块       tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=2 en1=0
+  bomb   炸弹；t. 轰炸     tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=2
+  bush   灌木；灌木丛       tags=['cet4', 'gk', 'ky', 'toefl'] freq=0 en1=2
+  cake   蛋糕；蛋糕，糕饼     tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=2
+  dead   死的；废弃的       tags=['gk', 'toefl', 'zk'] freq=0 en1=2
+  amid   …中间；…当中      tags=['cet6', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  bull   公牛；行情看涨的     tags=['cet4', 'cet6', 'ielts', 'ky'] freq=1 en1=0
+  cart   马车；手推车       tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  chef   厨师；主厨        tags=['gk', 'gre', 'ky', 'toefl'] freq=1 en1=0
+  dull   枯燥的；迟钝的      tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  fist   拳头           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  hang   t.&i. 悬挂     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=1 en1=0
+  hook   钩；钩状物        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=1 en1=0
+  inch   英寸；缓慢移动      tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'zk'] freq=1 en1=0
+  july   七月           tags=['gk', 'ielts', 'zk'] freq=1 en1=0
+  pork   猪肉           tags=['gk', 'zk'] freq=1 en1=0
+  bake   烤，烘；烘，烤，焙    tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=1
+  band   乐队；带子        tags=['cet4', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  boat   小船；艇         tags=['gk', 'ielts', 'zk'] freq=0 en1=1
+  bolt   螺栓；闪电        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky'] freq=0 en1=1
+  boss   老板；上司        tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=1
+  fool   傻子；t. 欺骗     tags=['cet4', 'gk', 'ky'] freq=0 en1=1
+  lord   主人；勋爵        tags=['cet4', 'cet6', 'ky'] freq=0 en1=1
+  sail   i. 航行        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=0 en1=1
+  damp   潮湿的；潮气       tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  glad   高兴的；高兴的，开心的  tags=['gk', 'zk'] freq=0 en1=0
+  toil   i. 苦干        tags=['gre', 'ielts'] freq=0 en1=0
+  bark   吠叫；树皮        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  barn   谷仓；牲口棚       tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  bowl   碗；一碗的量       tags=['cet4', 'gk', 'ky', 'toefl', 'zk'] freq=0 en1=0
+  brow   眉毛；额         tags=['cet4', 'ky'] freq=0 en1=0
+  cave   洞穴；山洞，洞穴     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  chin   下巴；下巴，颏      tags=['cet4', 'cet6', 'ielts', 'ky'] freq=0 en1=0
+  deaf   聋的；不愿听的      tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  dial   刻度盘；拨号盘      tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  dish   盘；碟          tags=['gk', 'zk'] freq=0 en1=0
+  dive   i. 跳水        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  doll   玩具娃娃         tags=['gk', 'ky', 'toefl', 'zk'] freq=0 en1=0
+  duck   鸭            tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  fork   叉；餐叉         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  frog   蛙；蛙，青蛙       tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  goat   山羊           tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  gown   长袍；礼服        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  horn   角；号角         tags=['cet4', 'cet6', 'gre', 'ky', 'toefl'] freq=0 en1=0
+  kiss   吻；t.&i. 吻    tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=0
+  kite   风筝           tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  knee   膝；膝盖         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  lady   女士；夫人        tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=0
+  leaf   叶；树叶         tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  luck   运气；好运        tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  lung   肺；肺,肺部       tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  pity   遗憾；可惜        tags=['gk', 'zk'] freq=0 en1=0
+  roar   i. 咆哮        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  tidy   整洁的；整齐的      tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  verb   动词；言         tags=['cet4', 'cet6', 'ky'] freq=0 en1=0
+  vest   衣服；背心,马甲,汗衫,内衣 tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  award  授予；奖品        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=13
+  annoy  使恼怒          tags=['gk', 'gre', 'ielts', 'toefl'] freq=0 en1=3
+  upset  使心烦；打乱       tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=6
+  block  阻塞；街区        tags=['gk', 'ielts', 'toefl'] freq=2 en1=2
+  label  标签；把…称为      tags=['cet4', 'cet6', 'ky', 'toefl'] freq=1 en1=4
+  abide  遵守；忍受        tags=['cet6', 'gre', 'ky', 'toefl'] freq=0 en1=2
+  cease  停止           tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  trail  踪迹；路线        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=1 en1=3
+  boast  自夸；夸耀        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  plead  恳求；申辩        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  index  指数；索引        tags=['cet4', 'cet6', 'ielts', 'ky'] freq=0 en1=3
+  youth  年轻人；青春       tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=3 en1=0
+  unity  团结；统一        tags=['cet4', 'cet6', 'ky', 'toefl'] freq=0 en1=2
+  actor  演员；行动者       tags=['cet4', 'gk', 'ielts', 'ky'] freq=1 en1=2
+  drama  戏剧           tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=6
+  breed  繁殖；品种        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  crime  犯罪           tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=2
+  awake  醒着的；唤醒       tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=1 en1=0
+  grand  宏伟的；重大的      tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  black  黑色的          tags=['gk', 'ielts', 'zk'] freq=0 en1=4
+  juror  陪审员          tags=[] freq=5 en1=0
+  rally  召集；回升        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  draft  草稿；起草        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  repel  击退；排斥        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  stern  严厉的；严峻的      tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  surge  激增           tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  knock  敲；撞击         tags=['gk', 'zk'] freq=0 en1=2
+  basin  盆地；流域        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=1
+  drunk  醉的           tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=1
+  eagle  鹰            tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=1
+  avail  效用；有用        tags=['cet6', 'ielts', 'ky'] freq=0 en1=0
+  avert  避免；防止        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  blind  盲的；盲目的       tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  bound  一定的；受约束的     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  charm  魅力           tags=['cet6', 'gre', 'ielts', 'ky'] freq=0 en1=0
+  chase  追逐           tags=['cet4', 'cet6', 'gre', 'ielts', 'ky'] freq=0 en1=0
+  curse  诅咒；咒骂        tags=['cet4', 'cet6', 'ielts', 'ky'] freq=0 en1=0
+  flesh  肉；肉体         tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  repay  偿还；报答        tags=['cet6', 'ky'] freq=0 en1=0
+  swamp  淹没；使应接不暇     tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  token  象征；代币        tags=['cet6', 'ielts', 'ky'] freq=0 en1=0
+  fibre  纤维           tags=['cet4', 'cet6', 'gk', 'ielts'] freq=1 en1=0
+  color  颜色           tags=['cet4', 'ielts', 'ky'] freq=0 en1=2
+  album  专辑；相册        tags=['cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  aloud  出声地；大声地      tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=0
+  amend  修订；修正        tags=['gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  audio  音频的          tags=['cet4', 'ielts', 'ky'] freq=0 en1=0
+  bathe  洗澡；沐浴        tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  beast  野兽；牲畜        tags=['cet4', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  bible  圣经           tags=['cet4', 'ielts', 'ky'] freq=0 en1=0
+  bored  厌烦的；无聊的      tags=['gk'] freq=0 en1=0
+  brisk  轻快的；兴旺的      tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  chant  反复呼喊；吟唱      tags=['gk', 'gre', 'ielts', 'zk'] freq=0 en1=0
+  cheer  欢呼；鼓舞        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  choke  窒息；堵塞        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  cough  咳嗽           tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  crazy  疯狂的；狂热的      tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=0 en1=0
+  donor  捐赠者          tags=['gre', 'toefl'] freq=0 en1=0
+  enrol  注册；招收        tags=[] freq=0 en1=0
+  lemon  柠檬           tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  lunar  月球的          tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  melon  瓜            tags=['cet4', 'cet6', 'gk', 'gre', 'ky'] freq=0 en1=0
+  chron  时间           tags=[] freq=0 en1=0
+  colon  殖民           tags=['gre'] freq=0 en1=0
+  crave  渴望           tags=['toefl'] freq=0 en1=0
+  jeans  牛仔裤          tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=0 en1=0
+  litre  升            tags=['gk', 'ky'] freq=0 en1=0
+  rebut  驳斥           tags=['toefl'] freq=0 en1=0
+  theat  戏剧           tags=[] freq=0 en1=0
+  toler  忍受           tags=[] freq=0 en1=0
+  tract  拉            tags=['cet6', 'gre', 'ielts', 'toefl'] freq=0 en1=0
+  great  伟大的；巨大的      tags=['gk', 'zk'] freq=45 en1=43
+  house  房子；住宅        tags=['gk', 'ielts', 'toefl', 'zk'] freq=39 en1=40
+  alone  单独的；仅仅       tags=['cet4', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=8 en1=12
+  daily  每日的；日常的      tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=17 en1=9
+  event  大事；事件        tags=['cet4', 'gk', 'ielts', 'ky'] freq=11 en1=12
+  light  光；灯          tags=['gk', 'ielts', 'zk'] freq=6 en1=17
+  carry  t. 携带        tags=['gk', 'ielts', 'zk'] freq=12 en1=13
+  heart  核心；重点        tags=['gk', 'ielts', 'zk'] freq=8 en1=11
+  extra  额外的；附加的      tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=5 en1=6
+  drink  t.&i. 喝      tags=['gk', 'zk'] freq=6 en1=8
+  happy  快乐的；幸福的      tags=['gk', 'zk'] freq=11 en1=7
+  clean  清洁的；干净的      tags=['gk', 'ielts', 'toefl', 'zk'] freq=11 en1=6
+  count  t.&i. 数      tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=6 en1=7
+  ahead  前面；前         tags=['gk'] freq=6 en1=1
+  cheap  便宜的；廉价的      tags=['gk', 'zk'] freq=9 en1=9
+  plant  植物；工厂        tags=['gk', 'ielts', 'zk'] freq=9 en1=28
+  royal  王室的；皇家的      tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=3 en1=10
+  grade  年级；分数        tags=['gk', 'ielts', 'zk'] freq=7 en1=19
+  glass  玻璃；玻璃杯       tags=['gk', 'ielts', 'zk'] freq=8 en1=1
+  equal  相等的；同等的      tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=2 en1=6
+  civil  平民的；民事的      tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'toefl'] freq=2 en1=5
+  chain  链子；连锁        tags=['cet4', 'cet6', 'gk', 'ky'] freq=7 en1=3
+  fresh  新鲜的；新的       tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=9 en1=2
+  rural  农村的；乡村的      tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=2 en1=11
+  spark  火花；火星        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=2 en1=5
+  funny  滑稽的；奇怪的      tags=['cet4', 'gk', 'ky', 'zk'] freq=4 en1=2
+  faith  信任；信心        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=2 en1=3
+  eager  热切的；渴望的      tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=3 en1=1
+  clock  钟；时钟         tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=3 en1=3
+  empty  空的；空虚的       tags=['gk', 'ielts', 'toefl', 'zk'] freq=4 en1=3
+  error  错误；差错        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=1 en1=4
+  march  行军；游行        tags=['gk', 'ielts', 'toefl', 'zk'] freq=3 en1=3
+  coach  教练；指导        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=5 en1=2
+  match  比赛；火柴        tags=['gk', 'ielts', 'toefl', 'zk'] freq=3 en1=2
+  glory  光荣；荣誉        tags=['cet4', 'cet6', 'gk', 'ky'] freq=2 en1=3
+  front  前面；前线        tags=['gk', 'zk'] freq=5 en1=1
+  fatal  致命的；灾难性的     tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=2 en1=1
+  loyal  忠诚的；忠心的      tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=5
+  green  绿色的；环保的      tags=['gk', 'gre', 'ielts', 'zk'] freq=3 en1=5
+  bread  面包           tags=['gk', 'zk'] freq=3 en1=1
+  false  错误的；不真实的     tags=['cet4', 'cet6', 'gk', 'ky'] freq=3 en1=1
+  final  最后的；决定性的     tags=['cet4', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=3 en1=0
+  alike  相同的；一样地      tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=1 en1=2
+  float  t.&i. 漂浮     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=3 en1=1
+  elect  t. 选举        tags=['cet4', 'gk', 'ky'] freq=1 en1=3
+  alive  活着的；有活力的     tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=2 en1=1
+  climb  t.&i. 爬      tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=3 en1=2
+  inner  内部的；内心的      tags=['cet4', 'cet6', 'ky', 'toefl'] freq=3 en1=2
+  cycle  周期；循环        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=2 en1=2
+  brush  刷子；画笔        tags=['gk', 'zk'] freq=4 en1=0
+  dirty  脏的；卑鄙的       tags=['gk', 'zk'] freq=4 en1=0
+  fruit  水果；果实        tags=['gk', 'ielts', 'zk'] freq=4 en1=0
+  found  t. 建立        tags=['cet4', 'cet6', 'gk', 'ky'] freq=1 en1=3
+  flash  闪光；闪现        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=1 en1=1
+  brown  棕色的；棕色       tags=['gk', 'toefl', 'zk'] freq=4 en1=1
+  anger  怒，愤怒         tags=['cet4', 'gk', 'ielts', 'ky'] freq=3 en1=1
+  tight  紧的；牢固的       tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=3 en1=1
+  blood  血；血统         tags=['cet4', 'gk', 'ielts', 'ky', 'zk'] freq=2 en1=1
+  floor  地板；楼层        tags=['gk', 'zk'] freq=2 en1=1
+  solar  太阳的；太阳能的     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=4 en1=1
+  guess  t.&i. 猜测     tags=['gk', 'zk'] freq=1 en1=3
+  crowd  人群；i. 拥挤     tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=4
+  cheat  欺骗；作弊        tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=2 en1=1
+  earth  地球；土壤        tags=['gk', 'zk'] freq=1 en1=3
+  exact  精确的；准确的      tags=['cet4', 'gk', 'gre', 'ky', 'toefl'] freq=1 en1=3
+  mercy  仁慈；宽恕        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=1 en1=0
+  china  瓷器；瓷器：piece of ~ 一件瓷器 /  tags=['gk', 'zk'] freq=1 en1=2
+  fetch  t. 去取来       tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=1 en1=2
+  heavy  重的；大量的       tags=['gk', 'ielts', 'zk'] freq=1 en1=2
+  hotel  旅馆；饭店        tags=['gk', 'ielts', 'zk'] freq=0 en1=6
+  pilot  驾驶员；飞行员      tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl', 'zk'] freq=2 en1=0
+  dress  连衣裙；衣服       tags=['gk', 'ielts', 'zk'] freq=1 en1=2
+  flood  洪水；大量        tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=1 en1=2
+  faint  i. 昏厥        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  grass  草；草地         tags=['gk', 'ielts', 'zk'] freq=22 en1=0
+  carve  t. 雕刻        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  angry  生气的；愤怒的      tags=['gk', 'ielts', 'zk'] freq=1 en1=1
+  coast  海岸；海滨        tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=1 en1=1
+  fever  发烧；发热        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=1 en1=1
+  metal  金属；金属,金属制品   tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=1 en1=1
+  evoke  t. 唤起        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=1 en1=0
+  apple  苹果           tags=['gk', 'zk'] freq=0 en1=3
+  cloud  云；云朵         tags=['gk', 'zk'] freq=0 en1=3
+  comic  喜剧的；滑稽的      tags=['gre', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  mayor  市长           tags=['cet4', 'cet6', 'ky'] freq=3 en1=0
+  angle  角；角度         tags=['cet4', 'gk', 'ky', 'toefl'] freq=0 en1=1
+  bench  长凳；法官席位      tags=['cet4', 'cet6', 'gk', 'gre', 'ky'] freq=0 en1=1
+  cable  缆绳；电缆        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  cloak  斗篷；披风        tags=['cet4', 'cet6', 'ky'] freq=0 en1=1
+  dizzy  头晕的；眼花的      tags=['cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  fault  缺点；缺陷        tags=['cet4', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  drift  漂流；趋势        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  cabin  小木屋；船舱       tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=2 en1=0
+  candy  糖果           tags=['cet4', 'gk', 'ky', 'zk'] freq=2 en1=0
+  hello  你好；问候        tags=['gk', 'zk'] freq=2 en1=0
+  pound  磅；英镑         tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=2 en1=0
+  wheel  轮子；车轮        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'zk'] freq=2 en1=0
+  depth  深；深度         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=2
+  lucky  幸运的；有福气的     tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=2
+  arrow  箭；箭头         tags=['cet4', 'gk', 'ky'] freq=1 en1=0
+  cargo  货物；船货        tags=['cet4', 'cet6', 'gre', 'ky', 'toefl'] freq=1 en1=0
+  chalk  粉笔；粉笔,白垩     tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=1 en1=0
+  chest  胸；胸腔         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl', 'zk'] freq=1 en1=0
+  feast  盛宴；节日        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=1 en1=0
+  greet  t. 问候        tags=['cet4', 'cet6', 'gk', 'ky'] freq=1 en1=0
+  guest  客人；宾客        tags=['gk', 'ielts', 'zk'] freq=1 en1=0
+  fluid  流体的；流动的      tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=2
+  bleed  流血；出血,流血     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  bride  新娘           tags=['gk', 'ky'] freq=0 en1=1
+  clerk  职员；办事员       tags=['cet4', 'gk', 'ky', 'toefl'] freq=0 en1=1
+  cruel  残酷的；残忍的      tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=0 en1=1
+  horse  马            tags=['gk', 'ielts', 'zk'] freq=0 en1=1
+  hurry  匆忙；急忙        tags=['gk', 'zk'] freq=0 en1=1
+  idiom  习语；成语        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  steam  蒸汽；蒸         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=1
+  adore  t. 崇拜，热爱     tags=['cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  blast  爆炸；爆破        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  canal  运河；沟渠        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  cliff  悬崖；峭壁        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  clone  克隆；无性繁殖      tags=['gk', 'ky', 'zk'] freq=0 en1=0
+  flame  火焰；热情        tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  flour  面粉；花         tags=['cet4', 'cet6', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  plain  平原；简单的       tags=['cet4', 'cet6', 'gk', 'gre', 'ky', 'toefl', 'zk'] freq=0 en1=0
+  smash  t. 打碎        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  aisle  过道，通道        tags=['ielts', 'ky'] freq=0 en1=0
+  badge  徽章；标记        tags=['cet6', 'gre', 'ielts', 'ky'] freq=0 en1=0
+  beard  胡须           tags=['cet4', 'gk', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  blade  刀刃；叶片        tags=['cet4', 'cet6', 'gre', 'ky', 'toefl'] freq=0 en1=0
+  blend  t.&i. 混合     tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  booth  电话亭；货摊       tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  brake  刹车；闸         tags=['cet4', 'gk', 'gre', 'ielts', 'ky'] freq=0 en1=0
+  brave  勇敢的；无畏的      tags=['cet4', 'gk', 'ky', 'zk'] freq=0 en1=0
+  brick  砖；砖块         tags=['cet4', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  broom  扫帚           tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  camel  骆驼           tags=['cet4', 'cet6', 'gk', 'ky', 'toefl', 'zk'] freq=0 en1=0
+  chair  椅子；主席        tags=['gk', 'ielts', 'zk'] freq=0 en1=0
+  cheek  面颊；面颊，脸蛋：kiss the baby o tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  chill  t. 使变冷       tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  cloth  布；布料         tags=['cet4', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  comet  彗星；扫把星       tags=['ielts', 'toefl'] freq=0 en1=0
+  crush  t. 压碎        tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  drill  钻头；训练        tags=['cet4', 'cet6', 'gk', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  drown  t.&i. 溺死     tags=['cet4', 'cet6', 'gk', 'ielts', 'ky'] freq=0 en1=0
+  elbow  肘；肘部         tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  endow  t. 资助        tags=['cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  fence  栅栏；篱笆        tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  glove  手套           tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  goose  鹅            tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  grape  葡萄           tags=['cet4', 'cet6', 'gk', 'ky', 'zk'] freq=0 en1=0
+  honey  蜂蜜；甜蜜        tags=['cet4', 'gk', 'ky'] freq=0 en1=0
+  juice  果汁           tags=['gk', 'ielts', 'toefl', 'zk'] freq=0 en1=0
+  knife  刀            tags=['gk', 'ielts', 'zk'] freq=0 en1=0
+  later  d. 后来        tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  layer  层；阶层         tags=['cet4', 'cet6', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  loose  松的；宽松的       tags=['cet4', 'cet6', 'gk', 'ky', 'toefl'] freq=0 en1=0
+  lorry  卡车；货车        tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  merry  欢乐的；愉快的      tags=['cet4', 'cet6', 'gk', 'ky'] freq=0 en1=0
+  pitch  程度；力度        tags=['cet4', 'cet6', 'gre', 'ielts', 'ky', 'toefl'] freq=0 en1=0
+  saint  圣徒；圣人        tags=['cet4', 'cet6', 'ky'] freq=0 en1=0
+
+=== insurance 明显错义（词根义/他词义）===
+   colon 殖民 | ecdict: n. 冒号, 结肠\n[医] 结肠
+   cult 耕种 | ecdict: n. 膜拜, 礼拜式, 祭仪, 一群信徒\n[医] 迷信, 巫术
+   tract 拉 | ecdict: n. 大片土地, 地带, 小册子\n[医] 束, 道
+
+=== forms 与主词语义零重合（最误导）===
+零重合对数 248
+   (0.0, 'words', 'create', '创造', 'creature', 'insurance', '生物；动物')
+   (0.0, 'words', 'follow', '跟随；遵循', 'following', 'insurance', '下列的')
+   (0.0, 'words', 'concern', '担忧；涉及', 'concerning', 'insurance', '关于')
+   (0.0, 'words', 'present', '目前的；呈现', 'presence', 'words', '出席；存在')
+   (0.0, 'words', 'government', '政府', 'govern', 'words', '统治；支配')
+   (0.0, 'words', 'tend', '倾向于', 'tendency', 'words', '趋势')
+   (0.0, 'words', 'power', '力量；权力', 'powerful', 'words', '强大的')
+   (0.0, 'words', 'state', '状态；陈述', 'statement', 'words', '声明')
+   (0.0, 'words', 'economy', '经济', 'economical', 'words', '节约的')
+   (0.0, 'words', 'form', '形式；形成', 'former', 'words', '以前的；前者')
+   (0.0, 'words', 'product', '产品', 'productive', 'words', '富有成效的')
+   (0.0, 'words', 'information', '信息', 'inform', 'insurance', '通知；告知')
+   (0.0, 'words', 'critical', '关键的；批评的', 'crisis', 'words', '危机')
+   (0.0, 'words', 'growth', '增长', 'grow', 'basic', '种植')
+   (0.0, 'words', 'identify', '识别', 'identity', 'words', '身份')
+   (0.0, 'words', 'attention', '注意', 'attend', 'words', '出席；照料')
+   (0.0, 'words', 'sign', '迹象；签名', 'signal', 'words', '信号；表明')
+   (0.0, 'words', 'sign', '迹象；签名', 'signify', 'insurance', '表示；意味着')
+   (0.0, 'words', 'available', '可获得的', 'avail', 'insurance', '效用；有用')
+   (0.0, 'words', 'regard', '看作', 'regarding', 'insurance', '关于；关于，至于')
+   (0.0, 'words', 'achieve', '实现', 'achievement', 'derivatives', '成就；完成')
+   (0.0, 'words', 'argue', '主张', 'argument', 'words', '论点；争论')
+   (0.0, 'words', 'major', '主要的', 'majority', 'words', '大多数')
+   (0.0, 'words', 'intend', '打算', 'intention', 'words', '意图')
+   (0.0, 'words', 'base', '基础', 'basement', 'insurance', '地下室')
+   (0.0, 'words', 'regulation', '法规', 'regulate', 'words', '管理；调节')
+   (0.0, 'words', 'evidence', '证据', 'evident', 'derivatives', '明显的')
+   (0.0, 'words', 'sense', '感觉；意义', 'sensible', 'words', '明智的')
+   (0.0, 'words', 'indicate', '表明', 'indication', 'words', '迹象')
+   (0.0, 'words', 'significant', '重要的；显著的', 'signify', 'insurance', '表示；意味着')
+其中跨库 100 [(0.0, 'words', 'create', '创造', 'creature', 'insurance', '生物；动物'), (0.0, 'words', 'follow', '跟随；遵循', 'following', 'insurance', '下列的'), (0.0, 'words', 'concern', '担忧；涉及', 'concerning', 'insurance', '关于'), (0.0, 'words', 'information', '信息', 'inform', 'insurance', '通知；告知'), (0.0, 'words', 'growth', '增长', 'grow', 'basic', '种植'), (0.0, 'words', 'sign', '迹象；签名', 'signify', 'insurance', '表示；意味着'), (0.0, 'words', 'available', '可获得的', 'avail', 'insurance', '效用；有用'), (0.0, 'words', 'regard', '看作', 'regarding', 'insurance', '关于；关于，至于'), (0.0, 'words', 'achieve', '实现', 'achievement', 'derivatives', '成就；完成'), (0.0, 'words', 'base', '基础', 'basement', 'insurance', '地下室'), (0.0, 'words', 'evidence', '证据', 'evident', 'derivatives', '明显的'), (0.0, 'words', 'significant', '重要的；显著的', 'signify', 'insurance', '表示；意味着'), (0.0, 'words', 'access', '使用权；进入', 'accessible', 'derivatives', '易接近的'), (0.0, 'words', 'current', '当前的', 'currency', 'derivatives', '货币'), (0.0, 'words', 'reward', '奖励', 'rewarding', 'insurance', '有益的；值得的'), (0.0, 'words', 'impose', '强加', 'imposing', 'insurance', '壮观的；宏伟的'), (0.0, 'words', 'engage', '参与；吸引', 'engaging', 'insurance', '迷人的'), (0.0, 'words', 'inspire', '激励', 'inspiration', 'derivatives', '灵感；鼓舞'), (0.0, 'words', 'connection', '联系', 'connect', 'basic', '连接'), (0.0, 'words', 'bear', '承担；忍受', 'born', 'insurance', '天生的；出生的')]
+
+=== 因 top_form 不对齐而 freq=0 的条目 ===
+条目数 31
+   ('basic', 'bit', '一点', 0, [('bite', 8, 4)])
+   ('insurance', 'complicated', '复杂的；难懂的', 0, [('complicate', 2, 2)])
+   ('insurance', 'rent', '租金；租用', 1, [('rend', 1, 1)])
+   ('insurance', 'biased', '有偏见的', 0, [('bias', 6, 6)])
+   ('insurance', 'data', '数据；资料', 0, [('datum', 17, 7)])
+   ('insurance', 'limited', '有限的', 0, [('limit', 21, 11)])
+   ('insurance', 'mess', '混乱；困境', 0, [('mes', 1, 1)])
+   ('insurance', 'related', '相关的；有联系的', 0, [('relate', 14, 7)])
+   ('insurance', 'writing', '写作；著作', 3, [('write', 36, 11)])
+   ('insurance', 'blessing', '祝福；幸事', 0, [('bless', 2, 2)])
+   ('insurance', 'born', '天生的；出生的', 0, [('bear', 6, 4)])
+   ('insurance', 'drawing', '图画；素描', 0, [('draw', 7, 6)])
+   ('insurance', 'underlying', '潜在的；根本的', 0, [('underlie', 2, 2)])
+   ('insurance', 'unexpected', '意外的', 0, [('unexpect', 3, 3)])
+   ('insurance', 'alleged', '声称的；涉嫌的', 0, [('allege', 1, 1)])
+   ('insurance', 'bored', '厌烦的；无聊的', 0, [('bore', 2, 2)])
+   ('insurance', 'fascinating', '迷人的', 0, [('fascinate', 2, 2)])
+   ('insurance', 'following', '下列的', 0, [('follow', 35, 14)])
+   ('insurance', 'isolated', '孤立的', 0, [('isolate', 3, 2)])
+   ('insurance', 'pressing', '紧迫的', 0, [('press', 4, 4)])
+   ('insurance', 'circumstances', '情况；环境', 0, [('circumstance', 4, 3)])
+   ('insurance', 'justified', '有正当理由的', 0, [('justify', 4, 3)])
+   ('insurance', 'threatened', '受威胁的', 0, [('threaten', 14, 8)])
+   ('insurance', 'agenda', '议程；议事日程', 1, [('agendum', 1, 1)])
+   ('insurance', 'boss', '老板；上司', 1, [('bos', 2, 2)])
+   ('insurance', 'exciting', '令人兴奋的', 0, [('excite', 6, 5)])
+   ('insurance', 'living', '生计；生活', 0, [('live', 27, 11)])
+   ('insurance', 'better', '更好的；d. 更好地', 0, [('well', 76, 15)])
+   ('insurance', 'ceiling', '天花板；上限', 0, [('ceil', 3, 2)])
+   ('insurance', 'clothes', '衣服；衣服，服装', 0, [('clothe', 6, 3)])
+   ('insurance', 'married', '已婚的；婚姻的', 0, [('marry', 4, 3)])
+
+=== 优先级全局 ===
+words S 323 A 483 B 536 C 0
+derivatives S 25 A 39 B 64 C 0
+basic S 0 A 0 B 0 C 349
+insurance S 0 A 2 B 243 C 1211
+rank=1 出现次数 4 rank<=100 出现次数 400
+insurance rank单调 False score空 0
+basic rank单调 False score空 349
+
+=== 覆盖率缺口分层 ===
+归一后缺失 597 非功能词 597
+缺失分层 {'四六级': 251, '初高中': 312, '仅考研/其他': 34}
+缺失初高中词 top30 [('university', 41), ('activity', 41), ('might', 39), ('rather', 36), ('percent', 31), ('rat', 29), ('against', 22), ('skill', 22), ('toward', 21), ('team', 21), ('wood', 20), ('role', 20), ('task', 20), ('plastic', 19), ('adult', 19), ('area', 17), ('although', 16), ('teenager', 15), ('within', 15), ('race', 15), ('top', 15), ('recent', 12), ('phone', 12), ('record', 12), ('billion', 11), ('zone', 11), ('weigh', 10), ('prepare', 10), ('step', 10), ('organization', 9)]
+缺失仅考研 top20 [('gender', 9), ('quota', 6), ('lottery', 3), ('erase', 3), ('evade', 2), ('federation', 2), ('gut', 2), ('calorie', 2), ('beverage', 1), ('esteem', 1), ('certify', 1), ('rut', 1), ('rigour', 1), ('paradoxical', 1), ('encyclopedia', 1), ('psychiatry', 1), ('census', 1), ('trash', 1), ('blueprint', 1), ('chancellor', 1)]
+大纲总词 4801 并集∩大纲 2399 50.0%
+按词次覆盖率 83.83% 9726 11602

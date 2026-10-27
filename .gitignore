@@ -1,0 +1,29 @@
+# 词典源数据（体积大，可重新下载）
+data/ecdict.csv
+data/lemma.en.txt
+data/derived.json
+
+# 真题原件
+ref/*.pdf
+ref/*.zip
+ref/ky2/*.pdf
+ref/ky1/*.pdf
+
+# 构建与调试产物
+output/
+dist/
+deploy/
+__pycache__/
+*.pyc
+.wrangler/
+
+# 临时脚本
+scripts/_*.py
+scripts/_*.js
+scripts/check_*.py
+scripts/review_*.py
+scripts/analysis_*.py
+
+# 系统
+Thumbs.db
+desktop.ini

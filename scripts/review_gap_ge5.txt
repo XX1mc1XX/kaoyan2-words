@@ -1,0 +1,362 @@
+the|2368|15|5|zk gk|art. 那
+and|958|15|5|zk gk|conj. 和, 与\n[计] 与
+that|766|15|5|zk gk|a. 那, 那个\nconj. 以致, 因为\npron. 那\nadv
+have|495|15|5|zk gk|vt. 有, 怀有, 拿, 进行\naux. 已经
+for|469|15|5|zk gk|prep. 为, 因为, 至于\nconj. 因为\n[计] DOS批处
+they|410|15|5|zk gk|pron. 他们, 它们
+you|389|13|5|zk gk|pron. 你, 你们
+with|282|15|5|zk gk|prep. 和...在一起, 以, 由于
+can|280|15|2|zk gk toefl|vt. 装罐\nn. 罐头, 容器\naux. 能, 可以\n[计] 作
+more|250|15|5|zk|n. 更多\na. 多的, 程度较大的, 更大的\nadv. 多, 更多
+but|239|15|5|zk gk|prep. 除了\nconj. 但是\nadv. 仅仅
+not|238|15|5|zk gk|adv. 不, 非, 未\n[计] 非
+this|231|15|5|zk gk|pron. 这, 本\na. 这, 本\nadv. 这么
+from|212|15|5|zk gk|prep. 从, 来自, 根据
+about|160|15|5|zk gk|prep. 在...周围, 大约, 有关, 关于\nadv. 大约, 四
+will|144|14|4|zk gk|n. 意志, 决心, 意愿, 意向, 干劲, 遗嘱\nvt. 用意志的力
+than|134|15|5|zk gk|conj. 比, 除...外\nprep. 比
+one|127|15|5|zk gk ielts|n. 一(个)\npron. 一, 任何人\nnum. 一, 一个\na
+other|123|15|5|zk gk|a. 其他的, 另外的, 从前的\npron. 其他的, 他人, 另外一
+may|115|15|4|zk gk ielts|n. 五月\naux. 愿能, 可以, 愿意
+what|115|15|5|zk gk|pron. 什么\ninterj. 怎么, 多么\na. 什么的\nad
+when|111|15|5|zk gk|conj. 当...的时候\nadv. 何时, 什么时候\npron. 
+who|105|15|5|zk gk|pron. 谁
+all|99|15|5|zk gk ielts|a. 所有的, 全部的, 一切的\nadv. 全部, 全然\npron.
+would|99|15|5|zk gk|aux. 将, 愿意
+most|96|15|5|zk gk ielts|n. 最多, 最大\na. 大多数的, 几乎全部的, 最多的\nadv.
+which|94|15|5|zk gk|pron. 哪一个, 那一个
+how|93|15|5|zk gk|adv. 如何, 怎样, 多少, 多么\nn. 方式
+out|92|15|5|zk gk|a. 外面的, 熄灭的, 结束的\nadv. 在外, 熄灭, 出现\np
+there|90|14|5|zk gk|adv. 在那里
+should|86|15|5|zk gk|aux. 应该, 将要
+much|77|15|5|zk gk|n. 大量, 许多, 重要的事\na. 很多的, 重要的\nadv. 多
+well|76|15|2|zk gk toefl|n. 井, 泉水, 源泉, 好\nv. 涌出\na. 健康的, 良好的,
+many|75|15|5|zk gk|n. 多数, 多数人\na. 许多的\npron. 许多
+just|73|15|1|zk gk|a. 正直的, 合理的, 正确的, 应得的\nadv. 刚刚, 正好, 
+also|73|14|5|zk gk|adv. 也, 并且, 同样地
+accord|69|15|5|cet4 cet6 ky toefl ielts gre|n. 一致, 调和, 协定\nvt. 给与, 使一致\nvi. 相符合
+only|67|15|5|zk gk|a. 唯一的, 仅有的, 最佳的\nadv. 只有, 仅仅, 只能\nc
+because|66|15|5|zk gk|conj. 因为
+such|66|15|5|zk gk|a. 如此的, 这样的
+study|66|13|5|zk gk ielts|n. 学习, 研究, 学科, 论文, 求学, 书房, 试作\nvt. 学
+into|58|15|5|zk gk|prep. 进入...之内, 朝..., 深入...之中, 成为...状
+les|56|12|0||abbr. 发射脱离系统（Launch Escape System）
+over|54|14|5|zk gk|adv. 结束, 越过, 从头到尾\nprep. 在...之上, 遍于.
+while|52|15|4|zk gk|n. 一会儿, (一段)时间\nconj. 当...的时候, 虽然\nv
+she|49|13|5|zk gk|pron. 她
+often|46|14|5|zk gk|adv. 时常, 常常
+after|45|14|5|zk gk|prep. 在...之后, 由于\nconj. 在...之后\nadv.
+too|45|13|5|zk gk|adv. 也, 非常, 太
+own|42|14|5|zk gk|n. 自己的\na. 自己的, 嫡亲的, 同胞的\nvt. 拥有, 支配
+talk|41|10|5|zk gk|n. 谈话, 交谈, 会谈, 讲话, 演讲, 空谈, 谣言, 方言, 语
+activity|41|7|4|zk gk cet4 ky ielts|n. 活动, 行动, 活跃, 活力\n[计] 活动
+any|40|14|5|zk gk|a. 任何的\npron. 任何
+before|40|13|5|zk gk|prep. 在...之前\nconj. 在...之前\nadv. 在前
+plan|40|12|5|zk gk ielts|n. 计划, 方案, 策略, 方法, 进度表, 程序表, 平面图, 设计
+worker|40|9|5|zk gk ielts|n. 工人, 劳动者\n[经] 工人, 劳工, 劳动者
+might|39|13|1|zk gk cet4 ky ielts|n. 力量, 权力\naux. 可能, 也许
+don't|38|13|5||(= do not)不要\nn. 禁忌
+art|38|5|5|zk gk cet4 ky ielts|n. 艺术, 人文科学, 技术, 巧妙, 诡计, 美术\n[计] 实际保
+now|37|15|5|zk gk|adv. 现在, 刚才, 目前\nn. 现在\na. 现在的\nconj
+rather|36|13|5|zk gk cet4 cet6 ky|adv. 宁可, 稍微, 相当
+through|36|13|5|zk gk|adv. 穿越, 从头至尾, 到底, 因为\nprep. 经过, 穿过\
+still|35|14|5|zk gk toefl|n. 蒸馏室, 寂静, 剧照\nv. 蒸馏, (使)平静, (使)静止\
+first|34|13|5|zk gk|adv. 首先, 第一, 优先\na. 第一的\nnum. 第一\nn.
+where|34|12|5|zk gk|adv. 在哪里\npron. 哪里\nn. 地点
+then|33|14|5|zk gk|adv. 然后, 当时\nconj. 然后, 当时\nn. 那时
+very|33|12|5|zk gk|a. 真正的, 恰好的, 十足的, 特有的\nadv. 非常, 完全
+food|33|10|5|zk gk ielts|n. 食物, 养料\n[医] 食物, 食品
+user|33|6|3|gk cet4 cet6|n. 使用者\n[计] 用户
+same|32|15|5|zk gk|a. 相同的, 同样的\npron. 相同的人(或事物)\nadv. 同
+something|31|13|5|zk gk|pron. 某事, 某物
+percent|31|12|5|zk gk cet4 cet6 ky ielts|n. 百分比, 百分数, 部分\n[机] 百分率
+both|30|13|5|zk gk|a. 两者的\nadv. 两者都\npron. 两者
+few|30|12|5|zk gk|a. 很少的, 不多的, 少数的\nn. 少数
+down|30|11|2|zk gk toefl gre|a. 向下的\nadv. 下, 下去, 降下\nprep. 往下, 沿着
+today|30|11|5|zk gk|n. 今天, 当今, 现在\nadv. 今天, 当今
+two|29|13|5|zk gk|num. 二, 二个
+another|29|12|5|zk gk|a. 另外的, 再一的, 不同的\npron. 又一个, 另一个, 类似
+rat|29|1|2|zk gk cet4 cet6 ky toefl ielts|n. 鼠, 卑鄙的人, 破坏者, 变节者\nvi. 捕鼠, 变节\nvt
+park|28|5|4|zk gk ielts|n. 公园, 停车处\nvt. 停车, 置于\nvi. 停车
+off|27|12|5|zk gk|a. 关着的, 不再生效的, 处于...境况的, 休假的, 空闲的\na
+every|27|11|5|zk gk|a. 每一, 所有的
+between|26|12|5|zk gk|prep. 在...之间
+once|26|12|5|zk gk ielts|adv. 一次, 曾经, 一旦\nconj. 一旦, 一经\nn. 一次
+you're|26|9|5||abbr. you are 你（你们）是
+yet|25|12|5|zk gk|adv. 还, 尚, 仍然, 已经, 然而\nconj. 然而
+past|24|12|5|zk gk|n. 过去, 昔时, 往事, 早年经历, 过去时\na. 过去的, 结束
+since|24|11|5|zk gk|prep. 自...以后, 自...以来\nadv. 自那时以后\nco
+tech|24|6|0||n. 技术学院或学校
+without|23|13|5|zk gk|prep. 没有, 不, 在...之外\nadv. 在外面, 户外\nn
+doesn't|23|12|5||aux. 表示否定
+sport|23|6|4|zk gk ielts gre|n. 运动, 游戏, 娱乐, 消遣, 玩笑\na. 运动的, 户外穿戴的
+among|22|13|5|zk gk|prep. 在...之中
+though|22|13|5|zk gk|adv. 然而, 可是\nconj. 虽然, 纵然
+always|22|12|5|zk gk|adv. 总是, 始终
+against|22|10|5|zk gk cet4 ky|prep. 反对, 对着, 倚靠
+skill|22|9|4|zk gk cet4 cet6 ky ielts|n. 技术, 技巧, 技能, 熟练, 熟练工人\n[化] 技能
+newspaper|22|2|4|zk gk ielts|n. 报纸
+toward|21|12|0|zk gk cet4 ky|prep. 向, 对于, 为了\na. 即将来临的, 进行中的
+must|21|11|5|zk|n. 必须, 未发酵葡萄汁, 绝对必要的事物\naux. 必须
+really|21|11|5|zk|adv. 实际上, 真实地, 实在
+office|21|6|5|zk gk ielts|n. 办公室, 部, 公职, 职责\n[化] 办公室
+per|21|6|0|gk ielts|prep. 每一, 通过, 经, 按照\n[经] 每, 按照
+team|21|6|5|zk gk cet4 cet6 ky toefl ielts|n. 队, 组\nvt. 把马(牛)套在同一辆车上, 把...编成一组\
+role|20|11|5|zk gk cet4 cet6 ky toefl ielts|n. 角色, 职责, 任务\n[医] 作用, 功用
+whether|20|11|5|zk gk|conj. 是否, 不论\npron. 两个中的哪一个
+actually|20|10|5|cet4 cet6 toefl|adv. 事实上, 竟然, 如今, 现在
+outside|20|8|5|zk gk|n. 外面, 外表, 外界\na. 外面的, 外表的, 外界的\nadv
+week|20|8|5|zk gk|n. 星期, 周
+task|20|7|4|zk gk cet4 cet6 ky|n. 工作, 任务, 作业, 困难的工作\nvt. 派给...工作, 使
+train|20|7|4|zk gk ielts|n. 火车, 列车, 行列, 长队, 一连串的后果, 顺序\nvt. 训
+wood|20|2|4|zk gk cet4 cet6 ky ielts|n. 木材, 木制品\nvt. 植林于, 给...添加木柴\nvi. 收
+early|19|10|5|zk gk|a. 早的, 早熟的\nadv. 很早, 初
+adult|19|8|4|gk cet4 ky ielts|n. 成人, 成虫\na. 成年的, 成熟的
+plastic|19|3|3|zk gk cet4 cet6 ky toefl ielts|n. 塑料, 可塑体, 可塑性物质\na. 塑料的, 塑造的, 有可塑性
+themselves|18|11|5|zk gk|pron. 他们自己, 她们自己, 它们自己
+quickly|18|10|0||adv. 很快地
+why|18|10|5|zk gk|adv. 为什么\nn. 原因, 理由
+already|18|9|5|zk gk|adv. 已经, 早已
+can't|18|9|5||vi. 不能
+three|18|8|5|zk gk|num. 三, 三个
+corporate|18|3|3|cet6 ielts gre|a. 社团的, 合伙的, 公司的\n[经] 团体的, 法人的, 社团的
+probably|17|13|5|zk gk cet4 cet6|adv. 大概, 或许
+area|17|10|5|zk gk cet4 ky ielts|n. 区域, 面积, 范围, 空地\n[计] 区域
+next|17|9|5|zk gk|n. 下一个\na. 下一个的, 其次的, 贴近的\nadv. 然后, 
+simply|17|9|4|gk|adv. 简单地, 只是, 简直, 简朴地, 坦白地
+datum|17|7|0|cet6 ky|n. 论据, 材料, 资料, 已知数\n[医] 材料, 资料, 论据
+you'll|17|7|0||abbr. (=you will； you shall)\n[网络] 你
+guilt|17|2|2|cet6 ky gre|n. 罪行, 内疚\n[法] 罪, 犯罪, 罪行
+almost|16|10|5|zk gk|adv. 几乎, 差不多
+recently|16|9|4|cet4 cet6 toefl|adv. 最近
+each|16|8|5|zk gk|a. 每个, 每一\nadv. 每个\npron. 每个, 个人, 各自
+million|16|8|5|gk ielts|n. 百万, 无数\nnum. 百万
+side|16|8|5|zk gk ielts|n. 旁边, 侧, 方面, 胁, 侧边, 血统\na. 旁的, 侧的, 
+although|16|7|5|zk gk cet4 ky|conj. 虽然, 尽管
+they're|16|7|5||abbr. they are 他们是
+app|16|3|0||[计] 应用, 应用程序; 相联并行处理器
+gene|16|1|3|cet4 ky ielts gre|n. 基因\n[化] 基因(遗传因子)
+generally|15|11|4|cet4 cet6 toefl|adv. 通常, 逐渐地, 普遍地
+within|15|10|5|gk cet4 cet6 ky|n. 内部, 里头\nadv. 在内部, 在内心里\nprep. 在..
+won't|15|10|5||将不, 不会（=will not）
+moment|15|9|5|zk gk toefl gre|n. 片刻, 瞬间, 重要, 阶段, 力矩\n[医] 片刻, 瞬间, 时
+age|15|8|5|zk gk toefl ielts|n. 年龄, 老年, 成年, 寿命, 时代, 时期\nv. 变老, 成熟
+during|15|8|5|zk gk|prep. 在...的时候
+return|15|8|5|zk gk ielts|n. 回来, 返回, 来回票, 归还, 报答, 利润率, 报告书\na.
+under|15|8|5|zk gk|prep. 在...之下, 低于\na. 下面的, 从属的\nadv. 
+half|15|7|5|zk gk|n. 一半, 半场, 不完全\na. 一半的, 不完全的, 部分的, 半
+race|15|6|5|zk gk cet4 cet6 ky toefl|n. 种族, 人种, 赛跑, 比赛, 急流, 人类, 同道, 姜根\nv
+top|15|6|5|zk gk cet4 cet6 ky ielts|n. 顶部, 顶端, 极点, 上面, 上部, 顶篷, 最高地位, 首位,
+tree|15|3|4|zk gk ielts|n. 树, 木料, 树状物\nvt. 把...赶上树\n[计] 树; D
+teenager|15|2|3|gk cet4 cet6 ky|n. 十三岁到十九岁的少年
+extracurricular|15|1|0|cet6|a. 课外的, 业余的
+push|14|9|4|zk gk|n. 推, 推动, 奋斗, 攻击, 进取心\nvt. 推, 推动, 使伸
+usually|14|9|4|gk|adv. 通常, 大抵
+surprise|14|8|5|zk gk ielts|n. 惊奇, 奇袭, 诧异\nvt. 使惊奇, 撞见, 奇袭
+ago|14|7|5|zk gk|adv. 以前
+someone|14|6|4|zk gk|pron. 有人, 某人
+allow|13|10|5|zk gk cet4 ky|vt. 允许, 同意给予, 承认\nvi. 容许, 猜想\n[计] 允许
+cannot|13|8|0||aux. 无法, 不能
+never|13|8|5|zk gk|adv. 从不, 决不, 不曾\n[法] 永不, 决不, 从来没有
+psychologist|13|8|0|toefl|n. 心理学家\n[医] 心理学家
+nearly|13|6|4|zk gk toefl|adv. 几乎, 密切地
+several|13|6|5|zk gk ielts|a. 几个的, 一些的, 各自的\npron. 几个
+again|12|10|5|zk gk|adv. 再一次, 又, 到原处
+record|12|10|5|zk gk cet4 cet6 ky ielts|n. 记录, 履历, 档案, 审判记录, 最高纪录, 唱片\nvt. 记
+recent|12|8|5|zk gk cet4 cet6 ky toefl|a. 最近的, 近代的, 最新的\n[经] 最近的, 新进的
+phone|12|6|4|zk cet4 ky ielts|n. 电话, 受话器, 耳机\nvt. 打电话给\nvi. 打电话
+paper|12|3|5|zk gk ielts|n. 纸, 文件, 文章, 报纸, 证券, 证件\nvt. 用纸糊, 贴
+fake|12|2|2|cet6 ky toefl ielts gre|n. 假货, 欺骗, 诡计\na. 假的\nvt. 假造, 仿造\nvi
+four|11|8|5|zk gk|num. 四, 四个\n[机] 四冲程循环
+until|11|8|5|zk gk|prep. 直到, 在...以前\nconj. 直到...时, 在...
+aren't|11|7|4||abbr. 不是（are not）
+watch|11|6|3|zk gk toefl|n. 观察, 手表, 看守, 守护, 监视, 值班人\nvt. 看, 注
+billion|11|5|5|gk cet4 cet6 ky toefl|num. 十亿, 十亿个
+workplace|11|5|2|gk|n. 工作场所, 工厂, 车间
+zone|11|3|3|gk cet4 cet6 ky toefl gre|n. 地带, 带, 地区\nvt. 环绕, 使分成地带\nvi. 分成区
+formation|11|2|2|cet4 cet6 ky toefl gre|n. 形成, 构造, 编队\n[医] 形成, 结构
+wind|11|2|4|zk gk ielts|n. 风, 气息, 气味, 呼吸, 风声, 趋势, 空谈, 卷绕, 弯曲
+rest|10|9|4|zk gk|n. 休息, 睡眠, 安息, 稍息, 静止, 支架, 休息处, 其余者,
+slow|10|8|4|zk gk|a. 慢的, 缓慢的, 迟缓的, 迟钝的, 冷漠的, 落后的\nadv.
+sometimes|10|8|4|zk gk|adv. 有时, 时常, 往往
+here|10|7|5|zk gk|adv. 在这里, 此时, 这里\nn. 这里
+prepare|10|7|4|zk gk cet4 cet6 ky ielts|vt. 准备, 筹备, 使在思想上有准备, 制造, 调制\nvi. 预备
+step|10|7|5|zk gk cet4 cet6 ky|n. 步骤, 步, 步幅, 脚步声, 踏级, 步伐, 短距离, 步态, 
+five|10|6|5|zk gk|num. 五, 五个
+yourself|10|6|4|zk gk|pron. 你自己
+didn't|10|5|5||abbr. did not 没有
+isn't|10|5|5||(=is not)不是
+giant|10|3|3|cet4 cet6 ky toefl|n. 巨人, 大力士, 巨大怪物\na. 庞大的, 巨大的
+weigh|10|3|3|zk gk cet4 cet6 ky|vt. 称...重量, 衡量, 把...压弯, 考虑, 权衡, 起锚\n
+together|9|8|5|zk gk|adv. 一起, 共同, 彼此
+whose|9|8|5|zk gk|pron. 谁的
+highly|9|7|4|cet4 cet6 ky|adv. 非常, 非常赞许地\n[电] 大大地
+purpose|9|7|4|zk gk cet4 cet6 ky ielts|n. 目的, 意向, 决心, 用途, 效果, 论题\nvt. 意欲, 企
+serious|9|7|5|zk gk cet4 cet6 ky toefl ielts|a. 严肃的, 认真的, 重要的, 严重的\n[电] 严重的
+along|9|6|5|zk gk|adv. 平行地, 向前\nprep. 沿着
+organization|9|6|4|gk cet4 cet6 ky ielts|n. 组织, 结构, 团体, 体制\n[医] 组织, 机构, 机化(血栓
+pick|9|6|3|zk gk ielts|n. 精选, 选择, 掘, 精华, 牙签, 鹤嘴锄\nv. 摘, 掘, 
+second|9|6|5|zk gk ielts|n. 秒, 瞬间, 第二名, 支持者, 助手\na. 第二的, 其次的,
+gender|9|4|2|ky ielts|n. 性\nvt. 产生
+interaction|9|4|0|cet4 cet6 toefl gre|n. 交互作用, 交感\n[计] 交互作用
+reader|9|4|4|cet4 cet6 ky|n. 读者, 读物, 文选, 校对人, 讲师\n[计] 阅读程序; 阅读
+room|9|4|5|zk gk ielts|n. 房间, 空位, 场所\nvi. 住宿, 居住\nvt. 留宿
+immigration|9|3|3|gk cet6 toefl|n. 移民, 移居\n[医] 移民
+scale|9|3|4|cet4 cet6 ky toefl ielts gre|n. 刻度, 衡量, 比例, 比例尺, 数值范围, 等级, 规模, 天平
+photograph|9|2|4|zk gk cet4 cet6 toefl ielts|n. 相片, 照片, 逼真的描绘\nv. 照相, 摄影
+weight|9|2|4|zk gk ielts|n. 重, 重量, 体重, 砝码, 重大, 影响, 力量\nvt. 加重
+ethic|9|1|2|toefl|n. 道德规范, 伦理
+first-generation|9|1|0||a. 出生在美国的
+timber|9|1|2|cet4 cet6 ky toefl ielts gre|n. 木材, 木料\nvt. 用木材建造
+we're|8|8|5||(we are 的常用口语形式)
+anyone|8|7|4|zk gk cet4 ky|pron. 任何人
+center|8|7|0|ielts|n. 中心, 中心点, 中锋\na. 中央的, 位在正中的\nvt. 集
+month|8|7|5|zk gk ielts|n. 月\n[经] 月
+ever|8|6|5|zk gk|adv. 曾经, 究竟, 永远
+finding|8|6|2|cet4 cet6 ky ielts|n. 发现, 发现物, 决定, 裁决\n[法] 调查结果, 对事实的认定
+lifestyle|8|6|2|ielts|n. 生活方式
+perhaps|8|6|5|zk gk cet4 cet6 ky|adv. 也许, 大概
+pretty|8|6|4|zk gk cet4 cet6 ky|a. 漂亮的, 优美的, 机灵的, 狡猾的, 恰当的\nadv. 相当,
+soon|8|6|5|zk gk|adv. 不久, 早, 快, 宁可
+therefore|8|6|4|gk cet4 cet6 ky toefl|adv. 因此, 所以
+whole|8|6|5|zk gk cet4 cet6 ky|n. 全部, 全体, 整体, 完全之体系\na. 所有的, 完整的, 完
+above|8|5|4|zk gk|prep. 在上方, 超出\nadv. 在上面\na. 上述的, 上面的
+simple|8|5|4|zk gk ielts|a. 简单的, 普通的, 朴素的, 单纯的, 绝对的, 初级的, 原始的
+tax|8|5|5|gk cet4 cet6 ky toefl|n. 税, 税款, 重负, 会费\nvt. 课以税, 使负重荷, 斥责
+corporation|8|4|3|gk cet4 cet6 ky ielts|n. 公司, 合作, 法人团体\n[法] 法人团体, 社团, 法人
+rich|8|4|4|zk gk|a. 富裕的, 富饶的, 浓厚的, 贵重的
+shop|8|4|4|zk gk ielts|n. 商店, 工厂, 车间\nvi. 购物, 到处寻找\nvt. 选购
+war|8|4|5|zk gk cet4 cet6 ky|n. 战争, 战争状态, 战术, 军事, 冲突, 斗争, 竞争\nvi.
+screen|8|3|4|zk gk cet4 cet6 ky toefl|n. 幕, 银幕, 屏风, 掩蔽物, 屏蔽, 筛子\nvt. 掩蔽, 放
+workforce|8|3|2|gk|n. 劳动力；工人总数, 职工总数
+writer|8|3|0|cet4 cet6 ielts|n. 作家, 撰稿者, 抄写员\n[化] 记录器
+curiosity|8|2|2|cet4 cet6 ky toefl|n. 好奇心, 新奇的事物, 珍品
+fast-food|8|2|0||a. 供应速食的\nn. 快餐
+wife|8|2|5|zk gk|n. 妻子, 太太, 夫人\n[法] 妻子, 已婚妇女
+adolescence|8|1|1|gk ielts|n. 青春期\n[医] 青年期, 青春期
+pink|8|1|3|zk cet4 cet6 ky ielts|n. 粉红色, 石竹花, 化身, 典范, 头面人物, 极度\na. 粉红
+selection|8|1|3|cet4 cet6 ky toefl ielts|n. 选择, 选文, 精选品\n[医] 选择, 淘汰
+unless|7|7|4|zk gk cet4 cet6 ky toefl|conj. 除非\nprep. 除...之外
+willing|7|7|4|gk cet4 cet6 ky|a. 乐意的, 自愿的, 甘愿的
+mainly|7|6|4|cet4 cet6|adv. 主要地, 大抵
+tum|7|6|0||n. (弦乐器弹拨时发出的)当的一声
+wait|7|6|5|zk gk|n. 等待, 等候\nvt. 等候, 期待, 延缓, 伺候, 推迟\nv
+nothing|7|5|5|zk gk ielts|n. 无, 不关紧要之事, 零\nadv. 毫不, 决不\ninterj
+official|7|5|5|gk cet4 cet6 ky toefl|n. 官员, 公务员, 职员\na. 公务的, 官方的, 正式的
+period|7|5|4|zk gk cet4 cet6 ky toefl ielts|n. 时期, 节段, 节, 句点, 学时, 周期\na. 当时特有的, 
+smile|7|5|4|zk gk|n. 微笑, 喜色, 笑容\nvi. 微笑, 觉得好笑\nvt. 微笑着
+strange|7|5|4|zk gk|a. 奇怪的, 陌生的, 生疏的, 不熟悉的, 不可思议的, 外行的, 
+whatever|7|5|4|zk gk cet4 cet6 ky ielts|pron. 无论什么
+agricultural|7|4|3|gk|a. 农业的\n[法] 农业的, 耕作的
+manufacturer|7|4|3|cet4 cet6|n. 制造业者, 厂商\n[经] 制造人, 制造商, 制造厂
+space|7|4|4|zk gk cet4 cet6 ky ielts|n. 位置, 空间, 距离, 太空, 空白, 间隔, (期刊等的)篇幅\
+thin|7|4|3|zk gk toefl|a. 薄的, 细的, 瘦的, 稀疏的, 稀薄的, 淡的, 弱的, 空洞的
+trap|7|4|3|gk cet4 cet6 ky toefl ielts|n. 圈套, 陷阱, 诡计, 存水弯\nvi. 设圈套, 设陷阱\nvt
+affordable|7|3|1|toefl gre|[计] 普及型
+slice|7|3|3|gk cet4 cet6 ky toefl ielts gre|n. 薄的切片, 一部分, 菜刀\nvt. 切成薄片, 切下\nvi. 
+video|7|3|4|zk gk cet4 cet6 ky ielts|n. 影像, 电视\na. 图像的, 电视的
+landowner|7|2|1||n. 地主\n[法] 土地所有人, 地主
+snap|7|1|3|cet4 cet6 ky toefl|vt. 使突然中断, 猛咬, 争夺, 拉断, 使有啪啪声, 厉声说, 突
+visa|7|1|2|gk cet6 ky ielts|n. 签证\nvt. 签发
+wealth|6|6|3|zk gk cet4 cet6 ky ielts|n. 财富, 资源, 财产, 丰富, 富裕, 大量\n[经] 财富
+article|6|5|4|zk gk cet4 ky toefl ielts|n. 文章, 冠词, 物品, 物件, 条款, 契约\n[计] 信件
+con|6|5|2||vt. 精读, 仔细研究, 默记\nadv. 反面地, 从反面\na. 
+favor|6|5|0|cet4 ky ielts|n. 好意, 喜爱\nvt. 赐予, 支持, 喜欢, 证实
+pas|6|5|0||n. 优先权, 舞步, 舞\n[化] 光声谱法; 光声光谱法
+quick|6|5|5|zk gk|a. 快的, 迅速的, 敏捷的, 灵敏的, 急速的\nadv. 快\nn
+quite|6|5|5|zk gk|adv. 相当, 完全, 十分
+rapidly|6|5|0|cet4 cet6|adv. 飞快地, 迅速地, 赶紧地
+temporarily|6|5|0|toefl|adv. 暂时, 一时, 临时
+thousand|6|5|5|zk gk ielts|num. 千\na. 成千的, 许多的\nn. 许许多多
+cooperation|6|4|0|toefl ielts|n. 合作, 协力, 配合\n[化] 合作
+historical|6|4|3|cet4 cet6 ky ielts|a. 历史的, 史实的, 历史上的\n[法] 历史性的
+name|6|4|5|zk gk|n. 名字, 名称, 姓名, 名义, 名誉, 文件名\nvt. 命名, 
+news|6|4|5|zk gk|n. 新闻, 消息, 报导\n[法] 新闻, 消息, 新闻报导
+party|6|4|5|zk gk toefl ielts|n. 宴会, 党, 政党, 团体, 当事人, 聚会\nv. 举办聚会
+picture|6|4|4|zk gk ielts|n. 图画, 照片, 景色, 美丽如画的人(或物), 化身, 生动的描述
+sound|6|4|2|zk gk ielts|n. 声音, 语音, 吵闹, 声调, 听力范围, 探条, 海峡\na. 
+towards|6|4|5|cet4 cet6|prep. 向, 对于, 为了
+widely|6|4|0|cet4 cet6|adv. 广泛地
+acre|6|3|3|gk cet4 ky toefl|n. 英亩
+clothe|6|3|0|cet4 ky|vt. 给...穿衣, 盖上, 赋予
+cue|6|3|3|cet4 cet6 ky toefl ielts gre|n. 提示, 线索\nvt. 给...暗示(或提示)\n[计] 尾接指令
+deeply|6|3|0|gk|adv. 深刻地, 在深处, 深沉地
+producer|6|3|0|cet6|n. 生产者, 制作者, 制作人\n[化] 发生器; (炉煤气)发生炉;
+protection|6|3|4|gk cet4 cet6 toefl|n. 保护, 防卫, 贸易保护制度\n[计] 保护
+safe|6|3|4|zk gk cet4 cet6 ky ielts gre|n. 保险箱, 冷藏室\na. 安全的, 可靠的, 平安的, 稳健的, 
+stranger|6|3|2|zk gk cet4 cet6 ky|n. 陌生人, 门外汉\n[法] 局外人, 非当事人, 第三者
+supermarket|6|3|2|zk gk ielts|n. 超级市场\n[经] 超级市场, 自助售货商店
+water|6|3|5|zk gk ielts|n. 水, 雨水, 海水, 水位, 水面, 流水\nvt. 给...浇水
+wear|6|3|4|zk gk toefl ielts|n. 穿着, 戴, 使用, 耗损, 服装, 耐久性\nvt. 穿着, 戴
+reaction|6|2|4|cet4 cet6|n. 反应, 反作用, 反动\n[医] 反应
+representative|6|2|4|gk cet4 cet6 ky toefl ielts|n. 代表, 众议员, 典型\na. 描写的, 表现的, 代理的, 代表
+stuff|6|2|4|cet4 cet6 ky ielts|n. 原料, 要素, 东西, 材料, 素质, 织品, 废物, 废话\nv
+wildfire|6|2|0||n. (古时战争时所用的)燃料剂, 磷火, 鬼火, 野火
+euro|6|1|0||n. 欧元（欧盟的统一货币单位）
+fbr|6|1|0||abbr. fast burst reactor 快速爆炸反应堆; fi
+passage|6|1|3|zk gk toefl ielts|n. 通道, 通过, 移居, 航行, 一段, 走廊\nvi. 通过, 经
+prairie|6|1|1|gk cet6 toefl|n. 大草原, 草甸
+quota|6|1|2|ky toefl ielts gre|n. 配额, 限额\n[化] 定额
+regenerative|6|1|0|cet6|a. 再生的, 更生的, 更新的\n[医] 再生的
+visitor|6|1|3|zk gk cet4 cet6 ky|n. 参观者, 游客, 访客\n[法] 视察人, 检视人, 检查员
+eight|5|5|5|zk gk|num. 八, 八个
+exactly|5|5|3|gk cet4|adv. 确切地, 精确地, 恰好, 完全地, 确实, 恰恰正是, 确实
+long-term|5|5|0||a. 长期的\n[经] 长期, (通常指一年以上)
+occasionally|5|5|0|cet4 cet6 toefl|adv. 有时候, 偶而
+personally|5|5|3|gk|adv. 亲自地, 个别地, 当面, 就本人而言, 针对个人地
+recall|5|5|4|cet4 cet6 ky toefl ielts gre|n. 回忆, 召回, 撤消\nvt. 回想, 回忆, 召回, 撤消, 使
+worry|5|5|4|zk gk|n. 担心, 烦恼, 忧虑, 苦恼, 撕咬\nvt. 使烦恼, 使焦虑,
+active|5|4|4|zk gk cet4 ky toefl|a. 活跃的, 起作用的, 积极的, 有效的, 主动的, 活性的, 现行
+favorite|5|4|0|cet4 ky ielts|n. 喜欢的事物, 幸运儿\na. 特别受喜爱的, 喜爱的, 宠爱的, 
+grind|5|4|2|cet4 cet6 ky toefl ielts gre|n. 磨, 碾, 苦差, 摩擦声, 用功的学生\nvt. 磨擦, 磨碎,
+pack|5|4|4|gk cet4 ky toefl gre|n. 包裹, 一伙, 一副, 背包, 包装\nvt. 包装, 捆扎, 塞
+poll|5|4|4|cet4 cet6 ky toefl gre|n. 投票, 民意测验, 选举投票, 投票数, 一组人中的一个, 头颈和
+prevent|5|4|4|zk gk cet4 cet6 ky toefl|v. 预防, 防止, 阻止, 妨碍
+rapid|5|4|4|zk gk cet4 cet6 ky ielts|a. 迅速的, 飞快的, 急促的, 陡的\nn. 急流
+roughly|5|4|0|cet4 cet6 ky toefl|adv. 概略地, 粗糙地, 粗暴地
+satisfy|5|4|2|zk gk cet4 cet6 ky toefl|vt. 使满意, 满足, 符合, 使确信, 赔偿\nvi. 令人满意, 
+seldom|5|4|2|zk gk cet4 cet6 ky toefl|a. 不常的, 稀少的\nadv. 很少, 不常
+shopper|5|4|0||n. 购物者\n[经] 顾客, 购物的人
+size|5|4|4|zk gk ielts|n. 大小, 尺寸, 规模, 尺码, 能力, 浆料\nvt. 上浆, 依
+speed|5|4|4|zk gk cet4 cet6 ky ielts|n. 速率, 速度, 迅速\nvi. 加速, 超速, 快进\nvt. 快
+stimulus|5|4|2|cet6 toefl ielts gre|n. 刺激, 激励, 刺激品\n[医] 刺激特, 刺激
+thought|5|4|5|zk gk cet4 cet6 ky toefl ielts|n. 想法, 思想, 思维, 关心, 挂念\nthink的过去式和过去分
+tie|5|4|4|zk gk cet4 cet6 ky|n. 带子, 线, 鞋带, 领带, 领结, 关系, 束缚, 平局, 不分
+warn|5|4|4|zk cet4 cet6 ky toefl|vt. 警告, 提醒, 通知\nvi. 发出警告
+waste|5|4|4|zk gk cet4 cet6 ky ielts gre|n. 浪费, 废物, 损耗, 消耗, 荒地, 垃圾, 地面风化物\na.
+web|5|4|1|gk cet6 ky ielts|n. 网, 蛛丝, 蹼, 织物, 圈套, 卷筒纸\nvi. 结网, 形成
+white|5|4|5|zk gk|n. 白色, 洁白, 眼白, 白种人, 蛋白\na. 白色的, 纯洁的,
+wouldn't|5|4|5||=would not
+behaviour|5|3|4|zk gk toefl|n. 行为, 举止\n[计] 特性, 性能, 特点, 行为, 动作, 状
+being|5|3|3|gk cet4 ky|n. 存在, 性质, 生命, 人, 生物, be的现在分词
+conceptual|5|3|1|toefl|a. 概念的\n[医] 概念的
+fitness|5|3|0|cet6 toefl ielts|n. 适合, 合宜, 合理, 恰当, 健康\n[医] 适合性, 适应性
+frequently|5|3|0|cet4 cet6|adv. 频繁, 经常地
+middle-class|5|3|0||a. 中层社会的, 中产阶级的
+mother|5|3|5|zk gk ielts|n. 母亲, 修女院长\nvt. 产生, 照看, 收养
+ourselves|5|3|3|zk gk|pron. 我们自己
+piece|5|3|4|zk gk|n. 块, 片, 篇, 碎片, 部分, 部件, 标准量\nvt. 修补,
+programme|5|3|5|zk gk ky|n. 节目, 节目单, 程序, 纲要, 大纲, 计划\nvt. 规划, 
+street|5|3|5|zk gk ielts|n. 街道, 马路, 街区\na. 街道的
+third|5|3|4|zk gk ielts|num. 第三, 三分之一\n[机] 第三; 第三的
+trip|5|3|4|zk gk toefl ielts|n. 旅行, 绊倒, 摔倒, 失足, 差错, 旅程\nvt. 使跌倒, 
+truly|5|3|3|gk cet4 cet6|adv. 真实地, 不假
+weather|5|3|4|zk gk toefl ielts gre|n. 天气, 气象, 处境\na. 迎风的\nvt. 使受风吹雨打, 侵
+western|5|3|0|zk gk ielts|n. 西方人, 西部片, 西部小说\na. 向西方的, 来自西方的, 西
+wildlife|5|3|2|gk toefl ielts|n. 野生动植物
+biodiversity|5|2|1||n. 生物多样性
+email|5|2|0|zk ielts|n. 电子信函
+governance|5|2|1|gre|n. 统治, 统辖, 管理\n[法] 统治, 管理, 支配
+motivate|5|2|3|cet4 cet6 ky toefl ielts|vt. 给与动机, 刺激, 提高...的学习欲望, 促动\n[经] 促动
+prosocial|5|2|0||a. 亲社会的,忠实(或拘泥)于既定社会道德准则的
+sex|5|2|4|gk cet4 cet6 ky ielts|n. 性别, 性欲\nvt. 区别...的性别, 引起...的性欲
+specie|5|2|0||n. 硬币\n[经] 硬币
+window|5|2|4|zk gk ielts|n. 窗户, 窗子, 窗口\nvt. 给...开窗\n[计] 窗口
+coworker|5|1|0||n. 共同工作的人, 同事, 合作者
+genetic|5|1|0|cet4 ky toefl ielts gre|a. 创始的, 遗传的, 起源的, 遗传学的\n[医] 生殖的, 遗传的
+ifs|5|1|0||abbr. installable file system 可安装文件系
+lawn|5|1|2|cet4 cet6 ky toefl ielts|n. 草地, 草坪, 上等细麻布\n[机] 细筛
+part-time|5|1|2|ielts|a. 兼任的, 半工半读的, 部分时间的\nadv. 部分时间, 兼任地
+passenger|5|1|3|zk gk cet4 cet6 ky|n. 乘客, 旅客\n[经] 乘客, 旅客
+rebellious|5|1|1|toefl gre|a. 造反的, 反抗的\n[法] 造反的, 反抗的, 反判的
+sympathy|5|1|3|gk cet4 cet6 ky toefl|n. 同情, 赞同, 怜悯, 慰问, 吊唁\n[医] 交感[作用], 同

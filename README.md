@@ -52,20 +52,38 @@
 
 ## 构建流程
 
+完整顺序（从零复现）：
+
 ```bash
-# 1. 统计真题词频（需要 ref/ky2/ 下的真题 PDF）
-python scripts/build_freq.py
+# 1. 下载真题 PDF 到 ref/ky2/、ref/ky1/
+python scripts/fetch_corpus.py
 
-# 2. 打包成单文件 HTML
-python scripts/make_html.py
+# 2. 统计词频
+python scripts/build_freq.py        # -> data/ky2_freq.json
+python scripts/build_freq_ky1.py    # -> data/ky1_freq.json
 
-# 3. 部署到 Cloudflare Pages（需要代理）
+# 3. 构建词库（依赖 data/ 下的校订释义文件，缺失会报错）
+python scripts/build_words.py       # -> words.json（需 meanings_*.json）
+python scripts/build_derivatives.py # -> derivatives.json（需 derivatives_curated.tsv）
+python scripts/build_basic_words.py # -> basic.json
+python scripts/build_optional_decks.py  # -> insurance.json
+
+# 4. 打包
+python scripts/make_html.py         # -> software/考研核心词.html
+python scripts/make_pdf.py          # -> 打印版 PDF（可选）
+
+# 5. 部署到 Cloudflare Pages（需要代理）
 copy software\考研核心词.html deploy\index.html
 $env:HTTP_PROXY="http://127.0.0.1:7897"
 npx wrangler pages deploy deploy --project-name=kaoyan2-words --branch=main
 ```
 
+**只改前端**（不动数据）的话，只需跑第 4、5 步。
+
 `data/ecdict.csv` 和 `data/lemma.en.txt` 不在仓库里，需要从 [ECDICT](https://github.com/skywind3000/ECDICT) 下载。
+
+`scripts/archive/` 是已完成使命的一次性脚本，内部路径已失效，仅供追溯历史改动，**不要执行**。
+
 
 ## 应用功能
 

@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -174,17 +175,31 @@ app_match = re.search(r'<script id="ky-app">(.*?)</script>', web_html, re.S)
 if not app_match:
     raise RuntimeError("ky-app script block not found")
 app_js = app_match.group(1)
+# 网页版主程序用 Terser 压缩；本机没有 npx 时自动回退到未压缩源码，不阻断构建。
+if not os.environ.get("KY_NO_MINIFY"):
+    npx = shutil.which("npx")
+    if npx:
+        try:
+            minified = subprocess.run(
+                [npx, "--yes", "terser", "--compress", "--mangle", "--format", "comments=false"],
+                input=app_js.encode("utf-8"), capture_output=True, timeout=90,
+            )
+            if minified.returncode == 0 and minified.stdout.strip():
+                app_js = minified.stdout.decode("utf-8")
+        except Exception:
+            pass
 app_digest = hashlib.sha256(app_js.encode("utf-8")).hexdigest()[:12]
 app_asset = f"./app.{app_digest}.js"
 (DEPLOY / app_asset[2:]).write_text(app_js, encoding="utf-8", newline="\n")
 web_html = web_html[:app_match.start()] + web_html[app_match.end():]
-head_end = web_html.find("</head>")
-if head_end < 0:
+head_start = web_html.find("<head>")
+if head_start < 0:
     raise RuntimeError("head tag not found")
+head_start += len("<head>")
 web_html = (
-    web_html[:head_end]
-    + f'<script defer src="{app_asset}"></script>\n'
-    + web_html[head_end:]
+    web_html[:head_start]
+    + f'\n<script defer fetchpriority="high" src="{app_asset}"></script>'
+    + web_html[head_start:]
 )
 
 # 每次构建都换一个缓存名，保证 Service Worker 能拿到新页面但保留已缓存发音。

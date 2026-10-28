@@ -1,9 +1,9 @@
-const BUILD_VERSION = '2a87190adf5a';
+const BUILD_VERSION = '22bb0e93d3d9';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v1';
 const AUDIO_CACHE_MAX = 1500;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const DATA_ASSETS = ["./data/words.7bfc52f3580f.json", "./data/derivatives.ad9cf4cb20ea.json", "./data/basic.52232073fbd3.json", "./data/insurance.f8b4a70be97a.json", "./app.7c288246b42f.js"];
+const DATA_ASSETS = ["./data/words.7bfc52f3580f.json", "./data/derivatives.ad9cf4cb20ea.json", "./data/basic.52232073fbd3.json", "./data/insurance.f8b4a70be97a.json", "./app.efa07bb746e7.js"];
 const SHELL = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png', ...DATA_ASSETS];
 
 self.addEventListener('install', event => {
@@ -17,11 +17,24 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
+    const hadOldShell = names.some(name => name.startsWith('ky-shell-') && name !== SHELL_CACHE);
     await Promise.all(names.filter(name =>
       (name.startsWith('ky-shell-') && name !== SHELL_CACHE)
       || (name.startsWith('ky-audio-') && name !== AUDIO_CACHE),
     ).map(name => caches.delete(name)));
     await self.clients.claim();
+    if (!hadOldShell) return;
+    // 新版本接管后主动刷新已打开的页面，避免用户长期看到旧缓存。
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    await Promise.allSettled(windows.map(client => {
+      try {
+        const url = new URL(client.url);
+        if (url.origin !== self.location.origin) return Promise.resolve(null);
+        return client.navigate(client.url);
+      } catch {
+        return Promise.resolve(null);
+      }
+    }));
   })());
 });
 

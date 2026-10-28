@@ -17,11 +17,24 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
+    const hadOldShell = names.some(name => name.startsWith('ky-shell-') && name !== SHELL_CACHE);
     await Promise.all(names.filter(name =>
       (name.startsWith('ky-shell-') && name !== SHELL_CACHE)
       || (name.startsWith('ky-audio-') && name !== AUDIO_CACHE),
     ).map(name => caches.delete(name)));
     await self.clients.claim();
+    if (!hadOldShell) return;
+    // 新版本接管后主动刷新已打开的页面，避免用户长期看到旧缓存。
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    await Promise.allSettled(windows.map(client => {
+      try {
+        const url = new URL(client.url);
+        if (url.origin !== self.location.origin) return Promise.resolve(null);
+        return client.navigate(client.url);
+      } catch {
+        return Promise.resolve(null);
+      }
+    }));
   })());
 });
 

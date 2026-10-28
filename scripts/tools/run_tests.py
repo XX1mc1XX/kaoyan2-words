@@ -83,7 +83,8 @@ def static_checks():
     check("SW 导航离线回退", "离线缓存尚未完成" in sw)
     check("SW 发音优先缓存", "cacheFirstAudio" in sw)
     check("SW 不拦接口请求", "url.pathname.includes('/api/')" in sw)
-    check("SW 注册禁缓存", "updateViaCache: 'none'" in t)
+    check("SW 注册禁缓存", "updateViaCache: 'none'" in t and "registration.update()" in t)
+    check("SW 新版本自动刷新", "hadOldShell" in sw and "client.navigate(client.url)" in sw)
     mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
     mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""
     check("manifest 独立显示", '"display": "standalone"' in mf)
@@ -367,6 +368,29 @@ setTimeout(function () {
           navigate(1);
           out.navigate_node_delta = document.querySelectorAll('*').length - nodesBeforeNext;
 
+          // P. 已认识库：右滑恢复后要停在同一位置，不能跳回本章第一个词
+          switchDeck('mastered');
+          if (queue.length >= 4) {
+            idx = 2; renderStudy();
+            const lenBefore = queue.length;
+            const nextWord = queue[3].word;
+            restoreMastered(queue[idx]);
+            out.restore_len_minus_one = queue.length === lenBefore - 1;
+            out.restore_on_next_word = document.getElementById('word').textContent === nextWord;
+          } else {
+            out.restore_len_minus_one = true;
+            out.restore_on_next_word = true;
+          }
+          switchDeck('core');
+
+          // Q. 云端做过「清空 / 导入」时，合并要以云端为准，不能把删掉的词拼回来
+          const snapForce = { state: { alpha: { mastered: true, t: 1 } }, chapterData: {}, conf: { forceAt: 999 } };
+          const snapPlain = {
+            state: { alpha: { mastered: true, t: 1 }, beta: { mastered: true, t: 1 } },
+            chapterData: {}, conf: { forceAt: 0 },
+          };
+          out.merge_cloud_force_wins = !('beta' in mergeSnapshots(snapPlain, snapForce).state);
+
           // M. 词表首屏只渲染一页，避免移动端一次创建上千个节点
           switchView('List');
           out.list_first_page = document.querySelectorAll('#wordList li').length === 100;
@@ -586,6 +610,8 @@ def browser_checks():
             "confirm_messages": True,
             "weight_down": True, "weight_badge_val": True,
             "mastered_has_words": True, "mastered_restored": True,
+            "restore_len_minus_one": True, "restore_on_next_word": True,
+            "merge_cloud_force_wins": True,
             "cross_next": True, "cross_prev": True,
             "badge_no_flip": True, "word_touchend_reaches_card": True,
             "list_first_page": True, "list_has_more": True, "list_load_more": True,

@@ -733,6 +733,8 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
     return;
   }
   studyLoading = false;
+  // 章节数会随「已认识」库的恢复/新增变化，记住的章号可能已经越界，先夹到有效范围
+  ch = Math.min(Math.max(ch, 0), Math.max(chapterCount() - 1, 0));
   curChapter = ch;
   clearUndoBar();
   const key = chapterKey(ch);
@@ -1151,11 +1153,13 @@ function lowerWeight(word) {
 // 已认识库：右滑恢复，放回原词库
 function restoreMastered(word) {
   if (!word) return;
+  const at = idx;   // 恢复后队列少一个，停在原位就是原来的下一个词
   const st = state[word.word];
   if (st) { st.mastered = false; st.due = 0; st.t = Date.now(); save(LS_STATE, state); }
   // 重建当前章队列：deckWords() 会因掌握数变化而重算切片，
   // 只改 queue 会导致切片与队列不一致、恢复的词本轮永远轮不到
-  loadChapter(curChapter);
+  // 不能用 posWord 定位——刚恢复的词已不在队列里，找不到就会跳回第一个
+  loadChapter(curChapter, undefined, at);
   updateStats();
   showUndo(word, 'restored');
 }
@@ -1313,9 +1317,10 @@ function renderList(reset) {
           const ck = owner + ':' + ch;
           if (chapterData[ck]) chapterData[ck].done = false;   // 清掉「已过完」，恢复的词才会出现
           switchDeck(owner);
-          loadChapter(ch);
+          // gotoChapter 会同时写回 conf.deckChapter，否则刷新后又跳回上次的章节
+          gotoChapter(ch);
         } else {
-          renderList(); updateStats(); loadChapter(curChapter);
+          renderList(); updateStats(); gotoChapter(curChapter);
         }
       };
     } else {
@@ -1413,7 +1418,7 @@ function gotoChapter(i) {
   save(LS_CONF, conf);
   loadChapter(i);
 }
-let undoTimer = null, undoWord = null, undoKind = 'mastered', undoChapter = null;
+let undoTimer = null, undoWord = null, undoKind = 'mastered', undoChapter = null, undoIdx = 0;
 function clearUndoBar() {
   clearTimeout(undoTimer);
   undoWord = null;
@@ -1425,6 +1430,8 @@ function showUndo(word, kind) {
   undoWord = word;
   undoKind = kind || 'mastered';
   undoChapter = chapterKey(curChapter);
+  // 记住它被移走时的位次，撤销时插回原位，而不是插到用户后来翻到的位置
+  undoIdx = Math.min(idx, queue.length);
   $('undoText').textContent = (undoKind === 'restored' ? '已恢复：' : '已认识：') + word.word;
   $('undoBar').classList.remove('hidden');
   clearTimeout(undoTimer);
@@ -1447,7 +1454,8 @@ function doUndo() {
     state[word.word] = st;
     save(LS_STATE, state);
   }
-  queue.splice(Math.min(idx, queue.length), 0, word);
+  queue.splice(Math.min(undoIdx, queue.length), 0, word);
+  undoIdx = 0;
   $('undoBar').classList.add('hidden');
   clearTimeout(undoTimer);
   undoWord = null;
@@ -1601,6 +1609,15 @@ $('progressBar').onchange = event => {
   dragging = false;
   savePos();
 };
+// 拖回原位置不会触发 change，必须另有出口，否则 dragging 永远为 true（进度条冻结、自动朗读失效）
+const endProgressDrag = () => {
+  if (!dragging) return;
+  dragging = false;
+  savePos();
+};
+$('progressBar').onpointerup = endProgressDrag;
+$('progressBar').ontouchend = endProgressDrag;
+$('progressBar').onblur = endProgressDrag;
 $('shuffleChapter').onclick = () => {
   const slice = chapterSlice(curChapter);
   if (slice.every(w => isMastered(w))) {
@@ -2132,6 +2149,17 @@ function mergeChapters(local, cloud) {
   return out;
 }
 function mergeSnapshots(local, cloud) {
+  const localForce = (local.conf && local.conf.forceAt) || 0;
+  const cloudForce = (cloud.conf && cloud.conf.forceAt) || 0;
+  // 哪一端做过「清空全部 / 导入覆盖」，就以那一端为准；
+  // 否则逐词合并会把刚删掉的词按「本地没有、云端有」又拼回来
+  if (cloudForce > localForce) {
+    return {
+      state: cloud.state || {},
+      chapterData: cloud.chapterData || {},
+      conf: cloud.conf,
+    };
+  }
   return {
     state: mergeState(local.state, cloud.state),
     chapterData: mergeChapters(local.chapterData, cloud.chapterData),
@@ -2153,8 +2181,12 @@ async function syncNow(quiet) {
   if (!authUser) return;
   if (syncing) { pendingSync = true; return; }
   syncing = true;
+  // 记下这次同步是替谁跑的：中途退出或换号，结果一律丢弃，绝不给新账号写别人的进度
+  const startedAs = authUser;
+  const stale = () => authUser !== startedAs;
   try {
     const remote = await api('/state');
+    if (stale()) return;
     const local = snapshot();
     // 本机刚清空或刚导入：直接覆盖云端，不参与合并
     if (local.conf.forceAt && local.conf.forceAt > (remote.updatedAt || 0)) {
@@ -2167,6 +2199,7 @@ async function syncNow(quiet) {
       if (!quiet) authSay('已把本机进度同步到云端', 'ok');
     } else {
       const merged = mergeSnapshots(local, remote.payload);
+      if (stale()) return;
       const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData);
       if (changedLocally) applySnapshot(merged);
       // 没有变化就不要回写，避免每 40 秒空转一次写库
@@ -2186,6 +2219,9 @@ async function refreshAuth() {
   const before = authUser;
   try {
     const r = await api('/me');
+    // 请求发出后用户可能已经登录成功（或退出了），这次结果已过期，直接丢弃，
+    // 否则慢网络下会把刚登录的账号又踢回游客
+    if (authUser !== before) return;
     const next = r.user ? r.user.username : null;
     if (next !== authUser) {
       authUser = next;
@@ -2353,7 +2389,8 @@ window.addEventListener('offline', updateOfflineStatus);
 updateOfflineStatus();
 if ('serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(async () => {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(async registration => {
+      registration.update().catch(() => {});
       await navigator.serviceWorker.ready;
       updateOfflineStatus();
     }).catch(() => updateOfflineStatus());

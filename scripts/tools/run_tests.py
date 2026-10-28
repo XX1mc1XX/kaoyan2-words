@@ -420,6 +420,37 @@ setTimeout(function () {
           out.merge_position_latest = posMerged.conf.deck === 'derivative'
             && posMerged.chapterData['derivative:0'].order[0] === 'investigation';
 
+          // S. 学习节奏：每日过卡计数、新掌握计数、连续天数、跨端合并
+          const todayK = dayKey(Date.now());
+          const sBefore = (daily[todayK] || {}).s || 0;
+          const mBefore = (daily[todayK] || {}).m || 0;
+          bumpDaily(false, false);
+          out.daily_bump = ((daily[todayK] || {}).s || 0) === sBefore + 1;
+          bumpDaily(true, true);
+          const recNow = daily[todayK] || {};
+          out.daily_master_bump = recNow.m === mBefore + 1 && recNow.s === sBefore + 2;
+          const dk = offset => dayKey(todayTs() - offset * DAY);
+          const fakeDaily = {};
+          fakeDaily[dk(0)] = { s: 1 }; fakeDaily[dk(1)] = { s: 2 }; fakeDaily[dk(2)] = { s: 3 };
+          out.streak_three = streakDays(fakeDaily) === 3;
+          const brokenDaily = {};
+          brokenDaily[dk(0)] = { s: 1 }; brokenDaily[dk(2)] = { s: 3 };
+          out.streak_broken = streakDays(brokenDaily) === 1;
+          const yesterdayOnly = {};
+          yesterdayOnly[dk(1)] = { s: 2 }; yesterdayOnly[dk(2)] = { s: 1 };
+          out.streak_yesterday = streakDays(yesterdayOnly) === 2;
+          const mergedD = mergeDaily(
+            { [dk(0)]: { s: 5, m: 1 } },
+            { [dk(0)]: { s: 3, m: 2 }, [dk(1)]: { s: 1, m: 0 } });
+          out.merge_daily_max = mergedD[dk(0)].s === 5 && mergedD[dk(0)].m === 2 && mergedD[dk(1)].s === 1;
+          out.snapshot_has_daily = !!snapshot().daily;
+          out.daily_scoped = typeof scopedKey(LS_DAILY) === 'string' && SCOPED_KEYS.has(LS_DAILY);
+          switchView('Stat');
+          out.rhythm_rendered = document.querySelectorAll('#sWeek .week-day').length === 7
+            && document.getElementById('sStreak').textContent !== ''
+            && !!document.querySelector('#sWeek .week-day.today');
+          switchView('Study');
+
           // R. 桌面鼠标点卡片翻面；触摸结束后补发的合成 click 不能多翻一次
           const cardEl = document.getElementById('card');
           const meanEl = document.getElementById('meaning');
@@ -582,6 +613,21 @@ setTimeout(async function(){
     const adopted = JSON.parse(localStorage.getItem('ky_words_v1@probe') || '{}');
     out.adopt_apple_mastered = !!(adopted.apple && adopted.apple.mastered);
     out.adopt_banana = !!adopted.banana;
+
+    // —— 学习节奏（每日统计） ——
+    out.web_daily_scoped = SCOPED_KEYS.has('ky_daily_v1');
+    out.web_snapshot_daily = !!(snapshot().daily && typeof snapshot().daily === 'object');
+    localStorage.setItem('ky_daily_v1', JSON.stringify({ '2026-01-01': { s: 4, m: 1 } }));
+    localStorage.setItem('ky_daily_v1@probe', JSON.stringify({ '2026-01-01': { s: 2, m: 2 } }));
+    adoptGuestProgress('probe');
+    const adoptedDaily = JSON.parse(localStorage.getItem('ky_daily_v1@probe') || '{}');
+    const ad = adoptedDaily['2026-01-01'] || {};
+    out.web_daily_adopt = ad.s === 4 && ad.m === 2;
+    // 同步合并后不能丢每日记录
+    const dailyMerged = mergeSnapshots(
+      { state: {}, chapterData: {}, daily: { '2026-01-01': { s: 3, m: 0 } }, conf: { forceAt: 0 } },
+      { state: {}, chapterData: {}, daily: { '2026-01-01': { s: 5, m: 2 } }, conf: { forceAt: 0 } });
+    out.web_daily_merge = dailyMerged.daily['2026-01-01'].s === 5 && dailyMerged.daily['2026-01-01'].m === 2;
   } catch (e) {
     out.error = e.stack || e.message;
   }
@@ -631,6 +677,10 @@ setTimeout(async function(){
               "章=%s deckChapter=%s" % (data.get("merge_chapter"), data.get("merge_deck_chapter")))
         check("登录采纳游客进度", data.get("adopt_apple_mastered") is True and data.get("adopt_banana") is True,
               "apple=%s banana=%s" % (data.get("adopt_apple_mastered"), data.get("adopt_banana")))
+        check("每日节奏按账号隔离", data.get("web_daily_scoped") is True)
+        check("每日节奏进入同步快照", data.get("web_snapshot_daily") is True)
+        check("登录采纳游客每日节奏", data.get("web_daily_adopt") is True)
+        check("每日节奏合并取较大值", data.get("web_daily_merge") is True)
     finally:
         server.terminate()
         try:
@@ -671,6 +721,8 @@ def runtime_checks():
     check("同步写入合并为单次 D1", "RETURNING updated_at" in worker_text and "ON CONFLICT(user_id) DO UPDATE" in worker_text)
     check("同步支持增量拉取", "unchanged: true" in worker_text and "searchParams.get('since')" in worker_text)
     check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(body.payload, remote)" in worker_text)
+    check("服务端合并每日节奏", "function mergeDaily(" in worker_text and "daily: mergeDaily(" in worker_text)
+    check("服务端章节与 deckChapter 自洽", "deckChapter[deck] = chapter;" in worker_text)
     check("同步支持压缩上传", "DecompressionStream" in worker_text and "x-ky-encoding" in worker_text)
 
 
@@ -711,6 +763,10 @@ def browser_checks():
             "mastered_has_words": True, "mastered_restored": True,
             "restore_len_minus_one": True, "restore_on_next_word": True,
             "merge_cloud_force_wins": True, "merge_position_latest": True,
+            "daily_bump": True, "daily_master_bump": True,
+            "streak_three": True, "streak_broken": True, "streak_yesterday": True,
+            "merge_daily_max": True, "snapshot_has_daily": True, "daily_scoped": True,
+            "rhythm_rendered": True,
             "desktop_click_flips": True, "touch_synth_click_ignored": True,
             "cross_next": True, "cross_prev": True,
             "badge_no_flip": True, "word_touchend_reaches_card": True,

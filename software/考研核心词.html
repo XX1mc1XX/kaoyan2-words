@@ -146,6 +146,15 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 7px;text-align:center}
 .stat b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
 .stat span{font-size:11px;color:var(--muted)}
+.streak{display:flex;align-items:baseline;gap:8px}
+.streak b{font-size:26px;font-variant-numeric:tabular-nums}
+.streak span{font-size:12.5px;color:var(--muted)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end}
+.week-day{display:flex;flex-direction:column;align-items:center;gap:4px}
+.week-day i{display:block;width:100%;height:var(--h,3px);max-height:56px;background:var(--brand-soft);border-radius:5px 5px 2px 2px;min-height:3px}
+.week-day.today i{background:var(--brand)}
+.week-day b{font-size:10.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.week-day span{font-size:10px;color:var(--muted)}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;display:flex;flex-direction:column;gap:12px}
 .panel-title{font-size:13px;color:var(--muted)}
 .daily{display:flex;gap:7px;flex-wrap:wrap}
@@ -369,6 +378,12 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       <div class="stat"><b id="sLearned">0</b><span>学过</span></div>
       <div class="stat"><b id="sMastered">0</b><span>掌握</span></div>
       <div class="stat"><b id="sDue">0</b><span>待学</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">学习节奏</div>
+      <div class="streak"><b id="sStreak">0</b><span>天连续学习</span></div>
+      <div class="week" id="sWeek"></div>
+      <div class="note" id="sToday">今天还没开始背。</div>
     </div>
     <div class="panel">
       <div class="panel-title">应用图标</div>
@@ -603,6 +618,9 @@ const ICON_PRESETS = [
     + '</svg>' },
 ];
 const LS_AUTH = 'ky_auth_user_v1';
+// 每日学习节奏：{ '2026-10-28': { s: 过卡次数, m: 当天新掌握数 } }
+const LS_DAILY = 'ky_daily_v1';
+const DAILY_KEEP_DAYS = 120;
 const savedAuthUser = (() => { try { return localStorage.getItem(LS_AUTH) || null; } catch { return null; } })();
 let authUser = savedAuthUser; // 先用上次账号打开本地进度；联网后再校验会话
 let syncTimer = null;
@@ -630,7 +648,7 @@ const bus = (() => {
   };
 })();
 // 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的
-const SCOPED_KEYS = new Set(['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1', 'ky_stamp_v1']);
+const SCOPED_KEYS = new Set(['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1', 'ky_stamp_v1', 'ky_daily_v1']);
 const scopedKey = key => (authUser && SCOPED_KEYS.has(key) ? key + '@' + authUser : key);
 const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(scopedKey(key))) ?? fallback; } catch { return fallback; } };
 let storageWarned = false;
@@ -650,6 +668,50 @@ const save = (key, value) => {
   }
 };
 const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+const dayKey = ts => {
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+let daily = load(LS_DAILY, {});
+// 只保留最近 120 天，跨账号合并也不会无限膨胀
+function pruneDaily(d) {
+  const cut = todayTs() - (DAILY_KEEP_DAYS - 1) * DAY;
+  const out = {};
+  for (const [k, v] of Object.entries(d || {})) {
+    const ts = new Date(k + 'T00:00:00').getTime();
+    if (Number.isFinite(ts) && ts >= cut) out[k] = v;
+  }
+  return out;
+}
+// s = 今天过卡次数；m = 今天从未掌握变成掌握的词数
+function bumpDaily(known, isNewMaster) {
+  const key = dayKey(Date.now());
+  const rec = daily[key] || { s: 0, m: 0 };
+  rec.s = (rec.s || 0) + 1;
+  if (known && isNewMaster) rec.m = (rec.m || 0) + 1;
+  daily[key] = rec;
+  daily = pruneDaily(daily);
+  save(LS_DAILY, daily);
+}
+// 连续学习天数：今天还没学就从昨天起算，中间断一天就停
+function streakDays(d) {
+  const recs = d || {};
+  let ts = todayTs();
+  let n = 0;
+  if (!(recs[dayKey(ts)] || {}).s) ts -= DAY;
+  while ((recs[dayKey(ts)] || {}).s) { n += 1; ts -= DAY; }
+  return n;
+}
+const mergeDaily = (local, cloud) => {
+  const out = {};
+  for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    const a = (local || {})[key] || {};
+    const b = (cloud || {})[key] || {};
+    // 同一端可能重复上报，取较大值而不是相加
+    out[key] = { s: Math.max(a.s || 0, b.s || 0), m: Math.max(a.m || 0, b.m || 0) };
+  }
+  return out;
+};
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
 let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, icon: null }, load(LS_CONF, {}));
@@ -1233,6 +1295,7 @@ function lowerWeight(word) {
   st.w = Math.max(0, st.w - 1);
   st.t = Date.now();
   save(LS_STATE, state);
+  bumpDaily(false, false);
   if (navigator.vibrate) navigator.vibrate(18);
   renderStudy();
 }
@@ -1242,6 +1305,7 @@ function restoreMastered(word) {
   const at = idx;   // 恢复后队列少一个，停在原位就是原来的下一个词
   const st = state[word.word];
   if (st) { st.mastered = false; st.due = 0; st.t = Date.now(); save(LS_STATE, state); }
+  if (st) bumpDaily(false, false);
   // 重建当前章队列：deckWords() 会因掌握数变化而重算切片，
   // 只改 queue 会导致切片与队列不一致、恢复的词本轮永远轮不到
   // 不能用 posWord 定位——刚恢复的词已不在队列里，找不到就会跳回第一个
@@ -1263,12 +1327,14 @@ function applyWordAction(word, dir) {
 function mark(word, known) {
   if (!word) return;
   const st = state[word.word] || { w: 0, mastered: false, seen: 0 };
+  const wasMastered = !!st.mastered;
   st.t = Date.now();
   st.seen = (st.seen || 0) + 1;
   if (known) { st.mastered = true; st.due = todayTs() + 7 * DAY; }
   else { st.w = (st.w || 0) + 1; st.mastered = false; st.due = 0; }
   state[word.word] = st;
   save(LS_STATE, state);
+  bumpDaily(known, known && !wasMastered);
   if (known) {
     showUndo(word);
     // 移出当前队列：进度条总数同步减少，下一个词自动顶上原位
@@ -1299,7 +1365,38 @@ function mark(word, known) {
   }
   updateStats();
 }
+function renderRhythm() {
+  const streakEl = $('sStreak'), weekEl = $('sWeek'), todayEl = $('sToday');
+  if (!streakEl || !weekEl || !todayEl) return;
+  const todayRec = daily[dayKey(Date.now())] || {};
+  streakEl.textContent = String(streakDays(daily));
+  todayEl.textContent = todayRec.s
+    ? '今天过了 ' + todayRec.s + ' 个词' + (todayRec.m ? '，新掌握 ' + todayRec.m + ' 个' : '') + '。'
+    : '今天还没开始背。';
+  const days = [];
+  for (let i = 6; i >= 0; i -= 1) days.push(todayTs() - i * DAY);
+  let max = 0;
+  for (const ts of days) max = Math.max(max, (daily[dayKey(ts)] || {}).s || 0);
+  const WEEKDAY = '日一二三四五六';
+  const frag = document.createDocumentFragment();
+  days.forEach((ts, i) => {
+    const rec = daily[dayKey(ts)] || {};
+    const cell = document.createElement('div');
+    cell.className = 'week-day' + (i === 6 ? ' today' : '');
+    const num = document.createElement('b');
+    num.textContent = String(rec.s || 0);
+    const bar = document.createElement('i');
+    const ratio = max ? (rec.s || 0) / max : 0;
+    bar.style.setProperty('--h', Math.max(3, Math.round(ratio * 56)) + 'px');
+    const lab = document.createElement('span');
+    lab.textContent = i === 6 ? '今' : WEEKDAY[new Date(ts).getDay()];
+    cell.append(num, bar, lab);
+    frag.append(cell);
+  });
+  weekEl.replaceChildren(frag);
+}
 function updateStats() {
+  renderRhythm();
   if (WEB_MODE && !deckDataReady(activeDeck)) {
     const target = activeDeck;
     $('sTotal').textContent = target === 'mastered' ? '…' : deckDataLength(target);
@@ -1978,6 +2075,7 @@ $('exportProgress').onclick = () => {
     exported: new Date().toISOString(),
     state,
     chapterData,
+    daily,
     conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, icon: conf.icon || null }
   };
   const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
@@ -2003,6 +2101,7 @@ $('importFile').onchange = event => {
         save(LS_STATE, state);
       }
       if (d.chapterData && typeof d.chapterData === 'object') { chapterData = d.chapterData; save('ky_chapter_v1', chapterData); }
+      if (d.daily && typeof d.daily === 'object') { daily = pruneDaily(d.daily); save(LS_DAILY, daily); }
       if (d.conf) {
         if (d.conf.deck && DECKS[d.conf.deck]) { activeDeck = d.conf.deck; conf.deck = d.conf.deck; }
         conf.chapter = d.conf.chapter || 0;
@@ -2039,6 +2138,8 @@ $('resetAll').onclick = () => {
   save(LS_CONF, conf);
   chapterData = {};
   save('ky_chapter_v1', chapterData);
+  daily = {};
+  save(LS_DAILY, daily);
   loadChapter(curChapter, 'natural');
   savePos();
   updateStats();
@@ -2156,6 +2257,7 @@ function snapshot() {
   return {
     state,
     chapterData,
+    daily,
     conf: {
       deck: conf.deck,
       chapter: Number(conf.chapter) || 0,
@@ -2178,6 +2280,10 @@ function applySnapshot(d) {
   if (d.chapterData && typeof d.chapterData === 'object') {
     chapterData = d.chapterData;
     save('ky_chapter_v1', chapterData);
+  }
+  if (d.daily && typeof d.daily === 'object') {
+    daily = pruneDaily(d.daily);
+    save(LS_DAILY, daily);
   }
   if (d.conf && typeof d.conf === 'object') {
     if (d.conf.deck && DECKS[d.conf.deck]) conf.deck = d.conf.deck;
@@ -2214,6 +2320,7 @@ function authSay(msg, kind) {
 function reloadSpace() {
   state = load(LS_STATE, {});
   chapterData = load('ky_chapter_v1', {});
+  daily = load(LS_DAILY, {});
   conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false, speak: true, icon: null }, load(LS_CONF, {}));
   delete conf.autoShow;
   // 换了账号，「已认识」缓存必须重建，否则会沿用上一个账号的词
@@ -2266,6 +2373,14 @@ function adoptGuestProgress(username) {
                                          parseStore(localStorage.getItem('ky_chapter_v1')));
     if (Object.keys(mergedChapters).length) {
       localStorage.setItem(chapterStoreKey, JSON.stringify(mergedChapters));
+    }
+
+    // 每日学习节奏也并进账号空间：同一天取较大值，不同天取并集
+    const dailyKey = LS_DAILY + '@' + username;
+    const mergedDaily = mergeDaily(parseStore(localStorage.getItem(dailyKey)),
+                                   parseStore(localStorage.getItem(LS_DAILY)));
+    if (Object.keys(mergedDaily).length) {
+      localStorage.setItem(dailyKey, JSON.stringify(mergedDaily));
     }
 
     // 位置（哪本词书 / 第几章）留给 progressAt 更新的一方
@@ -2506,12 +2621,14 @@ function mergeSnapshots(local, cloud) {
     return {
       state: cloud.state || {},
       chapterData: cloud.chapterData || {},
+      daily: cloud.daily || {},
       conf: cloud.conf,
     };
   }
   return {
     state: mergeState(local.state, cloud.state),
     chapterData: mergeChapters(local.chapterData, cloud.chapterData),
+    daily: mergeDaily(local.daily, cloud.daily),
     conf: mergeConf(local.conf, cloud.conf, local.chapterData, cloud.chapterData),
   };
 }
@@ -2550,6 +2667,7 @@ function progressKey(c) {
 function applyMergedSnapshot(merged, local) {
   const changedLocally = !sameJson(merged.state, local.state)
     || !sameJson(merged.chapterData, local.chapterData)
+    || !sameJson(merged.daily, local.daily)
     || !sameJson(progressKey(merged.conf), progressKey(local.conf));
   if (changedLocally) {
     applyingRemote = true;

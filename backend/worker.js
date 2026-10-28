@@ -164,6 +164,17 @@ function mergeChapters(local, cloud) {
   return out;
 }
 
+// 每日学习节奏：同一天取较大值，不把两端相加（重复上报会算重）
+function mergeDaily(local, cloud) {
+  const out = {};
+  for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    const a = (local || {})[key] || {};
+    const b = (cloud || {})[key] || {};
+    out[key] = { s: Math.max(a.s || 0, b.s || 0), m: Math.max(a.m || 0, b.m || 0) };
+  }
+  return out;
+}
+
 function latestChapterTime(chapterData) {
   let latest = 0;
   for (const rec of Object.values(chapterData || {})) {
@@ -189,12 +200,19 @@ function mergeConf(local, cloud, localChapters, cloudChapters) {
   const winner = chooseCloud ? b : a;
   const other = chooseCloud ? a : b;
   const deck = winner.deck || other.deck || 'core';
+  const deckChapter = { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) };
+  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新
+  const chapter = Number.isInteger(winner.chapter)
+    ? winner.chapter
+    : (Number.isInteger(deckChapter[deck]) ? deckChapter[deck] : 0);
+  // 两者必须一致，否则恢复时前端会从另一边读到别的章
+  deckChapter[deck] = chapter;
   return {
     ...other,
     ...winner,
     deck,
-    chapter: Number(winner.chapter ?? (winner.deckChapter || {})[deck] ?? 0) || 0,
-    deckChapter: { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) },
+    chapter,
+    deckChapter,
     progressAt: Math.max(localAt, cloudAt),
   };
 }
@@ -202,11 +220,17 @@ function mergeSnapshots(local, cloud) {
   const localForce = (local.conf && local.conf.forceAt) || 0;
   const cloudForce = (cloud.conf && cloud.conf.forceAt) || 0;
   if (cloudForce > localForce) {
-    return { state: cloud.state || {}, chapterData: cloud.chapterData || {}, conf: cloud.conf };
+    return {
+      state: cloud.state || {},
+      chapterData: cloud.chapterData || {},
+      daily: cloud.daily || {},
+      conf: cloud.conf,
+    };
   }
   return {
     state: mergeState(local.state, cloud.state),
     chapterData: mergeChapters(local.chapterData, cloud.chapterData),
+    daily: mergeDaily(local.daily, cloud.daily),
     conf: mergeConf(local.conf, cloud.conf, local.chapterData, cloud.chapterData),
   };
 }

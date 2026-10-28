@@ -1,9 +1,9 @@
-const BUILD_VERSION = '8840d337a223';
+const BUILD_VERSION = '0a9aeedd43bd';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v1';
 const AUDIO_CACHE_MAX = 1500;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.bec177f33863.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.0c353731615a.js"];
+const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.bec177f33863.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.b38c8dc70d49.js"];
 const SHELL = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png', ...DATA_ASSETS];
 
 self.addEventListener('install', event => {

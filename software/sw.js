@@ -1,4 +1,4 @@
-const BUILD_VERSION = '53d5bd86bfee';
+const BUILD_VERSION = 'ffc52267f21c';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v1';
 // 四本词库合计三千多词，「下载全部」要能一次装下，条数上限不能再卡在 1500；
@@ -10,7 +10,7 @@ const NAV_TIMEOUT_MS = 3000;
 const AUDIO_BUDGET_RATIO = 0.8;
 const AUDIO_BUDGET_MIN_FREE = 8 * 1024 * 1024;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.4e1156f32263.js"];
+const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.42fe0fae2db5.js"];
 const SHELL = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png', ...DATA_ASSETS];
 
 // 写缓存一律允许失败：配额满时 cache.put 会 reject，

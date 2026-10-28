@@ -145,9 +145,9 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .list-meaning{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .restore-btn{border:1px solid var(--line);background:transparent;color:var(--brand);border-radius:8px;padding:4px 8px;font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
 .list-priority{font-size:11px;font-weight:800;border-radius:999px;padding:4px 7px;white-space:nowrap}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 7px;text-align:center}
-.stat b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 7px;text-align:center;min-width:0}
+.stat b{display:block;font-size:clamp(17px,5.2vw,21px);font-variant-numeric:tabular-nums}
 .stat span{font-size:11px;color:var(--muted)}
 .streak{display:flex;align-items:baseline;gap:8px}
 .streak b{font-size:26px;font-variant-numeric:tabular-nums}
@@ -165,8 +165,8 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .daily button.active{color:var(--brand);border-color:var(--brand);background:var(--brand-soft);font-weight:700}
 .note{font-size:12.5px;line-height:1.7;color:var(--muted)}
 .note b{color:var(--ink)}
-.account-btn{position:relative;border:0;background:none;padding:0;cursor:pointer;flex-shrink:0;line-height:0;
-  border-radius:50%}
+.account-btn{position:relative;border:0;background:none;padding:5px;margin:-5px;cursor:pointer;
+  flex-shrink:0;line-height:0;border-radius:50%}
 .account-btn:active{transform:scale(.94)}
 .account-btn .avatar{display:flex;align-items:center;justify-content:center;width:34px;height:34px;
   border-radius:50%;overflow:hidden;background:var(--line);color:#fff;font-size:15px;font-weight:800;
@@ -409,12 +409,12 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
         <button type="button" id="iconReset">恢复默认</button>
       </div>
       <input type="file" id="iconFile" accept="image/*" class="hidden">
-      <div class="note" id="iconStatus">可从相册选择图片，会自动裁成方形；左上角和浏览器标签页立即更新，手机主屏图标由系统缓存。</div>
+      <div class="note" id="iconStatus">可从相册选择图片，会自动裁成方形；左上角、浏览器标签页立即更新，并跟着账号同步到其它设备。手机主屏图标由系统缓存，换图标后需要重新「添加到主屏幕」才会变。</div>
     </div>
     <div class="panel">
       <div class="panel-title">背诵优先级</div>
       <div class="note">
-        <b>S 必背</b> → <b>A 重点</b> → <b>B 次重点</b><br>右滑（不认识）会给这个词加权重，卡片上显示「错 N 次」；点「打乱本章」时权重越高越可能排前面，但不会强制置顶。<br>
+        <b>S 必背</b> → <b>A 重点</b> → <b>B 次重点</b> → <b>C 补充</b><br>右滑（不认识）会给这个词加权重，卡片上显示「错 N 次」；点「打乱本章」时权重越高越可能排前面，但不会强制置顶。<br>
         系统已综合真题权重、词书分层和五书共识，按优先级从高到低排好。你不需要自己再看次数、覆盖套数和频段。
       </div>
     </div>
@@ -606,6 +606,9 @@ const AVATAR_LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"
   + 'stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"/>'
   + '<circle cx="28.5" cy="9.3" r="1.7" fill="#fbbf24"/>'
   + '</svg>';
+// 图标 dataURL 的上限。它要跟着账号同步，撑大了会顶到同步 payload 的 512KB 线；
+// 导入备份时也可能被人塞进一张几百 KB 的图，直接写满 localStorage。
+const ICON_DATA_MAX = 120 * 1024;
 const ICON_PRESETS = [
   { id: 'brand', label: '默认 Logo', svg: AVATAR_LOGO },
   { id: 'book', label: '书本', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" aria-hidden="true">'
@@ -751,7 +754,7 @@ function streakDays(d) {
 // 以前本地这份用 Math.max，撤销减掉的计数一同步就被云端「取大」复活了。
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
-let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, icon: null }, load(LS_CONF, {}));
+let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, icon: null, iconAt: 0 }, load(LS_CONF, {}));
 const DECKS = {
   core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', get words() { return deckJson('words'); } },
   derivative: { label: '阶段二 · 核心派生', note: '阶段二 · 核心派生：只收词族中高频、词性或语义有明显变化的成员。', get words() { return deckJson('derivatives'); } },
@@ -1487,7 +1490,9 @@ function updateStats() {
   $('sTotal').textContent = total;
   $('sLearned').textContent = learned;
   $('sMastered').textContent = mastered;
-  $('sDue').textContent = Math.max(total - mastered, 0);
+  // 「待学」是还没碰过的词，不是「还没掌握的词」。用 total - mastered 会让
+  // 学过但没掌握的词同时被算进「学过」和「待学」，学得越多这个数越不动。
+  $('sDue').textContent = Math.max(total - learned, 0);
 }
 const LIST_PAGE_SIZE = 100;
 let listLimit = LIST_PAGE_SIZE;
@@ -2166,6 +2171,7 @@ $('testSpeak').onclick = () => {
 $('iconUpload').onclick = () => $('iconFile').click();
 $('iconReset').onclick = () => {
   conf.icon = null;
+  conf.iconAt = Date.now();
   save(LS_CONF, conf);
   renderAuth();
   renderIconSettings();
@@ -2203,6 +2209,7 @@ $('iconFile').onchange = event => {
       ctx.drawImage(image, sx, sy, side, side, 0, 0, size, size);
       const data = canvas.toDataURL('image/jpeg', 0.86);
       conf.icon = { kind: 'image', data, name: file.name.slice(0, 60) };
+      conf.iconAt = Date.now();
       save(LS_CONF, conf);
       renderAuth();
       renderIconSettings();
@@ -2229,7 +2236,7 @@ $('exportProgress').onclick = () => {
     state,
     chapterData,
     daily,
-    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, progressAt: Number(conf.progressAt) || 0, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, icon: conf.icon || null }
+    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, progressAt: Number(conf.progressAt) || 0, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, icon: conf.icon || null, iconAt: Number(conf.iconAt) || 0 }
   };
   const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -2313,7 +2320,17 @@ $('importFile').onchange = event => {
         }
         conf.showByDefault = !!d.conf.showByDefault;
         if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
-        if (Object.prototype.hasOwnProperty.call(d.conf, 'icon')) conf.icon = d.conf.icon || null;
+        if (Object.prototype.hasOwnProperty.call(d.conf, 'icon')) {
+          // 备份是外部文件：图标不收超大或非图片的 dataURL，否则会写满 localStorage
+          const incoming = d.conf.icon;
+          const usable = !!incoming && typeof incoming === 'object'
+            && (incoming.kind !== 'image'
+              || (typeof incoming.data === 'string'
+                  && incoming.data.length <= ICON_DATA_MAX
+                  && /^data:image\//i.test(incoming.data)));
+          conf.icon = usable ? incoming : null;
+          conf.iconAt = NOW_T;
+        }
         conf.progressAt = NOW_T;
         save(LS_CONF, conf);
         renderAuth();
@@ -2428,6 +2445,9 @@ $('deckSelect').onchange = event => switchDeck(event.target.value);
 
 // ---------- 账号与云同步 ----------
 let authMode = 'login';
+// 头像要在首屏就画出来。放在这里而不是更上面的启动序列：renderAuth 读 authMode，
+// 提前调用会撞上它的 TDZ，整段脚本会从那里中断。
+renderAuth();
 
 // 会话过期（401）后必须把界面也踢回未登录状态：
 // 否则界面一直显示已登录，而自动同步在后台静默失败，用户完全无感知。
@@ -2439,12 +2459,18 @@ function handleSessionExpired() {
   try { localStorage.removeItem(LS_AUTH); } catch {}
   reloadSpace();
   renderAuth();
+  showSessionNotice('登录已过期，请重新登录。进度仍保存在本机。', 8000);
+}
+
+// 顶部提示条：登录成功、退出、会话过期这类一次性结果都在这里说一声。
+// 只写在弹窗里的话，弹窗一关用户就什么也看不到了。
+function showSessionNotice(text, ms) {
   const el = $('sessionWarn');
-  if (el) {
-    el.textContent = '登录已过期，请重新登录。进度仍保存在本机。';
-    el.classList.remove('hidden');
-    setTimeout(() => el.classList.add('hidden'), 8000);
-  }
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('hidden');
+  clearTimeout(showSessionNotice.timer);
+  showSessionNotice.timer = setTimeout(() => el.classList.add('hidden'), ms || 6000);
 }
 
 async function api(path, options) {
@@ -2519,6 +2545,8 @@ function snapshot() {
     if (name === '__proto__') continue;
     slimState[name] = slimRecord(rec);
   }
+  // 只上传能通过校验的图标：坏数据不该被同步到别的设备，也不该撑大 payload
+  const iconOk = !!configuredIcon();
   return {
     state: slimState,
     chapterData,
@@ -2530,6 +2558,9 @@ function snapshot() {
       progressAt: Number(conf.progressAt) || 0,
       showByDefault: !!conf.showByDefault,
       speak: conf.speak !== false,
+      // 图标是账号级偏好：跟着账号走，换手机不用重设。体积由 ICON_DATA_MAX 兜住。
+      icon: iconOk ? conf.icon : null,
+      iconAt: iconOk ? (Number(conf.iconAt) || 0) : 0,
     },
   };
 }
@@ -2555,6 +2586,13 @@ function applySnapshot(d) {
     if (typeof d.conf.progressAt === 'number') conf.progressAt = d.conf.progressAt;
     if (typeof d.conf.showByDefault === 'boolean') conf.showByDefault = d.conf.showByDefault;
     if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
+    // 图标按各自的设置时间取新。云端从没设过（iconAt=0）时不要动本机图标，
+    // 否则别处一台没设图标的设备同步一次就把这里的自定义图标洗成默认。
+    const remoteIconAt = Number(d.conf.iconAt) || 0;
+    if (remoteIconAt > (Number(conf.iconAt) || 0)) {
+      conf.icon = d.conf.icon && typeof d.conf.icon === 'object' ? d.conf.icon : null;
+      conf.iconAt = remoteIconAt;
+    }
     // 删除已改用墓碑表达，老数据里的 forceAt 留着只会误导后续判断
     delete conf.forceAt;
     save(LS_CONF, conf);
@@ -2573,6 +2611,10 @@ function applySnapshot(d) {
   renderChapters();
   updateStats();
   renderList();
+  // 图标可能刚从别的设备同步过来，左上角头像、浏览器标签页和设置面板都要跟着变
+  renderAuth();
+  renderIconSettings();
+  syncFavicon(currentIcon());
 }
 
 function authSay(msg, kind) {
@@ -2689,6 +2731,7 @@ function configuredIcon() {
     return preset ? { ...preset, kind: 'preset' } : null;
   }
   if (icon.kind === 'image' && typeof icon.data === 'string'
+      && icon.data.length <= ICON_DATA_MAX
       && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(icon.data)) return icon;
   return null;
 }
@@ -2703,6 +2746,7 @@ function iconDataUrl(icon) {
 function iconLabel(icon) {
   return icon.kind === 'image' ? (icon.name ? '自定义：' + icon.name : '自定义图片') : icon.label;
 }
+let faviconToken = 0;
 function syncFavicon(icon) {
   try {
     const link = $('appFavicon');
@@ -2714,8 +2758,11 @@ function syncFavicon(icon) {
     }
     const touch = $('appleTouchIcon');
     if (!touch) return;
+    // 连点图标时，旧图的 onload 可能后到，把刚换上的图又盖回去
+    const token = ++faviconToken;
     const image = new Image();
     image.onload = () => {
+      if (token !== faviconToken) return;
       try {
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 180;
@@ -2728,7 +2775,7 @@ function syncFavicon(icon) {
         touch.href = iconDataUrl(icon);
       }
     };
-    image.onerror = () => { touch.href = iconDataUrl(icon); };
+    image.onerror = () => { if (token === faviconToken) touch.href = iconDataUrl(icon); };
     image.src = iconDataUrl(icon);
   } catch {}
 }
@@ -2743,7 +2790,8 @@ function renderIconSettings() {
   previewImg.src = iconDataUrl(selected);
   previewImg.alt = '';
   preview.append(previewImg);
-  const selectedId = active && active.kind === 'preset' ? active.id : 'brand';
+  // 自定义图片时不能把「默认 Logo」标成选中，那会和左上角的实际图标自相矛盾
+  const selectedId = active ? (active.kind === 'preset' ? active.id : null) : 'brand';
   $('iconCurrentName').textContent = active ? iconLabel(active) : '默认 Logo';
   choices.replaceChildren();
   for (const preset of ICON_PRESETS) {
@@ -2762,6 +2810,7 @@ function renderIconSettings() {
     button.append(img, label);
     button.onclick = () => {
       conf.icon = preset.id === 'brand' ? null : { kind: 'preset', id: preset.id };
+      conf.iconAt = Date.now();
       save(LS_CONF, conf);
       renderAuth();
       renderIconSettings();
@@ -2792,6 +2841,10 @@ function renderAuth() {
   }
   btn.classList.toggle('custom-icon', !!active);
   btn.classList.toggle('online', !!authUser);
+  // 头像只有 34px，光靠绿点和底色区分登录态，读屏用户和色弱用户都读不出来
+  btn.setAttribute('aria-label', authUser
+    ? '账号：' + authUser + '，点这里管理账号与离线缓存'
+    : '未登录，点这里登录或注册');
   $('authSync').classList.toggle('hidden', !authUser);
   $('pairNewBox').classList.toggle('hidden', !authUser);
   $('pairClaimToggle').classList.toggle('hidden', !!authUser);
@@ -3036,7 +3089,9 @@ async function afterLogin(username) {
   try { localStorage.setItem(LS_AUTH, username); } catch {}
   reloadSpace();
   renderAuth();
-  authSay('正在同步…');
+  // 登录成功后把弹窗收起来，改用顶部提示条说明结果，别让人对着表单发愣
+  $('authModal').classList.add('hidden');
+  showSessionNotice('已登录：' + username + '，正在同步进度…', 5000);
   setTimeout(() => syncNow(false), 0);
 }
 
@@ -3074,12 +3129,24 @@ $('authForm').onsubmit = async event => {
   }
 };
 $('authLogout').onclick = async () => {
-  try { await api('/logout', { method: 'POST' }); } catch {}
+  const btn = $('authLogout');
+  btn.disabled = true;
+  try {
+    await api('/logout', { method: 'POST' });
+  } catch (e) {
+    // 离线时服务端 session 还活着。这时假装退出，下次刷新会被自动登回去，
+    // 用户会以为退出没生效。宁可报错也不要装作成功。
+    btn.disabled = false;
+    authSay('退出失败：' + ((e && e.message) || '网络异常') + '，请联网后再试', 'err');
+    return;
+  }
+  btn.disabled = false;
   authUser = null;
   try { localStorage.removeItem(LS_AUTH); } catch {}
   reloadSpace();
   renderAuth();
-  authSay('已退出登录，进度仍保存在本机', 'ok');
+  $('authModal').classList.add('hidden');
+  showSessionNotice('已退出登录，进度仍保存在本机', 5000);
 };
 $('pairClaimToggle').onclick = () => {
   $('pairClaimBox').classList.toggle('hidden');

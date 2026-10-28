@@ -196,6 +196,17 @@ function mergeConf(local, cloud, localChapters, cloudChapters, localActivityAt, 
   // 两者必须一致，否则恢复时前端会从另一边读到别的章
   deckChapter[deck] = chapter;
   const out = { ...other, ...winner, deck, chapter, deckChapter, progressAt: Math.max(localAt, cloudAt) };
+  // 图标是本机偏好，不能跟着「位置时间」走：游客从没设过图标时 icon 是 null，
+  // 用整对象仲裁会把账号那边的自定义图标一起洗成默认。
+  const aIconAt = Number(a.iconAt) || 0;
+  const bIconAt = Number(b.iconAt) || 0;
+  if (aIconAt || bIconAt) {
+    const icon = aIconAt === bIconAt
+      ? (winner.icon ?? other.icon)
+      : (aIconAt > bIconAt ? a.icon : b.icon);
+    out.icon = (icon && typeof icon === 'object') ? icon : null;
+    out.iconAt = Math.max(aIconAt, bIconAt);
+  }
   delete out.forceAt;   // 删除改用墓碑表达后，这个字段已经没有语义
   return out;
 }

@@ -89,6 +89,10 @@ def static_checks():
     check("详情带音标与真题次数", '"p":' in t and '"freq":' in t)
     check("详情词典默认展开", "$('detailDictBox').open = true" in t)
     check("等级只用单字母上卡片", "PRIORITY_LABELS" in t and "el.textContent = level;" in t)
+    check("图标有体积上限", "ICON_DATA_MAX" in t and "icon.data.length <= ICON_DATA_MAX" in t)
+    check("头像不等网络就先渲染",
+          "renderAuth();" in t.split("let authMode = 'login';")[1][:160])
+    check("头像读屏标签随登录态变", "btn.setAttribute('aria-label'" in t)
 
     # --- 首屏：词库走 JSON 数据块，按需解析 ---
     check("词库改用 JSON 数据块", t.count('type="application/json"') == 6)
@@ -399,6 +403,24 @@ setTimeout(function () {
           out.detail_shown = !document.getElementById('detailMask').classList.contains('hidden');
           closeDetail();
           out.detail_hidden = document.getElementById('detailMask').classList.contains('hidden');
+
+          // K3. 统计口径：待学 = 总词数 - 学过，学过但没掌握的词不能还算「待学」
+          out.stat_total = Number(document.getElementById('sTotal').textContent);
+          out.stat_learned = Number(document.getElementById('sLearned').textContent);
+          out.stat_due = Number(document.getElementById('sDue').textContent);
+          out.stat_due_ok = out.stat_due === out.stat_total - out.stat_learned;
+
+          // K4. 图标跟着账号走：要进快照，且不能被「从没设过图标的游客端」洗成默认
+          const presetIcon = { kind: 'preset', id: 'moon' };
+          const keptIcon = conf.icon, keptIconAt = conf.iconAt;
+          conf.icon = presetIcon; conf.iconAt = 1;
+          out.snapshot_has_icon = JSON.stringify(snapshot().conf.icon) === JSON.stringify(presetIcon);
+          const iconMerged = mergeConf(
+            { deck: 'core', progressAt: 1, icon: presetIcon, iconAt: 1 },
+            { deck: 'core', progressAt: 999999, icon: null, iconAt: 0 },
+            {}, {}, 0, 0);
+          out.merge_icon_kept = !!iconMerged.icon && iconMerged.icon.id === 'moon';
+          conf.icon = keptIcon; conf.iconAt = keptIconAt;
 
           // L. 从单词上起手的触摸不会被吞（否则滑动判定的 touchend 丢失）
           let cardGotTouchEnd = false;
@@ -899,7 +921,7 @@ def browser_checks():
     io.open(tmp, "w", encoding="utf-8").write(html)
     try:
         r = subprocess.run(
-            [EDGE, "--headless=new", "--disable-gpu", "--virtual-time-budget=8000",
+            [EDGE, "--headless=new", "--disable-gpu", "--virtual-time-budget=20000",
              "--window-size=390,840", "--dump-dom", "file:///" + tmp.replace("\\", "/")],
             capture_output=True, timeout=150,
         )
@@ -918,6 +940,7 @@ def browser_checks():
             "flip_after_next": False,
             "left_mastered": True, "left_due": True, "undo_visible": True,
             "swipe_settled": True, "right_settled": True,
+            "stat_due_ok": True, "snapshot_has_icon": True, "merge_icon_kept": True,
             "undo_cleared": True, "undo_back": True,
             "right_same": True, "right_weight": True, "weight_badge": True,
             "composite_weight": True, "unique_weights": True,

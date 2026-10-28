@@ -279,12 +279,9 @@ async function handleApi(request, env, ctx) {
   try {
     // 微信扫码登录：需要微信开放平台「网站应用」资质（企业主体 + 认证费）
     if (path === '/wx' && method === 'GET') {
-      const appid = env.WX_APPID || '';
-      return json({
-        enabled: !!appid,
-        appid,
-        hint: appid ? '' : '需微信开放平台网站应用资质（企业主体），未配置时不可用',
-      });
+      // 扫码登录的回调（code 换 token、绑定 or 建号）还没实现。
+      // 只要配了 appid 就放出去，用户会被跳到微信授权页、回来却什么也不发生。
+      return json({ enabled: false, hint: '微信扫码登录尚未接入回调，暂不可用' });
     }
 
     if (path === '/register' && method === 'POST') {

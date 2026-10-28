@@ -46,6 +46,10 @@ def static_checks():
     check("含撤销条", "undoBar" in t)
     check("含导出进度", "exportProgress" in t)
     check("含 deckChapter 记忆", "deckChapter" in t)
+    check("含登录面板", "authModal" in t and "accountBtn" in t)
+    check("含云同步接口", "/state" in t and "snapshot" in t)
+    check("含恢复原序按钮", "restoreOrder" in t)
+    check("含合成权重", "scoreOf" in t)
 
 
 # ---------- 数据完整性 ----------
@@ -154,8 +158,10 @@ setTimeout(function () {
           delete chapterData[k0];
           loadChapter(0);
           out.order_stable = ord1.length > 0 && ord1 === queue.slice(0, 15).map(x => x.word).join();
-          loadChapter(0, true);
+          loadChapter(0, 'shuffle');
           out.order_shuffled = ord1 !== queue.slice(0, 15).map(x => x.word).join();
+          loadChapter(0, 'natural');
+          out.order_restored = ord1 === queue.slice(0, 15).map(x => x.word).join();
           delete chapterData[k0];
 
           // H. 点红点减权重
@@ -209,7 +215,7 @@ def browser_checks():
             "undo_cleared": True, "undo_back": True,
             "right_same": True, "right_weight": True, "weight_badge": True,
             "deck_chapter": True, "resume_ok": True,
-            "order_stable": True, "order_shuffled": True,
+            "order_stable": True, "order_shuffled": True, "order_restored": True,
             "weight_down": True, "weight_badge_val": True,
         }
         for k, v in expect.items():

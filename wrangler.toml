@@ -1,0 +1,8 @@
+name = "kaoyan2-words"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "deploy"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kaoyan2-users"
+database_id = "1b129245-4f8e-4d4c-ace5-4406c477088f"

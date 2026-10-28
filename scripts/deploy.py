@@ -48,6 +48,13 @@ def main():
         os.path.join(ROOT, "software", "考研核心词.html"),
         os.path.join(ROOT, "deploy", "index.html"),
     )
+    src_worker = os.path.join(ROOT, "backend", "worker.js")
+    if os.path.exists(src_worker):
+        shutil.copyfile(src_worker, os.path.join(ROOT, "deploy", "_worker.js"))
+        print("  已同步 _worker.js（登录与同步接口）")
+    shutil.rmtree(os.path.join(ROOT, "deploy", "functions"), ignore_errors=True)
+    # deploy/ 是生成目录，残留的 .git 会污染上传
+    shutil.rmtree(os.path.join(ROOT, "deploy", ".git"), ignore_errors=True)
 
     print("[4/4] 部署到 Cloudflare Pages")
     # 用 PowerShell 执行，避开 python subprocess 调 npx 的兼容问题

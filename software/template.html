@@ -66,6 +66,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .shuffle-btn{border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:10px;
   font:inherit;font-size:12px;padding:6px;cursor:pointer;flex-shrink:0}
 .shuffle-btn:active{border-color:var(--brand);color:var(--brand)}
+.order-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0}
 .card{position:relative;flex:1;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:22px;
   box-shadow:var(--shadow);padding:20px 18px 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;gap:12px;overflow:hidden;touch-action:none;user-select:none}
@@ -132,6 +133,34 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .daily button.active{color:var(--brand);border-color:var(--brand);background:var(--brand-soft);font-weight:700}
 .note{font-size:12.5px;line-height:1.7;color:var(--muted)}
 .note b{color:var(--ink)}
+.account-btn{border:1px solid var(--line);background:transparent;color:var(--muted);
+  font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:6px 11px;cursor:pointer;
+  max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-btn.online{color:var(--brand);border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  padding:18px;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.modal-card{position:relative;width:min(100%,360px);background:var(--card);color:var(--ink);
+  border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);
+  padding:22px 18px 18px;display:flex;flex-direction:column;gap:10px}
+.modal-close{position:absolute;top:8px;right:10px;border:0;background:transparent;color:var(--muted);
+  font-size:24px;line-height:1;cursor:pointer;padding:4px 6px}
+.modal-title{font-size:17px;font-weight:800}
+.modal-note{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+.auth-form{display:flex;flex-direction:column;gap:8px}
+.auth-input{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:11px;
+  padding:11px 12px;font:inherit;font-size:14px}
+.auth-input:focus{outline:2px solid color-mix(in srgb,var(--brand) 45%,transparent);outline-offset:1px}
+.auth-switch{border:0;background:transparent;color:var(--brand);font:inherit;font-size:12.5px;
+  cursor:pointer;padding:4px;text-decoration:underline;text-underline-offset:3px}
+.danger-link{color:var(--bad)}
+.auth-sep{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11.5px}
+.auth-sep::before,.auth-sep::after{content:"";flex:1;height:1px;background:var(--line)}
+.wx-btn{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:11px;
+  padding:11px;font:inherit;font-size:13px;cursor:not-allowed;opacity:.65}
+.auth-status{font-size:12.5px;color:var(--muted);min-height:1em;line-height:1.5}
+.auth-status.err{color:var(--bad)}
+.auth-status.ok{color:var(--ok)}
+.auth-sync{display:flex;flex-direction:column;gap:8px}
 .danger{border:1px solid color-mix(in srgb,var(--bad) 38%,var(--line));background:transparent;color:var(--bad);border-radius:12px;padding:10px;font:inherit;font-size:13px;cursor:pointer}
 @media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:12px 13px 42px}.meaning-toggle{font-size:12px}}
 @media (max-height:620px){
@@ -151,6 +180,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     <button class="tab active" id="tabStudy">学习</button>
     <button class="tab" id="tabList">词表</button>
     <button class="tab" id="tabStat">统计</button>
+    <button class="account-btn" id="accountBtn">登录</button>
   </div>
 </header>
 <div class="storage-warn hidden" id="storageWarn">进度保存失败：浏览器存储已满或处于隐私模式，刷新后可能丢失。</div>
@@ -195,7 +225,10 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       <span class="word-id" id="wordId">优先级 #1</span>
       <button class="nav-btn" id="nextWord">下一个 →</button>
     </div>
-    <button class="shuffle-btn" id="shuffleChapter">↻ 打乱本章顺序</button>
+    <div class="order-btns">
+      <button class="shuffle-btn" id="shuffleChapter">↻ 打乱顺序</button>
+      <button class="shuffle-btn" id="restoreOrder">⟲ 恢复原序</button>
+    </div>
     <div class="empty hidden" id="done">
       <strong id="doneTitle">本章过完了</strong>
       <span id="doneHint">还有没掌握的词，可以再过一轮。</span>
@@ -248,6 +281,27 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   <span id="undoText">已认识</span>
   <button id="undoBtn">撤销</button>
 </div>
+<div class="modal hidden" id="authModal">
+  <div class="modal-card">
+    <button class="modal-close" id="authClose" aria-label="关闭">×</button>
+    <div class="modal-title" id="authTitle">登录</div>
+    <p class="modal-note">登录后进度在手机和电脑之间同步。</p>
+    <form class="auth-form" id="authForm">
+      <input class="auth-input" id="authUser" placeholder="用户名" autocomplete="username" required>
+      <input class="auth-input" id="authPass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" required>
+      <button class="btn primary" id="authSubmit" type="submit">登录</button>
+    </form>
+    <button class="auth-switch" id="authMode">没有账号？注册一个</button>
+    <div class="auth-sep"><span>或</span></div>
+    <button class="wx-btn" id="wxLogin" disabled title="需微信开放平台网站应用资质">微信扫码登录（暂不可用）</button>
+    <div class="auth-status" id="authStatus"></div>
+    <div class="auth-sync hidden" id="authSync">
+      <button class="btn" id="syncUp">用本机进度覆盖云端</button>
+      <button class="btn" id="syncDown">用云端进度覆盖本机</button>
+      <button class="auth-switch danger-link" id="authLogout">退出登录</button>
+    </div>
+  </div>
+</div>
 <script>
 const WORDS = __DATA__;
 const DERIVATIVES = __DERIVATIVES__;
@@ -256,12 +310,15 @@ const INSURANCE = __INSURANCE__;
 const DATA_META = __META__;
 const LS_STATE = 'ky_words_v1';
 const LS_CONF = 'ky_conf_v1';
+const LS_STAMP = 'ky_stamp_v1';
 const DAY = 864e5;
 const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 let storageWarned = false;
 const save = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    try { localStorage.setItem(LS_STAMP, String(Date.now())); } catch {}
+    scheduleCloudSync();
   } catch (e) {
     if (!storageWarned) {
       storageWarned = true;
@@ -317,15 +374,25 @@ function weightOf(word) {
   const st = state[word.word];
   return st ? (st.w || 0) : 0;
 }
-// 默认顺序：确定性排序，权重高的靠前，同级按词表原序（每次打开完全一致）
-function priorityOrder(list) {
-  return list.slice().sort((a, b) => (weightOf(b) - weightOf(a)) || (a.id - b.id));
+// 词表自带的优先度权重（S 最高）
+const TIER_SCORE = { S: 3, A: 2, B: 1, C: 0 };
+function tierOf(word) {
+  const p = String(word.priority || 'C').trim().charAt(0).toUpperCase();
+  return TIER_SCORE[p] || 0;
 }
-// 加权洗牌：仅「打乱本章顺序」按钮使用
+// 合成权重 = 词表默认权重 + 我右滑累计的次数
+function scoreOf(word) {
+  return tierOf(word) + weightOf(word);
+}
+// 原序：完全按词表顺序，每次打开都一样
+function naturalOrder(list) {
+  return list.slice().sort((a, b) => a.id - b.id);
+}
+// 加权洗牌：只影响「靠前的概率」，权重高更可能排在前面，但不强制置顶
 function shuffleByWeight(list) {
   const arr = list.map(word => ({
     word,
-    key: Math.pow(Math.random(), 1 / (1 + weightOf(word) * 0.5))
+    key: Math.pow(Math.random(), 1 / (1 + scoreOf(word) * 0.6))
   }));
   arr.sort((a, b) => b.key - a.key);
   return arr.map(x => x.word);
@@ -343,7 +410,7 @@ function savePos() {
   chapterData[key].done = queue.length > 0 && idx >= queue.length;
   save('ky_chapter_v1', chapterData);
 }
-function loadChapter(ch, reshuffle) {
+function loadChapter(ch, mode) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
   curChapter = ch;
   const key = chapterKey(ch);
   const now = todayTs();
@@ -354,11 +421,11 @@ function loadChapter(ch, reshuffle) {
     return !!(st && st.due && st.due <= now);
   });
   let rec = chapterData[key];
-  if (reshuffle) {
+  if (mode === 'shuffle') {
     rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true };
     save('ky_chapter_v1', chapterData);
-  } else if (!rec || !Array.isArray(rec.order)) {
-    rec = chapterData[key] = { order: priorityOrder(pending).map(w => w.word), pos: 0 };
+  } else if (mode === 'natural' || !rec || !Array.isArray(rec.order)) {
+    rec = chapterData[key] = { order: naturalOrder(pending).map(w => w.word), pos: 0 };
     save('ky_chapter_v1', chapterData);
   }
   const byName = new Map(pending.map(w => [w.word, w]));
@@ -452,22 +519,59 @@ function navigate(delta) {
   savePos();
   renderStudy();
 }
-let speakCache = null;
 let lastSpoken = '';
+let speakVoice = null;
+let voiceReady = false;
+// 音色缓存：在线 Natural 音色每次合成要联网，延迟明显，优先选本地音色
+function refreshVoice() {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const voices = synth.getVoices() || [];
+    if (!voices.length) return;
+    const us = voices.filter(v => /en[-_]US/i.test(v.lang));
+    const anyEn = voices.filter(v => /^en/i.test(v.lang));
+    const pick = (list) => list.find(v => !/online|natural|network/i.test(v.name + ' ' + v.voiceURI))
+                    || list[0];
+    speakVoice = pick(us) || pick(anyEn) || null;
+    voiceReady = true;
+  } catch (e) {}
+}
+// 预热：先合成一个空串，把语音引擎初始化掉，第一次点词才不会卡半秒
+function warmUpSpeech() {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    refreshVoice();
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    u.rate = 1;
+    u.lang = 'en-US';
+    if (speakVoice) u.voice = speakVoice;
+    synth.speak(u);
+  } catch (e) {}
+}
+if (window.speechSynthesis) {
+  refreshVoice();
+  window.speechSynthesis.onvoiceschanged = refreshVoice;
+  warmUpSpeech();
+  // 移动端首次触摸时再预热一次（部分浏览器要求用户手势后才初始化）
+  document.addEventListener('touchstart', warmUpSpeech, { once: true, passive: true });
+  document.addEventListener('click', warmUpSpeech, { once: true });
+}
 function speak(word) {
   try {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    if (!voiceReady) refreshVoice();
+    if (synth.speaking || synth.pending) synth.cancel();
     const u = new SpeechSynthesisUtterance(word);
     u.lang = 'en-US';
-    u.rate = 0.92;
-    // 优先选英语母语发音
-    const voices = window.speechSynthesis.getVoices() || [];
-    const en = voices.find(v => /en[-_]US/i.test(v.lang) && /google|samantha|natural/i.test(v.name))
-            || voices.find(v => /en[-_]US/i.test(v.lang))
-            || voices.find(v => /^en/i.test(v.lang));
-    if (en) u.voice = en;
-    window.speechSynthesis.speak(u);
+    u.rate = 1;
+    u.pitch = 1;
+    u.volume = 1;
+    if (speakVoice) u.voice = speakVoice;
+    synth.speak(u);
   } catch (e) {}
 }
 function toggleMeaning() {
@@ -768,7 +872,11 @@ $('shuffleChapter').onclick = () => {
     for (const w of slice) if (state[w.word]) state[w.word].mastered = false;
     save(LS_STATE, state);
   }
-  loadChapter(curChapter, true);
+  loadChapter(curChapter, 'shuffle');
+  updateStats();
+};
+$('restoreOrder').onclick = () => {
+  loadChapter(curChapter, 'natural');
   updateStats();
 };
 $('prevWord').onclick = () => navigate(-1);
@@ -783,7 +891,7 @@ $('doneAction').onclick = () => {
     }
     save(LS_STATE, state);
   }
-  loadChapter(curChapter, true);
+  loadChapter(curChapter, mode === 'reshuffle' ? 'shuffle' : 'natural');
   updateStats();
 };
 $('tabStudy').onclick = () => switchView('Study');
@@ -855,7 +963,7 @@ $('resetAll').onclick = () => {
   save(LS_STATE, state);
   chapterData = {};
   save('ky_chapter_v1', chapterData);
-  loadChapter(curChapter, true);
+  loadChapter(curChapter, 'natural');
   updateStats();
 };
 window.addEventListener('keydown', event => {
@@ -912,6 +1020,201 @@ $('word').addEventListener('touchend', event => {
   if (w) { wordTouchedAt = Date.now(); speak(w.word); }
 });
 $('deckSelect').onchange = event => switchDeck(event.target.value);
+
+// ---------- 账号与云同步 ----------
+let authUser = null;
+let authMode = 'login';
+let syncTimer = null;
+let syncing = false;
+
+async function api(path, options) {
+  const opt = options || {};
+  const res = await fetch('/api' + path, {
+    method: opt.method || (opt.body ? 'POST' : 'GET'),
+    credentials: 'same-origin',
+    headers: opt.body ? { 'content-type': 'application/json' } : {},
+    body: opt.body ? JSON.stringify(opt.body) : undefined,
+  });
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) throw new Error((data && data.error) || ('请求失败 ' + res.status));
+  return data || {};
+}
+
+function snapshot() {
+  return {
+    state,
+    chapterData,
+    conf: {
+      deck: conf.deck,
+      deckChapter: conf.deckChapter || {},
+      showByDefault: !!conf.showByDefault,
+      speak: conf.speak !== false,
+    },
+  };
+}
+
+function applySnapshot(d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.state && typeof d.state === 'object') {
+    state = d.state;
+    save(LS_STATE, state);
+  }
+  if (d.chapterData && typeof d.chapterData === 'object') {
+    chapterData = d.chapterData;
+    save('ky_chapter_v1', chapterData);
+  }
+  if (d.conf && typeof d.conf === 'object') {
+    if (d.conf.deck && DECKS[d.conf.deck]) conf.deck = d.conf.deck;
+    if (d.conf.deckChapter) conf.deckChapter = d.conf.deckChapter;
+    if (typeof d.conf.showByDefault === 'boolean') conf.showByDefault = d.conf.showByDefault;
+    if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
+    save(LS_CONF, conf);
+    activeDeck = DECKS[conf.deck] ? conf.deck : 'core';
+    $('deckSelect').value = activeDeck;
+    updateDeckMeta();
+    loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || 0);
+    renderChapters();
+  }
+  updateStats();
+  renderList();
+}
+
+function authSay(msg, kind) {
+  const el = $('authStatus');
+  el.textContent = msg || '';
+  el.className = 'auth-status' + (kind ? ' ' + kind : '');
+}
+
+function renderAuth() {
+  const btn = $('accountBtn');
+  btn.textContent = authUser ? authUser : '登录';
+  btn.classList.toggle('online', !!authUser);
+  $('authSync').classList.toggle('hidden', !authUser);
+  $('authForm').classList.toggle('hidden', !!authUser);
+  $('authMode').classList.toggle('hidden', !!authUser);
+  $('wxLogin').classList.toggle('hidden', !!authUser);
+  document.querySelector('.auth-sep').classList.toggle('hidden', !!authUser);
+  $('authTitle').textContent = authUser ? '已登录：' + authUser : (authMode === 'login' ? '登录' : '注册');
+  $('authSubmit').textContent = authMode === 'login' ? '登录' : '注册并登录';
+  $('authPass').setAttribute('autocomplete', authMode === 'login' ? 'current-password' : 'new-password');
+}
+
+function scheduleCloudSync() {
+  if (!authUser || syncing) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(uploadProgress, 2500);
+}
+
+async function uploadProgress(silent) {
+  if (!authUser) return;
+  syncing = true;
+  try {
+    await api('/state', { method: 'PUT', body: { payload: snapshot() } });
+    if (!silent) authSay('已上传到云端', 'ok');
+  } catch (e) {
+    if (!silent) authSay(e.message, 'err');
+  } finally {
+    syncing = false;
+  }
+}
+
+async function refreshAuth() {
+  try {
+    const r = await api('/me');
+    authUser = r.user ? r.user.username : null;
+  } catch {
+    authUser = null;
+  }
+  renderAuth();
+}
+
+async function afterLogin(username) {
+  authUser = username;
+  renderAuth();
+  authSay('已登录，正在比对云端进度…');
+  try {
+    const r = await api('/state');
+    const localStamp = Number(localStorage.getItem(LS_STAMP) || 0);
+    if (!r.payload) {
+      await uploadProgress(true);
+      authSay('已把本机进度上传到云端', 'ok');
+    } else if (r.updatedAt > localStamp) {
+      const words = Object.keys(r.payload.state || {}).length;
+      authSay('云端有 ' + words + ' 个词的进度（较新）。点下面按钮选择保留哪一份。');
+    } else {
+      await uploadProgress(true);
+      authSay('本机进度较新，已上传到云端', 'ok');
+    }
+  } catch (e) {
+    authSay(e.message, 'err');
+  }
+}
+
+$('accountBtn').onclick = () => {
+  $('authModal').classList.remove('hidden');
+  authSay('');
+  refreshAuth();
+};
+$('authClose').onclick = () => $('authModal').classList.add('hidden');
+$('authModal').onclick = event => {
+  if (event.target === $('authModal')) $('authModal').classList.add('hidden');
+};
+$('authMode').onclick = () => {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  renderAuth();
+  authSay('');
+};
+$('authForm').onsubmit = async event => {
+  event.preventDefault();
+  const username = $('authUser').value.trim();
+  const password = $('authPass').value;
+  if (!username || password.length < 6) { authSay('用户名不能为空，密码至少 6 位', 'err'); return; }
+  $('authSubmit').disabled = true;
+  authSay('处理中…');
+  try {
+    const r = await api(authMode === 'login' ? '/login' : '/register', { body: { username, password } });
+    $('authPass').value = '';
+    await afterLogin(r.username);
+  } catch (e) {
+    authSay(e.message, 'err');
+  } finally {
+    $('authSubmit').disabled = false;
+  }
+};
+$('authLogout').onclick = async () => {
+  try { await api('/logout', { method: 'POST' }); } catch {}
+  authUser = null;
+  renderAuth();
+  authSay('已退出登录，本机进度保留', 'ok');
+};
+$('syncUp').onclick = () => uploadProgress(false);
+$('syncDown').onclick = async () => {
+  try {
+    const r = await api('/state');
+    if (!r.payload) { authSay('云端还没有进度', 'err'); return; }
+    applySnapshot(r.payload);
+    localStorage.setItem(LS_STAMP, String(Date.now()));
+    save(LS_CONF, conf);
+    authSay('已用云端进度覆盖本机', 'ok');
+  } catch (e) {
+    authSay(e.message, 'err');
+  }
+};
+// 微信扫码：需要开放平台网站应用资质，未配置时按钮保持禁用
+api('/wx').then(r => {
+  const btn = $('wxLogin');
+  if (r.enabled) {
+    btn.disabled = false;
+    btn.textContent = '微信扫码登录';
+    btn.onclick = () => {
+      const redirect = encodeURIComponent(location.origin + '/');
+      location.href = 'https://open.weixin.qq.com/connect/qrconnect?appid=' + encodeURIComponent(r.appid)
+        + '&redirect_uri=' + redirect + '&response_type=code&scope=snsapi_login&state=ky#wechat_redirect';
+    };
+  }
+}).catch(() => {});
+refreshAuth();
 </script>
 </body>
 </html>

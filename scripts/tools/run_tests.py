@@ -294,6 +294,9 @@ setTimeout(function () {
     setTimeout(function () {
       out.left_mastered = !!(state[w.word] || {}).mastered;
       out.left_due = ((state[w.word] || {}).due || 0) > Date.now();
+      // 滑完卡片必须完全归位：晚到的 rAF 不能把位移和透明度又写回去
+      out.swipe_settled = swipeTrack.style.transform === '' && card.style.opacity === ''
+        && !card.classList.contains('swipe-ok');
       out.undo_visible = !document.getElementById('undoBar').classList.contains('hidden');
       document.getElementById('undoBtn').click();
       setTimeout(function () {
@@ -307,6 +310,8 @@ setTimeout(function () {
           out.right_same = document.getElementById('word').textContent === w2.word;
           out.right_weight = ((state[w2.word] || {}).w || 0) >= 1;
           out.weight_badge = !document.getElementById('weightBadge').classList.contains('hidden');
+          // 右滑是弹回：位移和透明度要立刻复位，红色边框提示会再留一会儿
+          out.right_settled = swipeTrack.style.transform === '' && card.style.opacity === '';
           const shownWeight = Number(document.getElementById('wordId').textContent);
           out.composite_weight = Number.isFinite(shownWeight)
             && Math.abs(shownWeight - displayWeightOf(w2)) < 0.001;
@@ -912,6 +917,7 @@ def browser_checks():
             "flip_init": False, "flip_1": True, "flip_2": False,
             "flip_after_next": False,
             "left_mastered": True, "left_due": True, "undo_visible": True,
+            "swipe_settled": True, "right_settled": True,
             "undo_cleared": True, "undo_back": True,
             "right_same": True, "right_weight": True, "weight_badge": True,
             "composite_weight": True, "unique_weights": True,

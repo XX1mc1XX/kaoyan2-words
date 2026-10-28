@@ -1757,6 +1757,13 @@ const hideSwipeActions = () => {
 };
 // 边框提示用 class，不直接写 style.borderColor：后者每次都要重算样式
 const clearSwipeHint = () => card.classList.remove('swipe-ok', 'swipe-bad');
+// 最后一次 touchmove 排的 rAF 可能晚于 touchend 执行，会把已经复位的
+// transform / opacity / 边框 class 又写回去，卡片就歪着停在半透明上。
+// 抬手前先掐掉挂起的那一帧。
+const settleSwipe = () => {
+  if (swipeFrame) { cancelAnimationFrame(swipeFrame); swipeFrame = 0; }
+  pendingSwipe = null;
+};
 card.addEventListener('touchstart', event => {
   if (event.target.closest && event.target.closest('.badges')) { touchStart = null; return; }
   if (event.touches.length !== 1) return;
@@ -1797,8 +1804,8 @@ card.addEventListener('touchmove', event => {
 }, { passive: false });
 card.addEventListener('touchend', event => {
   // 长按已经打开了详情面板，这次抬手不要再当成点击翻面
-  if (pressFired) { pressFired = false; touchStart = null; return; }
-  if (event.target.closest && event.target.closest('.badges')) { touchStart = null; return; }
+  if (pressFired) { pressFired = false; touchStart = null; settleSwipe(); return; }
+  if (event.target.closest && event.target.closest('.badges')) { touchStart = null; settleSwipe(); return; }
   if (!touchStart || event.changedTouches.length !== 1) { touchStart = null; return; }
   const t = event.changedTouches[0];
   const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
@@ -1806,6 +1813,7 @@ card.addEventListener('touchend', event => {
   const moved = touchStart.moved;
   const startX = touchStart.x;
   touchStart = null;
+  settleSwipe();
   hideSwipeActions();
   if (slideLock) return;
   if (!moved && elapsed < 600) {
@@ -1836,12 +1844,14 @@ card.addEventListener('touchend', event => {
         card.style.transition = 'none';
         card.style.opacity = '';
         clearSwipeHint();
-        action();
-        slideLock = false;
-        requestAnimationFrame(() => {
-          swipeTrack.style.transition = '';
-          card.style.transition = '';
-        });
+        // action 里一旦抛错，锁不复位就会把之后所有滑动都吞掉
+        try { action(); } finally {
+          slideLock = false;
+          requestAnimationFrame(() => {
+            swipeTrack.style.transition = '';
+            card.style.transition = '';
+          });
+        }
       }, 130);
     };
     const bounce = () => {
@@ -1878,6 +1888,7 @@ card.addEventListener('touchend', event => {
 }, { passive: true });
 card.addEventListener('touchcancel', () => {
   touchStart = null;
+  settleSwipe();
   hideSwipeActions();
   swipeTrack.style.transition = 'transform .16s ease';
   swipeTrack.style.transform = '';

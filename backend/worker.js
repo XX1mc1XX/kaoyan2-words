@@ -147,9 +147,10 @@ async function handleApi(request, env) {
       const row = await env.DB.prepare(
         'SELECT id, username, pass_hash, pass_salt FROM users WHERE username = ?',
       ).bind(username).first();
-      if (!row) return json({ error: '用户名或密码不对' }, 401);
-      const hash = await hashPassword(password, row.pass_salt);
-      if (hash !== row.pass_hash) return json({ error: '用户名或密码不对' }, 401);
+      // 用户不存在时也跑一遍同样开销的哈希，避免靠响应时间探测账号是否存在
+      const salt = row ? row.pass_salt : '00000000000000000000000000000000';
+      const hash = await hashPassword(password, salt);
+      if (!row || hash !== row.pass_hash) return json({ error: '用户名或密码不对' }, 401);
       const token = randomHex(24);
       const exp = Date.now() + SESSION_DAYS * 86400_000;
       await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
@@ -176,9 +177,12 @@ async function handleApi(request, env) {
       if (!user) return json({ error: '未登录' }, 401);
       const now = Date.now();
       await env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(now).run();
+      await env.DB.prepare('DELETE FROM pair_codes WHERE user_id = ?').bind(user.id).run();  // 同时只留一个有效码
       let code = '';
       for (let i = 0; i < 6; i++) {
-        code = String(Math.floor(100000 + Math.random() * 900000));
+        const buf = new Uint8Array(4);
+        crypto.getRandomValues(buf);
+        code = String((new DataView(buf.buffer).getUint32(0) % 900000) + 100000);
         const dup = await env.DB.prepare('SELECT code FROM pair_codes WHERE code = ?').bind(code).first();
         if (!dup) break;
       }
@@ -248,6 +252,14 @@ export default {
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       return handleApi(request, env);
     }
-    return env.ASSETS.fetch(request);
+    const asset = await env.ASSETS.fetch(request);
+    const type = asset.headers.get('content-type') || '';
+    if (type.includes('text/html')) {
+      // HTML 每次都向服务器确认，避免手机长期加载旧版本
+      const copy = new Response(asset.body, asset);
+      copy.headers.set('cache-control', 'no-cache, must-revalidate');
+      return copy;
+    }
+    return asset;
   },
 };

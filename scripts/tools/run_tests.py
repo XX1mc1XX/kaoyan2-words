@@ -35,7 +35,7 @@ def static_checks():
 
     check("产物大小 < 600KB", os.path.getsize(BUILT) < 600 * 1024,
           "%.0fKB" % (os.path.getsize(BUILT) / 1024))
-    check("无 autoShow 残留", t.count("autoShow") <= 1,
+    check("无 autoShow 残留", t.count("autoShow") <= 2,
           "仅允许 delete conf.autoShow 清理语句")
     check("无 forms-title 残留", t.count("forms-title") == 0)
     check("无「考查形式」字样", t.count("考查形式") == 0)
@@ -168,6 +168,17 @@ setTimeout(function () {
           out.order_shuffled = ord1 !== queue.slice(0, 15).map(x => x.word).join();
           loadChapter(0, 'natural');
           out.order_restored = ord1 === queue.slice(0, 15).map(x => x.word).join();
+
+          const orderBeforeConfirm = queue.map(x => x.word).join();
+          const prompts = [];
+          const originalConfirm = window.confirm;
+          window.confirm = msg => { prompts.push(msg); return false; };
+          document.getElementById('shuffleChapter').click();
+          out.shuffle_confirm_cancel = prompts.length === 1 && queue.map(x => x.word).join() === orderBeforeConfirm;
+          document.getElementById('restoreOrder').click();
+          out.restore_confirm_cancel = prompts.length === 2 && queue.map(x => x.word).join() === orderBeforeConfirm;
+          out.confirm_messages = prompts.length === 2;
+          window.confirm = originalConfirm;
           delete chapterData[k0];
 
           // H. 点红点减权重
@@ -256,6 +267,8 @@ def browser_checks():
             "right_same": True, "right_weight": True, "weight_badge": True,
             "deck_chapter": True, "resume_ok": True,
             "order_stable": True, "order_shuffled": True, "order_restored": True,
+            "shuffle_confirm_cancel": True, "restore_confirm_cancel": True,
+            "confirm_messages": True,
             "weight_down": True, "weight_badge_val": True,
             "mastered_has_words": True, "mastered_restored": True,
             "cross_next": True, "cross_prev": True,

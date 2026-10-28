@@ -67,8 +67,19 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   font:inherit;font-size:12px;padding:6px;cursor:pointer;flex-shrink:0}
 .shuffle-btn:active{border-color:var(--brand);color:var(--brand)}
 .order-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0}
-.card{position:relative;flex:1;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:22px;
-  box-shadow:var(--shadow);padding:6px 18px 74px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.swipe-stage{flex:1;min-height:0;width:100%;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:6px}
+.swipe-action{min-width:0;border:1px solid;border-radius:17px;padding:10px 3px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;text-align:center;font-size:10px;font-weight:750;line-height:1.25;
+  overflow:hidden;transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.swipe-action.good{background:color-mix(in srgb,var(--ok) 16%,var(--card));border-color:color-mix(in srgb,var(--ok) 48%,var(--line));color:var(--ok)}
+.swipe-action.bad{background:color-mix(in srgb,var(--bad) 15%,var(--card));border-color:color-mix(in srgb,var(--bad) 48%,var(--line));color:var(--bad)}
+.swipe-action.active{filter:saturate(1.2);box-shadow:0 0 0 3px color-mix(in srgb,currentColor 18%,transparent)}
+.swipe-action .swipe-arrow{font-size:22px;line-height:1;font-weight:800}
+.swipe-action .swipe-label{font-size:11px;opacity:.9}
+.swipe-action strong{font-size:14px;line-height:1.2;white-space:nowrap}
+.swipe-action .swipe-detail{font-size:9px;font-weight:650;opacity:.82;line-height:1.25}
+.card{position:relative;min-width:0;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:22px;
+  box-shadow:var(--shadow);padding:6px 18px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;gap:12px;overflow:hidden;touch-action:none;user-select:none}
 .card::after{content:"";position:absolute;inset:auto -25% -45% -25%;height:60%;background:radial-gradient(circle,var(--brand-soft),transparent 68%);opacity:.65;pointer-events:none}
 .card>*{position:relative;z-index:1}
@@ -89,13 +100,11 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .word:active{opacity:.6}
 .word::after{content:"🔊";font-size:.32em;margin-left:.28em;opacity:.28;vertical-align:super;font-weight:400}
 .rule{height:1px;width:min(210px,70%);background:var(--line)}
-.forms-box{width:min(100%,460px)}
+.forms-box{width:min(100%,460px);border:1px solid var(--line);border-radius:11px;overflow:hidden;background:color-mix(in srgb,var(--bg) 58%,var(--card))}
 .forms{color:var(--muted);font-size:clamp(12.5px,3.5vw,14.5px);font-weight:500;line-height:1.5;overflow-wrap:anywhere}
 .family-note{font-size:12px;color:var(--muted);font-weight:600;margin-top:-4px}
 .meaning{font-size:clamp(23px,6.5vw,32px);line-height:1.35;font-weight:650;max-width:30ch;min-height:1.35em}
 .meaning-placeholder{font-size:12px;color:var(--muted);font-weight:400;opacity:.75}
-.swipe-hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;
-  font-size:11px;color:var(--muted);opacity:.8;pointer-events:none}
 .nav-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;flex-shrink:0}
 .nav-btn{border:1px solid var(--line);background:var(--card);color:var(--muted);font:inherit;font-size:13px;border-radius:12px;padding:9px 10px;cursor:pointer}
 .nav-btn:disabled{opacity:.35;cursor:default}
@@ -172,13 +181,13 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   letter-spacing:.18em;text-align:center;color:var(--brand);padding:10px 0}
 .pair-tip{font-size:12px;color:var(--muted);text-align:center;line-height:1.5}
 .danger{border:1px solid color-mix(in srgb,var(--bad) 38%,var(--line));background:transparent;color:var(--bad);border-radius:12px;padding:10px;font:inherit;font-size:13px;cursor:pointer}
-@media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:4px 13px 58px}.meaning-toggle{font-size:12px}}
+@media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:4px 13px 16px}.meaning-toggle{font-size:12px}}
 @media (max-height:620px){
   header{padding:6px 10px}main{padding:6px 10px 7px}.view{gap:6px}
-  .card{padding:2px 12px 48px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
+  .card{padding:2px 12px 12px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
   .forms{font-size:11.5px}
   .deck-bar{padding:5px 9px}.family-note{font-size:11px}
-  .meaning{font-size:clamp(18px,5vh,24px)}.rule{margin:0}.swipe-hint{display:none}
+  .meaning{font-size:clamp(18px,5vh,24px)}.rule{margin:0}.swipe-stage{grid-template-columns:38px minmax(0,1fr) 38px;gap:5px}
   .nav-btn{padding:6px 8px}.actions .btn{padding:9px 6px;font-size:14px}
 }
 </style>
@@ -219,7 +228,14 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       </div>
     </div>
     <input class="progress" id="progressBar" type="range" min="0" max="0" value="0" step="1" aria-label="进度，可拖动跳转">
-    <article class="card" id="card">
+    <div class="swipe-stage">
+      <aside class="swipe-action good" id="swipeLeftCard" aria-label="左滑：认识，不再出现">
+        <span class="swipe-arrow" aria-hidden="true">←</span>
+        <span class="swipe-label">左滑</span>
+        <strong id="swipeLeftAction">认识</strong>
+        <span class="swipe-detail" id="swipeLeftDetail">不再出现</span>
+      </aside>
+      <article class="card" id="card">
       <div class="badges">
         <span class="priority b" id="priorityBadge">B 次重点</span>
         <button type="button" class="weight-badge hidden" id="weightBadge" title="点一下减 1 次权重"></button>
@@ -231,8 +247,14 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       </div>
       <div class="rule"></div>
       <div class="meaning" id="meaning"></div>
-      <div class="swipe-hint" id="swipeHint">左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）</div>
-    </article>
+      </article>
+      <aside class="swipe-action bad" id="swipeRightCard" aria-label="右滑：不认识，权重加一">
+        <span class="swipe-arrow" aria-hidden="true">→</span>
+        <span class="swipe-label">右滑</span>
+        <strong id="swipeRightAction">不认识</strong>
+        <span class="swipe-detail" id="swipeRightDetail">权重 +1</span>
+      </aside>
+    </div>
     <div class="nav-row">
       <button class="nav-btn" id="prevWord">← 上一个</button>
       <span class="word-id" id="wordId">优先级 #1</span>
@@ -367,12 +389,15 @@ const bus = (() => {
     },
   };
 })();
-const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+// 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的
+const SCOPED_KEYS = new Set(['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1', 'ky_stamp_v1']);
+const scopedKey = key => (authUser && SCOPED_KEYS.has(key) ? key + '@' + authUser : key);
+const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(scopedKey(key))) ?? fallback; } catch { return fallback; } };
 let storageWarned = false;
 const save = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
-    try { localStorage.setItem(LS_STAMP, String(Date.now())); } catch {}
+    localStorage.setItem(scopedKey(key), JSON.stringify(value));
+    try { localStorage.setItem(scopedKey(LS_STAMP), String(Date.now())); } catch {}
     bus.emit('data:change', key);
   } catch (e) {
     if (!storageWarned) {
@@ -386,7 +411,6 @@ const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getT
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
 let conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false, speak: true }, load(LS_CONF, {}));
-delete conf.autoShow;   // 旧版本遗留的全局开关，彻底废弃
 const DECKS = {
   core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', words: WORDS },
   derivative: { label: '阶段二 · 核心派生', note: '阶段二 · 核心派生：只收词族中高频、词性或语义有明显变化的成员。', words: DERIVATIVES },
@@ -462,6 +486,7 @@ function savePos() {
   if (!chapterData[key]) return;
   chapterData[key].pos = idx;
   chapterData[key].posWord = idx < queue.length ? queue[idx].word : null;
+  chapterData[key].t = Date.now();
   save('ky_chapter_v1', chapterData);
 }
 function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
@@ -480,10 +505,10 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
       });
   let rec = chapterData[key];
   if (mode === 'shuffle') {
-    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true };
+    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true, t: Date.now() };
     save('ky_chapter_v1', chapterData);
   } else if (mode === 'natural' || !rec || !Array.isArray(rec.order)) {
-    rec = chapterData[key] = { order: naturalOrder(pending).map(w => w.word), pos: 0 };
+    rec = chapterData[key] = { order: naturalOrder(pending).map(w => w.word), pos: 0, t: Date.now() };
     save('ky_chapter_v1', chapterData);
   }
   const byName = new Map(pending.map(w => [w.word, w]));
@@ -565,9 +590,13 @@ function renderStudy() {
   $('speakToggle').textContent = conf.speak ? '朗读开' : '朗读关';
   $('speakToggle').setAttribute('aria-pressed', String(!!conf.speak));
   if (conf.speak && !dragging && lastSpoken !== word.word && speak(word.word)) lastSpoken = word.word;
-  $('swipeHint').textContent = activeDeck === 'mastered'
-    ? '左滑 = 降权重 · 右滑 = 恢复到原词库'
-    : '左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）';
+  const masteredDeck = activeDeck === 'mastered';
+  $('swipeLeftAction').textContent = masteredDeck ? '降权重' : '认识';
+  $('swipeLeftDetail').textContent = masteredDeck ? '权重 -1' : '不再出现';
+  $('swipeRightAction').textContent = masteredDeck ? '恢复' : '不认识';
+  $('swipeRightDetail').textContent = masteredDeck ? '回原词库' : '权重 +1';
+  $('swipeLeftCard').setAttribute('aria-label', masteredDeck ? '左滑：降权重' : '左滑：认识，不再出现');
+  $('swipeRightCard').setAttribute('aria-label', masteredDeck ? '右滑：恢复到原词库' : '右滑：不认识，权重加一');
   $('chapterSelect').value = String(currentChapter());
   $('prevWord').disabled = idx <= 0 && curChapter <= 0;
   $('nextWord').disabled = idx >= total - 1 && curChapter >= chapterCount() - 1;
@@ -789,7 +818,7 @@ function renderList() {
       badge.title = owner ? (DECKS[owner].label + ' 第' + (Math.floor(ownerIndex(owner, word.word) / CHAPTER_SIZE) + 1) + '章') : '';
       badge.onclick = () => {
         const st = state[word.word];
-        if (st) { st.mastered = false; state[word.word] = st; save(LS_STATE, state); }
+        if (st) { st.mastered = false; st.due = 0; st.t = Date.now(); state[word.word] = st; save(LS_STATE, state); }
         if (owner) {
           const ch = Math.floor(ownerIndex(owner, word.word) / CHAPTER_SIZE);
           const ck = owner + ':' + ch;
@@ -914,6 +943,8 @@ function doUndo() {
 $('undoBtn').onclick = doUndo;
 let touchStart = null;
 const card = $('card');
+const swipeLeftCard = $('swipeLeftCard');
+const swipeRightCard = $('swipeRightCard');
 card.addEventListener('touchstart', event => {
   if (event.target.closest && event.target.closest('.badges')) { touchStart = null; return; }
   if (event.touches.length !== 1) return;
@@ -934,8 +965,12 @@ card.addEventListener('touchmove', event => {
     card.style.transform = 'translateX(' + shift + 'px)';
     card.style.opacity = String(1 - Math.min(absX / 420, 0.28));
     card.style.borderColor = absX > 30 ? (dx < 0 ? 'var(--ok)' : 'var(--bad)') : '';
+    swipeLeftCard.classList.toggle('active', absX > 30 && dx < 0);
+    swipeRightCard.classList.toggle('active', absX > 30 && dx > 0);
   } else if (absY > 10) {
     event.preventDefault();
+    swipeLeftCard.classList.remove('active');
+    swipeRightCard.classList.remove('active');
   }
 }, { passive: false });
 card.addEventListener('touchend', event => {
@@ -947,6 +982,8 @@ card.addEventListener('touchend', event => {
   const moved = touchStart.moved;
   const startX = touchStart.x;
   touchStart = null;
+  swipeLeftCard.classList.remove('active');
+  swipeRightCard.classList.remove('active');
   if (!moved && elapsed < 600) {
     card.style.transform = ''; card.style.opacity = ''; card.style.borderColor = ''; card.style.transition = '';
     // 点词朗读，点别处翻面；起点落在单词上也只是「点」，不影响手势
@@ -1001,6 +1038,8 @@ card.addEventListener('touchend', event => {
 }, { passive: true });
 card.addEventListener('touchcancel', () => {
   touchStart = null;
+  swipeLeftCard.classList.remove('active');
+  swipeRightCard.classList.remove('active');
   card.style.transition = 'transform .16s ease, opacity .16s ease, border-color .16s ease';
   card.style.transform = '';
   card.style.opacity = '';
@@ -1021,14 +1060,17 @@ $('progressBar').onchange = event => {
 $('shuffleChapter').onclick = () => {
   const slice = chapterSlice(curChapter);
   if (slice.every(w => isMastered(w))) {
-    if (!confirm('本章已全部掌握。打乱会清空掌握记录、重新背一遍，继续？')) return;
-    for (const w of slice) if (state[w.word]) state[w.word].mastered = false;
+    if (!window.confirm('本章已全部掌握。打乱会清空掌握记录、重新背一遍，继续？')) return;
+    for (const w of slice) if (state[w.word]) { state[w.word].mastered = false; state[w.word].t = Date.now(); }
     save(LS_STATE, state);
+  } else if (!window.confirm('打乱当前章节顺序？学习进度不会丢失。')) {
+    return;
   }
   loadChapter(curChapter, 'shuffle');
   updateStats();
 };
 $('restoreOrder').onclick = () => {
+  if (!window.confirm('恢复当前章节原序？打乱的顺序会被重置，学习进度不会丢失。')) return;
   loadChapter(curChapter, 'natural');
   updateStats();
 };
@@ -1038,9 +1080,10 @@ $('doneAction').onclick = () => {
   const mode = $('doneAction').dataset.mode;
   if (mode === 'list') { switchView('List'); return; }
   if (mode === 'reshuffle') {
+    if (!window.confirm('打乱重背会清空本章掌握标记并重新开始，继续？')) return;
     // 整章已掌握：清掉掌握标记，按权重重新洗牌重背
     for (const w of chapterSlice(curChapter)) {
-      if (state[w.word]) state[w.word].mastered = false;
+      if (state[w.word]) { state[w.word].mastered = false; state[w.word].t = Date.now(); }
     }
     save(LS_STATE, state);
   }
@@ -1101,7 +1144,12 @@ $('importFile').onchange = event => {
   reader.onload = () => {
     try {
       const d = JSON.parse(reader.result);
-      if (d.state && typeof d.state === 'object') { state = d.state; save(LS_STATE, state); }
+      const NOW_T = Date.now();
+      if (d.state && typeof d.state === 'object') {
+        state = d.state;
+        for (const k of Object.keys(state)) { if (state[k] && !state[k].t) state[k].t = NOW_T; }
+        save(LS_STATE, state);
+      }
       if (d.chapterData && typeof d.chapterData === 'object') { chapterData = d.chapterData; save('ky_chapter_v1', chapterData); }
       if (d.conf) {
         if (d.conf.deck && DECKS[d.conf.deck]) { activeDeck = d.conf.deck; conf.deck = d.conf.deck; }
@@ -1111,6 +1159,8 @@ $('importFile').onchange = event => {
         if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
         save(LS_CONF, conf);
       }
+      conf.forceAt = NOW_T;      // 导入是覆盖操作，同步时以本机为准
+      save(LS_CONF, conf);
       updateDeckMeta();
       renderChapters();
       loadChapter(conf.chapter || 0);
@@ -1128,6 +1178,8 @@ $('resetAll').onclick = () => {
   if (!confirm('确定清空全部学习记录？此操作不可恢复。')) return;
   state = {};
   save(LS_STATE, state);
+  conf.forceAt = Date.now();     // 本地清空过，同步时以本机为准，避免云端把词补回来
+  save(LS_CONF, conf);
   chapterData = {};
   save('ky_chapter_v1', chapterData);
   loadChapter(curChapter, 'natural');
@@ -1231,9 +1283,15 @@ function applySnapshot(d) {
     activeDeck = DECKS[conf.deck] ? conf.deck : 'core';
     $('deckSelect').value = activeDeck;
     updateDeckMeta();
-    loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || 0);
-    renderChapters();
   }
+  // 同步回来的数据不能让用户正在背的词跳走：记住当前词，重载后再定位回去
+  const keepWord = (queue[idx] && queue[idx].word) || null;
+  loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || curChapter);
+  if (keepWord) {
+    const j = queue.findIndex(w => w.word === keepWord);
+    if (j >= 0) { idx = j; savePos(); renderStudy(); }
+  }
+  renderChapters();
   updateStats();
   renderList();
 }
@@ -1242,6 +1300,31 @@ function authSay(msg, kind) {
   const el = $('authStatus');
   el.textContent = msg || '';
   el.className = 'auth-status' + (kind ? ' ' + kind : '');
+}
+
+// 登录/退出后重新装载该账号自己的进度
+function reloadSpace() {
+  state = load(LS_STATE, {});
+  chapterData = load('ky_chapter_v1', {});
+  conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false, speak: true }, load(LS_CONF, {}));
+  delete conf.autoShow;
+  activeDeck = DECKS[conf.deck] ? conf.deck : 'core';
+  $('deckSelect').value = activeDeck;
+  updateDeckMeta();
+  renderChapters();
+  loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || 0);
+  updateStats();
+  renderList();
+}
+// 第一次登录某账号时，把未登录状态下背的进度带进该账号，避免看起来清零
+function adoptGuestProgress(username) {
+  try {
+    if (localStorage.getItem(LS_STATE + '@' + username)) return;
+    for (const key of ['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1']) {
+      const v = localStorage.getItem(key);
+      if (v) localStorage.setItem(key + '@' + username, v);
+    }
+  } catch {}
 }
 
 function renderAuth() {
@@ -1309,6 +1392,9 @@ function mergeChapters(local, cloud) {
     const b = (cloud || {})[k];
     if (!a) { out[k] = b; continue; }
     if (!b) { out[k] = a; continue; }
+    // 按最后修改时间取，退回按进度位置
+    const ta = a.t || 0, tb = b.t || 0;
+    if (ta !== tb) { out[k] = tb > ta ? b : a; continue; }
     const pa = (a.order || []).length ? (a.pos || 0) : 0;
     const pb = (b.order || []).length ? (b.pos || 0) : 0;
     out[k] = pa >= pb ? a : b;
@@ -1340,6 +1426,12 @@ async function syncNow(quiet) {
   try {
     const remote = await api('/state');
     const local = snapshot();
+    // 本机刚清空或刚导入：直接覆盖云端，不参与合并
+    if (local.conf.forceAt && local.conf.forceAt > (remote.updatedAt || 0)) {
+      await putState(local);
+      if (!quiet) authSay('已把本机进度同步到云端', 'ok');
+      return;
+    }
     if (!remote.payload) {
       await putState(local);
       if (!quiet) authSay('已把本机进度同步到云端', 'ok');
@@ -1347,7 +1439,9 @@ async function syncNow(quiet) {
       const merged = mergeSnapshots(local, remote.payload);
       const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData);
       if (changedLocally) applySnapshot(merged);
-      await putState(merged);
+      // 没有变化就不要回写，避免每 40 秒空转一次写库
+      if (!sameJson(merged, remote.payload)) await putState(merged);
+      else lastSyncAt = remote.updatedAt || lastSyncAt;
       if (!quiet) authSay(changedLocally ? '已合并云端进度' : '进度已同步', 'ok');
     }
   } catch (e) {
@@ -1369,10 +1463,12 @@ async function refreshAuth() {
 }
 
 async function afterLogin(username) {
+  adoptGuestProgress(username);
   authUser = username;
+  reloadSpace();
   renderAuth();
   authSay('正在同步…');
-  scheduleCloudSync(0);
+  setTimeout(() => syncNow(false), 0);
 }
 
 $('accountBtn').onclick = () => {
@@ -1409,8 +1505,9 @@ $('authForm').onsubmit = async event => {
 $('authLogout').onclick = async () => {
   try { await api('/logout', { method: 'POST' }); } catch {}
   authUser = null;
+  reloadSpace();
   renderAuth();
-  authSay('已退出登录，本机进度保留', 'ok');
+  authSay('已退出登录，进度仍保存在本机', 'ok');
 };
 $('pairClaimToggle').onclick = () => {
   $('pairClaimBox').classList.toggle('hidden');

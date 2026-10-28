@@ -37,7 +37,8 @@ def static_checks():
         return
     t = io.open(BUILT, encoding="utf-8").read()
 
-    check("产物大小 < 600KB", os.path.getsize(BUILT) < 600 * 1024,
+    # 单文件版内联了长按详情（约 416KB），上限相应放宽；网页版首包不受影响
+    check("产物大小 < 1.2MB", os.path.getsize(BUILT) < 1200 * 1024,
           "%.0fKB" % (os.path.getsize(BUILT) / 1024))
     check("无 autoShow 残留", t.count("autoShow") <= 2,
           "仅允许 delete conf.autoShow 清理语句")
@@ -52,7 +53,7 @@ def static_checks():
     check("含 deckChapter 记忆", "deckChapter" in t)
     check("含登录面板", "authModal" in t and "accountBtn" in t)
     check("含云同步接口", "/state" in t and "snapshot" in t)
-    check("同步单请求快路径", all(x in t for x in ("baseUpdatedAt", "mergeRemoteIntoLocal", "/state?since=")))
+    check("同步单请求快路径", all(x in t for x in ("baseUpdatedAt", "syncWithServer", "/state/sync", "/state?since=", "CompressionStream")))
     check("同步变更追踪", all(x in t for x in ("syncDirty", "localRevision", "noteLocalChange")))
     check("含恢复原序按钮", "restoreOrder" in t)
     check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
@@ -69,8 +70,13 @@ def static_checks():
     check("移除首屏毛玻璃", "backdrop-filter:blur(12px)" not in t)
     check("含自定义图标", all(x in t for x in ("iconChoices", "iconUpload", "ICON_PRESETS", "appFavicon")))
 
+    # --- 长按详情 ---
+    check("含长按详情面板", all(x in t for x in ("detailMask", "detailSheet", "pressTimer")))
+    check("长按详情数据块", 'id="ky-deck-detail"' in t)
+    check("详情带音标与真题次数", '"p":' in t and '"freq":' in t)
+
     # --- 首屏：词库走 JSON 数据块，按需解析 ---
-    check("词库改用 JSON 数据块", t.count('type="application/json"') == 5)
+    check("词库改用 JSON 数据块", t.count('type="application/json"') == 6)
     check("无内联词表字面量", "const WORDS =" not in t)
     first_screen = json_block_bytes(t, "words")
     check("首屏解析数据量 < 250KB", 0 < first_screen < 250 * 1024, "%.0fKB" % (first_screen / 1024))
@@ -112,8 +118,11 @@ def static_checks():
         check("网页主程序独立缓存", len(app_files) == 1 and ("src=\"./" + app_files[0] + "\"") in web_html, str(app_files))
         data_dir = os.path.join(deploy, "data")
         data_files = sorted(os.listdir(data_dir)) if os.path.isdir(data_dir) else []
+        data_names = [re.sub(r"\.[0-9a-f]{12}\.json$", "", x) for x in data_files]
+        deck_names = [x.split(".", 1)[0] for x in data_files]
         check("网页词库拆分资源齐备",
-              len(data_files) == 4 and all(x.endswith(".json") for x in data_files), str(data_files))
+              all(x.endswith(".json") for x in data_files)
+              and {"words", "derivatives", "basic", "insurance"} <= set(deck_names), str(data_files))
         deploy_sw = io.open(os.path.join(deploy, "sw.js"), encoding="utf-8").read() if os.path.exists(os.path.join(deploy, "sw.js")) else ""
         check("SW 预缓存拆分词库", "./data/" in deploy_sw and "__DATA_ASSETS__" not in deploy_sw)
         check("SW 预缓存主程序", any(("./" + x) in deploy_sw for x in app_files))
@@ -125,7 +134,7 @@ def static_checks():
         check("部署含 _worker.js", False)
 
     check("顶栏合并词库与词数", "deck-inline" in t and "deck-bar" not in t and "deck-label" not in t)
-    check("顶栏无品牌文字与当前词库标签", "英语二词汇" not in t and "当前词库" not in t)
+    check("顶栏无品牌文字与旧标签", "英语二词汇" not in t and "deck-label" not in t and "deck-bar" not in t)
     check("页面标题不含英语二", "<title>考研核心词汇</title>" in t)
     check("应用名称不含英语二", "英语二" not in mf)
 
@@ -549,6 +558,9 @@ setTimeout(async function(){
         check("网页版进入按需加载模式", data.get("web_mode") is True)
         check("网页首屏只解析首章", data.get("partial_len") == 200, "实际=%s" % data.get("partial_len"))
         check("网页首卡快速出现", 0 < data.get("first_card", 0) < 800, "%sms" % data.get("first_card"))
+        app_name = next((x for x in os.listdir(deploy) if re.fullmatch(r"app\.[0-9a-f]{12}\.js", x)), "")
+        app_text = io.open(os.path.join(deploy, app_name), encoding="utf-8").read() if app_name else ""
+        check("同步位置字段完整", all(x in app_text for x in ("progressAt", "chapter:Number(conf.chapter)", "mergeConf")), "同步页码/当前位置")
         check("网页首屏显示完整词数", data.get("boot_meta") == "1342 词", "实际=%s" % data.get("boot_meta"))
         check("网页章节总数完整", data.get("boot_options") == 7, "实际=%s" % data.get("boot_options"))
         check("网页切章加载成功", data.get("chapter") == 1 and data.get("chapter_queue", 0) > 0,
@@ -595,6 +607,8 @@ def runtime_checks():
     worker_text = io.open(worker, encoding="utf-8").read()
     check("同步写入合并为单次 D1", "RETURNING updated_at" in worker_text and "ON CONFLICT(user_id) DO UPDATE" in worker_text)
     check("同步支持增量拉取", "unchanged: true" in worker_text and "searchParams.get('since')" in worker_text)
+    check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(body.payload, remote)" in worker_text)
+    check("同步支持压缩上传", "DecompressionStream" in worker_text and "x-ky-encoding" in worker_text)
 
 
 def browser_checks():

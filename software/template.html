@@ -236,6 +236,35 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   .meaning{font-size:clamp(18px,5vh,24px)}.rule{margin:0}.swipe-action{width:88px}.swipe-hint{display:none}
   .nav-btn{padding:6px 8px}.actions .btn{padding:9px 6px;font-size:14px}
 }
+/* 长按详情面板：贴底弹出，手机单手可及；桌面同样适用 */
+.detail-mask{position:fixed;inset:0;background:rgba(9,16,14,.45);z-index:70;display:flex;
+  align-items:flex-end;justify-content:center;-webkit-tap-highlight-color:transparent}
+.detail-sheet{width:100%;max-width:560px;max-height:82vh;overflow-y:auto;background:var(--card);
+  border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 32px rgba(0,0,0,.24);position:relative;animation:detailUp .18s ease-out}
+@keyframes detailUp{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+.detail-close{position:absolute;top:8px;right:10px;border:0;background:transparent;color:var(--muted);
+  font-size:26px;line-height:1;padding:6px 9px;cursor:pointer;border-radius:10px}
+.detail-word{font-size:30px;font-weight:800;letter-spacing:-.02em;padding-right:36px;word-break:break-word}
+.detail-phonetic{color:var(--muted);font-size:14px;margin-top:2px}
+.detail-phonetic:empty{display:none}
+.detail-block{margin-top:12px;font-size:14px;line-height:1.6}
+.detail-block:empty{display:none}
+.detail-row{display:flex;gap:10px;padding:3px 0;align-items:baseline}
+.detail-row .k{color:var(--muted);flex:0 0 66px;font-size:13px}
+.detail-row .v{flex:1;min-width:0;word-break:break-word}
+.detail-chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;
+  background:var(--brand-soft);color:var(--brand);margin-right:6px}
+.detail-dict{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.detail-dict summary{font-size:13px;color:var(--muted);cursor:pointer;list-style:none;padding:4px 0}
+.detail-dict summary::-webkit-details-marker{display:none}
+.detail-dict summary::before{content:"\25B8 "}
+.detail-dict[open] summary::before{content:"\25BE "}
+.detail-dict-body{margin-top:6px;font-size:13px;line-height:1.7;color:var(--muted);
+  white-space:pre-line;word-break:break-word}
+.detail-again{margin-top:14px;border:1px solid var(--line);background:var(--card);color:var(--brand);
+  border-radius:12px;padding:9px 16px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.detail-hint{margin-top:10px;font-size:12px;color:var(--muted);text-align:center;opacity:.8}
 </style>
 </head>
 <body>
@@ -416,10 +445,28 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     </div>
   </div>
 </div>
+<div class="detail-mask hidden" id="detailMask">
+  <div class="detail-sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="detailWord">
+    <button class="detail-close" id="detailClose" type="button" aria-label="关闭">×</button>
+    <div class="detail-word" id="detailWord"></div>
+    <div class="detail-phonetic" id="detailPhonetic"></div>
+    <div class="detail-block" id="detailStatus"></div>
+    <div class="detail-block" id="detailExam"></div>
+    <div class="detail-block" id="detailForms"></div>
+    <details class="detail-dict" id="detailDictBox">
+      <summary>词典释义（含考研不考的义项，仅供对照）</summary>
+      <div class="detail-dict-body" id="detailDict"></div>
+    </details>
+    <button class="detail-again" id="detailAgain" type="button">朗读一遍</button>
+    <div class="detail-hint">点空白处或右上角 × 关闭</div>
+  </div>
+</div>
 <script type="application/json" id="ky-deck-words">__DATA__</script>
 <script type="application/json" id="ky-deck-derivatives">__DERIVATIVES__</script>
 <script type="application/json" id="ky-deck-basic">__BASIC__</script>
 <script type="application/json" id="ky-deck-insurance">__INSURANCE__</script>
+
+<script type="application/json" id="ky-deck-detail">__DETAIL__</script>
 <script type="application/json" id="ky-deck-meta">__META__</script>
 <script id="ky-app">
 // 词库放进 JSON 数据块：浏览器不把它当脚本编译，切到哪个库才 JSON.parse 哪个。
@@ -604,7 +651,7 @@ const save = (key, value) => {
 const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
-let conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false, speak: true, icon: null }, load(LS_CONF, {}));
+let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, icon: null }, load(LS_CONF, {}));
 const DECKS = {
   core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', get words() { return deckJson('words'); } },
   derivative: { label: '阶段二 · 核心派生', note: '阶段二 · 核心派生：只收词族中高频、词性或语义有明显变化的成员。', get words() { return deckJson('derivatives'); } },
@@ -701,10 +748,15 @@ function chapterKey(ch) { return activeDeck + ':' + ch; }
 function savePos() {
   const key = chapterKey(curChapter);
   if (!chapterData[key]) return;
+  const now = Date.now();
   chapterData[key].pos = idx;
   chapterData[key].posWord = idx < queue.length ? queue[idx].word : null;
-  chapterData[key].t = Date.now();
+  chapterData[key].t = now;
+  conf.deck = activeDeck;
+  conf.chapter = curChapter;
+  conf.progressAt = now;
   save('ky_chapter_v1', chapterData);
+  save(LS_CONF, conf);
 }
 let studyLoading = false;
 function showStudyLoading(message) {
@@ -755,10 +807,22 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
       });
   let rec = chapterData[key];
   if (mode === 'shuffle') {
-    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true, t: Date.now() };
+    const now = Date.now();
+    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true, t: now };
+    conf.deck = activeDeck;
+    conf.chapter = ch;
+    conf.progressAt = now;
     save('ky_chapter_v1', chapterData);
+    save(LS_CONF, conf);
   } else if (mode === 'natural' || !rec || !Array.isArray(rec.order)) {
-    rec = chapterData[key] = { order: naturalOrder(pending).map(w => w.word), pos: 0, t: Date.now() };
+    const now = Date.now();
+    rec = chapterData[key] = { order: naturalOrder(pending).map(w => w.word), pos: 0, t: now };
+    if (mode === 'natural') {
+      conf.deck = activeDeck;
+      conf.chapter = ch;
+      conf.progressAt = now;
+      save(LS_CONF, conf);
+    }
     save('ky_chapter_v1', chapterData);
   }
   const byName = new Map(pending.map(w => [w.word, w]));
@@ -1369,9 +1433,9 @@ async function switchDeck(value) {
   savePos();
   activeDeck = value;
   conf.deck = value;
-  save(LS_CONF, conf);
   const resume = (conf.deckChapter && conf.deckChapter[value]) || 0;
   conf.chapter = resume;
+  conf.progressAt = Date.now();
   save(LS_CONF, conf);
   if (WEB_MODE && !deckCanShowChapter(value, resume)) {
     showStudyLoading('正在加载所选词库，首次只需下载这一套词。');
@@ -1417,9 +1481,11 @@ function renderChapters() {
 }
 function gotoChapter(i) {
   savePos();
+  conf.deck = activeDeck;
   conf.chapter = i;
   conf.deckChapter = conf.deckChapter || {};
   conf.deckChapter[activeDeck] = i;
+  conf.progressAt = Date.now();
   save(LS_CONF, conf);
   loadChapter(i);
 }
@@ -1508,6 +1574,8 @@ card.addEventListener('touchmove', event => {
   }
 }, { passive: false });
 card.addEventListener('touchend', event => {
+  // 长按已经打开了详情面板，这次抬手不要再当成点击翻面
+  if (pressFired) { pressFired = false; touchStart = null; return; }
   if (event.target.closest && event.target.closest('.badges')) { touchStart = null; return; }
   if (!touchStart || event.changedTouches.length !== 1) { touchStart = null; return; }
   const t = event.changedTouches[0];
@@ -1599,11 +1667,109 @@ let lastCardTouchAt = 0;
 card.addEventListener('touchend', () => { lastCardTouchAt = Date.now(); }, { passive: true });
 card.addEventListener('click', event => {
   if (Date.now() - lastCardTouchAt < 800) return;
+  if (pressFired) { pressFired = false; return; }   // 长按刚打开详情，别顺手翻面
   if (studyLoading || !queue[idx]) return;
   if (event.target.closest && event.target.closest('.badges')) return;   // 角标自带行为
   if (event.target.closest && event.target.closest('#word')) return;     // 点单词只朗读
   toggleMeaning();
 });
+
+// ---------- 长按看详情 ----------
+// 内容顺序按考研优先级排：先给「值不值得花时间」（等级 + 真题次数），
+// 再给释义和词形；词典全义项默认折叠，避免把「州 / 大写字母」这类非重点义摆到最前面。
+let detailMap = null;
+let detailLoading = null;
+function loadDetail() {
+  if (detailMap) return Promise.resolve(detailMap);
+  if (detailLoading) return detailLoading;
+  const url = WEB_MODE && DATA_META && DATA_META.assets && DATA_META.assets.detail;
+  if (!url) {
+    // 单文件版内联；detail 是「词 → 详情」的对象，不能走 deckJson（那边只收数组）
+    const el = document.getElementById('ky-deck-detail');
+    try { detailMap = el ? JSON.parse(el.textContent) : {}; }
+    catch { detailMap = {}; }
+    return Promise.resolve(detailMap);
+  }
+  detailLoading = fetch(url, { cache: 'force-cache' })
+    .then(r => { if (!r.ok) throw new Error('detail ' + r.status); return r.json(); })
+    .then(d => { detailMap = d || {}; return detailMap; })
+    .catch(() => { detailMap = {}; return detailMap; })
+    .finally(() => { detailLoading = null; });
+  return detailLoading;
+}
+
+function escapeHtml(text) {
+  return String(text == null ? '' : text).replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function detailRow(key, value) {
+  return value ? '<div class="detail-row"><span class="k">' + key + '</span><span class="v">' + value + '</span></div>' : '';
+}
+function renderDetail(word, extra) {
+  const info = (extra && extra[word.word]) || {};
+  $('detailWord').textContent = word.word;
+  $('detailPhonetic').textContent = info.p ? '/' + info.p + '/' : '';
+
+  const chips = [];
+  if (word.priority) chips.push('<span class="detail-chip">' + escapeHtml(word.priority) + '</span>');
+  if ((info.g || []).indexOf('ky') >= 0) chips.push('<span class="detail-chip">考研大纲</span>');
+  $('detailStatus').innerHTML = chips.length
+    ? '<div class="detail-row"><span class="k">定位</span><span class="v">' + chips.join('') + '</span></div>'
+    : '';
+
+  const exam = [];
+  if (word.freq) exam.push('英语二 ' + word.freq + ' 次');
+  if (word.en1_freq) exam.push('英语一 ' + word.en1_freq + ' 次');
+  $('detailExam').innerHTML = detailRow('真题', exam.length ? exam.join(' · ') : '未在已收录真题中出现');
+
+  const forms = (word.forms || []).filter(Boolean);
+  $('detailForms').innerHTML =
+    detailRow('释义', escapeHtml(word.meaning)) +
+    (word.family ? detailRow('词族', escapeHtml(word.family)) : '') +
+    (forms.length ? detailRow('词形', escapeHtml(forms.join(' / '))) : '');
+
+  $('detailDict').textContent = info.t || '（这个词没有额外的词典义项）';
+  $('detailDictBox').open = false;
+  $('detailMask').classList.remove('hidden');
+}
+
+async function openDetail(word) {
+  if (!word) return;
+  renderDetail(word, detailMap);        // 先把已有内容显示出来，别让用户干等
+  const extra = await loadDetail();
+  const mask = $('detailMask');
+  if (mask.classList.contains('hidden')) return;
+  if (queue[idx] && queue[idx].word === word.word) renderDetail(word, extra);
+}
+function closeDetail() { $('detailMask').classList.add('hidden'); }
+$('detailClose').onclick = closeDetail;
+$('detailMask').onclick = event => { if (event.target === $('detailMask')) closeDetail(); };
+$('detailAgain').onclick = () => { const w = queue[idx]; if (w) speak(w.word); };
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('detailMask').classList.contains('hidden')) closeDetail();
+});
+
+// 长按 0.5 秒打开；手指一动或提前抬起就取消，避免和滑动冲突
+let pressTimer = null;
+let pressFired = false;
+const startPress = () => {
+  clearTimeout(pressTimer);
+  pressFired = false;
+  const w = queue[idx];
+  if (!w || studyLoading || !$('detailMask').classList.contains('hidden')) return;
+  pressTimer = setTimeout(() => {
+    pressFired = true;
+    if (navigator.vibrate) navigator.vibrate(12);
+    openDetail(w);
+  }, 500);
+};
+const stopPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+card.addEventListener('touchstart', startPress, { passive: true });
+card.addEventListener('touchmove', stopPress, { passive: true });
+card.addEventListener('touchcancel', stopPress, { passive: true });
+card.addEventListener('mousedown', startPress);
+card.addEventListener('mouseup', stopPress);
+card.addEventListener('mouseleave', stopPress);
 
 // 鼠标滚轮翻词：向下滚下一个，向上滚上一个；节流避免触控板一次跳过多个词。
 let wheelLockedUntil = 0;
@@ -1890,13 +2056,28 @@ async function api(path, options) {
   const opt = options || {};
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
+  let body;
+  let headers = {};
+  if (opt.body !== undefined) {
+    const text = JSON.stringify(opt.body);
+    body = text;
+    headers = { 'content-type': 'application/json' };
+    if (opt.compress && text.length >= 2048 && typeof CompressionStream !== 'undefined' && typeof Blob !== 'undefined') {
+      try {
+        body = await new Response(
+          new Blob([text], { type: 'application/json' }).stream().pipeThrough(new CompressionStream('gzip')),
+        ).arrayBuffer();
+        headers = { 'content-type': 'application/octet-stream', 'x-ky-encoding': 'gzip' };
+      } catch {}
+    }
+  }
   let res;
   try {
     res = await fetch('/api' + path, {
-      method: opt.method || (opt.body ? 'POST' : 'GET'),
+      method: opt.method || (opt.body !== undefined ? 'POST' : 'GET'),
       credentials: 'same-origin',
-      headers: opt.body ? { 'content-type': 'application/json' } : {},
-      body: opt.body ? JSON.stringify(opt.body) : undefined,
+      headers,
+      body,
       signal: controller ? controller.signal : undefined,
     });
   } catch (e) {
@@ -1921,7 +2102,9 @@ function snapshot() {
     chapterData,
     conf: {
       deck: conf.deck,
+      chapter: Number(conf.chapter) || 0,
       deckChapter: conf.deckChapter || {},
+      progressAt: Number(conf.progressAt) || 0,
       showByDefault: !!conf.showByDefault,
       speak: conf.speak !== false,
       // 重置/导入时置位，同步时凭它压过云端
@@ -1943,20 +2126,19 @@ function applySnapshot(d) {
   if (d.conf && typeof d.conf === 'object') {
     if (d.conf.deck && DECKS[d.conf.deck]) conf.deck = d.conf.deck;
     if (d.conf.deckChapter) conf.deckChapter = d.conf.deckChapter;
+    if (typeof d.conf.chapter === 'number') conf.chapter = d.conf.chapter;
+    if (typeof d.conf.progressAt === 'number') conf.progressAt = d.conf.progressAt;
     if (typeof d.conf.showByDefault === 'boolean') conf.showByDefault = d.conf.showByDefault;
     if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
     save(LS_CONF, conf);
     activeDeck = DECKS[conf.deck] ? conf.deck : 'core';
-    $('deckSelect').value = activeDeck;
+    const deckSelect = $('deckSelect');
+    if (deckSelect) deckSelect.value = activeDeck;
     updateDeckMeta();
   }
-  // 同步回来的数据不能让用户正在背的词跳走：记住当前词，重载后再定位回去
-  const keepWord = (queue[idx] && queue[idx].word) || null;
-  loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || curChapter);
-  if (keepWord) {
-    const j = queue.findIndex(w => w.word === keepWord);
-    if (j >= 0) { idx = j; savePos(); renderStudy(); }
-  }
+  // 同步回来的进度是权威位置：直接跳到云端当前词库、章节和单词，不保留本机旧位置。
+  const targetChapter = conf.deckChapter && conf.deckChapter[activeDeck];
+  loadChapter(typeof targetChapter === 'number' ? targetChapter : (Number(conf.chapter) || 0));
   renderChapters();
   updateStats();
   renderList();
@@ -2134,7 +2316,7 @@ function renderAuth() {
 function scheduleCloudSync(delay) {
   if (!authUser || navigator.onLine === false) return;
   clearTimeout(syncTimer);
-  const wait = typeof delay === 'number' ? delay : 2500;
+  const wait = typeof delay === 'number' ? delay : 6000;
   syncTimer = setTimeout(() => {
     if (syncing) { pendingSync = true; return; }
     syncNow(true);
@@ -2185,6 +2367,29 @@ function mergeChapters(local, cloud) {
   }
   return out;
 }
+function latestChapterTime(chapterData) {
+  let latest = 0;
+  for (const rec of Object.values(chapterData || {})) {
+    latest = Math.max(latest, Number(rec && rec.t) || 0);
+  }
+  return latest;
+}
+function mergeConf(local, cloud, localChapters, cloudChapters) {
+  const a = local || {};
+  const b = cloud || {};
+  const localAt = Math.max(Number(a.progressAt) || 0, latestChapterTime(localChapters));
+  const cloudAt = Math.max(Number(b.progressAt) || 0, latestChapterTime(cloudChapters));
+  const localForce = Number(a.forceAt) || 0;
+  const cloudForce = Number(b.forceAt) || 0;
+  const chooseCloud = cloudForce > localForce || (cloudForce === localForce && cloudAt >= localAt);
+  const winner = chooseCloud ? b : a;
+  const other = chooseCloud ? a : b;
+  return {
+    ...other,
+    ...winner,
+    deckChapter: { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) },
+  };
+}
 function mergeSnapshots(local, cloud) {
   const localForce = (local.conf && local.conf.forceAt) || 0;
   const cloudForce = (cloud.conf && cloud.conf.forceAt) || 0;
@@ -2200,7 +2405,7 @@ function mergeSnapshots(local, cloud) {
   return {
     state: mergeState(local.state, cloud.state),
     chapterData: mergeChapters(local.chapterData, cloud.chapterData),
-    conf: local.conf,
+    conf: mergeConf(local.conf, cloud.conf, local.chapterData, cloud.chapterData),
   };
 }
 function sameJson(a, b) {
@@ -2213,19 +2418,30 @@ async function putState(payload, baseUpdatedAt, force) {
     baseUpdatedAt: Math.max(0, Number(baseUpdatedAt) || 0),
   };
   if (force) body.force = true;
-  const r = await api('/state', { method: 'PUT', body });
+  const r = await api('/state', { method: 'PUT', body, compress: true });
   lastSyncAt = r.updatedAt || Date.now();
   return r;
 }
 
 function applyMergedSnapshot(merged, local) {
-  const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData);
+  const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData) || !sameJson(merged.conf, local.conf);
   if (changedLocally) {
     applyingRemote = true;
     try { applySnapshot(merged); }
     finally { applyingRemote = false; }
   }
   return changedLocally;
+}
+
+async function syncWithServer(local) {
+  const result = await api('/state/sync', {
+    method: 'POST',
+    body: { payload: local },
+    compress: true,
+  });
+  lastSyncAt = result.updatedAt || Date.now();
+  const changedLocally = applyMergedSnapshot(result.payload, local);
+  return { result, changedLocally };
 }
 
 // 把一次 GET/PUT 拿到的云端快照并入本机；只有确实有差异时才回写。
@@ -2265,20 +2481,10 @@ async function syncNow(quiet) {
     let result = 'pulled';
     if (!syncInitialized && syncDirty) {
       const local = snapshot();
-      try {
-        // 新账号或本地有离线改动：先尝试单请求上传。
-        await putState(local, 0);
-        syncInitialized = true;
-        result = 'pushed';
-      } catch (e) {
-        if (e.status !== 409 || !e.data || !('payload' in e.data)) throw e;
-        syncInitialized = true;
-        await mergeRemoteIntoLocal(snapshot(), {
-          payload: e.data.payload,
-          updatedAt: e.data.updatedAt,
-        });
-        result = 'merged';
-      }
+      // 首次登录只需一次请求：服务端完成鉴权、合并和写回。
+      const synced = await syncWithServer(local);
+      syncInitialized = true;
+      result = synced.changedLocally ? 'merged' : 'pushed';
     } else if (!syncInitialized) {
       const remote = await api('/state');
       if (stale()) return;
@@ -2290,12 +2496,9 @@ async function syncNow(quiet) {
         await putState(local, lastSyncAt);
         result = 'pushed';
       } catch (e) {
-        if (e.status !== 409 || !e.data || !('payload' in e.data)) throw e;
-        await mergeRemoteIntoLocal(snapshot(), {
-          payload: e.data.payload,
-          updatedAt: e.data.updatedAt,
-        });
-        result = 'merged';
+        if (e.status !== 409) throw e;
+        const synced = await syncWithServer(snapshot());
+        result = synced.changedLocally ? 'merged' : 'pushed';
       }
     } else {
       const path = lastSyncAt ? '/state?since=' + encodeURIComponent(lastSyncAt) : '/state';
@@ -2438,7 +2641,7 @@ $('syncNowBtn').onclick = () => syncNow(false);
 setInterval(() => {
   if (!authUser || document.visibilityState !== 'visible' || navigator.onLine === false) return;
   syncNow(true);
-}, 90000);
+}, 30000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && authUser && navigator.onLine !== false) syncNow(true);
 });
@@ -2468,7 +2671,11 @@ const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
 idle(() => refreshAuth());
 
 // ---- 订阅：谁需要响应数据变化，就在这里登记，不再散落在各处 ----
-bus.on('data:change', () => { noteLocalChange(); scheduleCloudSync(); });
+bus.on('data:change', () => {
+  if (applyingRemote) return;
+  noteLocalChange();
+  scheduleCloudSync();
+});
 bus.on('data:change', () => updateStats());
 bus.on('deck:change', () => {
   renderChapters();

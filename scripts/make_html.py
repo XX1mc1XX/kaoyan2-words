@@ -2,6 +2,7 @@
 """Embed the generated word list into the single-file mobile web app."""
 from __future__ import annotations
 
+import csv
 import hashlib
 import io
 import json
@@ -71,6 +72,9 @@ def slim_rows(source):
             "meaning": r["meaning"],
             "forms": r.get("forms", []),
             "priority": r.get("priority", ""),
+            # 长按面板要显示真题出现次数，用来判断这个词值不值得多花时间
+            "freq": r.get("freq", 0),
+            "en1_freq": r.get("en1_freq", 0),
             # 词表已按综合优先级排序；用名次映射到 0.01–100.00，
             # 保证同一词库内每个词的展示权重都不同。
             "weight": round((total - index + 1) * 100 / total, 2),
@@ -97,15 +101,57 @@ def json_block(value):
     return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
 
 
-def render_html(deck_values, meta_value):
+def render_html(deck_values, meta_value, detail_value):
     return (
         template.replace("__DATA__", json_block(deck_values["words"]))
         .replace("__DERIVATIVES__", json_block(deck_values["derivatives"]))
         .replace("__BASIC__", json_block(deck_values["basic"]))
         .replace("__INSURANCE__", json_block(deck_values["insurance"]))
         .replace("__META__", json_block(meta_value))
+        .replace("__DETAIL__", json_block(detail_value))
     )
 
+
+EXAM_TAGS = ("zk", "gk", "cet4", "cet6", "ky", "toefl", "ielts", "gre")
+
+
+def build_detail(rows):
+    """长按查看用的详情：音标 + 前两个词性组。
+
+    只取前两组是因为词典里靠后的义项大多是生僻用法，考研不考；
+    把整段塞进去反而会把「州 / 大写字母」这类非重点义摆到用户眼前。
+    """
+    path = DATA / "ecdict.csv"
+    if not path.exists():
+        return {}
+    wanted = {r["word"] for r in rows}
+    detail = {}
+    with io.open(path, encoding="utf-8", errors="replace", newline="") as f:
+        for row in csv.DictReader(f):
+            word = (row.get("word") or "").lower()
+            if word not in wanted or word in detail:
+                continue
+            groups = []
+            for line in (row.get("translation") or "").split("\n"):
+                line = line.strip()
+                if not line or line.startswith("["):   # 跳过 [计] [医] 这类领域行
+                    continue
+                groups.append(line[:46] + "…" if len(line) > 46 else line)
+            if not groups:
+                continue
+            item = {"t": "\n".join(groups[:2])}
+            phonetic = (row.get("phonetic") or "").strip()
+            if phonetic:
+                item["p"] = phonetic
+            # 考纲标签：ky = 考研大纲词，其余用来判断这个词的通用程度
+            tags = [t for t in (row.get("tag") or "").split() if t in EXAM_TAGS]
+            if tags:
+                item["g"] = tags
+            detail[word] = item
+    return detail
+
+
+detail = build_detail(slim + derivative_slim + basic_slim + insurance_slim)
 
 # 本地单文件版继续内嵌全部词库，双击即可完整离线使用。
 standalone_html = render_html(
@@ -116,6 +162,7 @@ standalone_html = render_html(
         "insurance": insurance_slim,
     },
     meta,
+    detail,
 )
 OUT.write_text(standalone_html, encoding="utf-8", newline="\n")
 
@@ -146,6 +193,13 @@ for deck_id, deck_rows in deck_payloads.items():
     target.write_text(payload, encoding="utf-8", newline="\n")
     asset_map[deck_id] = "./" + rel_path.as_posix()
 
+# 长按详情单独一片：只有第一次长按时才下载，不占首屏
+detail_payload = json_block(detail)
+detail_digest = hashlib.sha256(detail_payload.encode("utf-8")).hexdigest()[:12]
+detail_rel = Path("data") / f"detail.{detail_digest}.json"
+(DEPLOY / detail_rel).write_text(detail_payload, encoding="utf-8", newline="\n")
+asset_map["detail"] = "./" + detail_rel.as_posix()
+
 web_meta = dict(meta)
 web_meta.update(
     {
@@ -167,6 +221,7 @@ web_html = render_html(
         "insurance": [],
     },
     web_meta,
+    {},   # 网页版详情走独立分片，按需加载
 )
 
 # 主程序拆成带哈希的独立脚本，放入 head 并用 defer 提前并行下载。
@@ -207,7 +262,8 @@ web_html = (
 build_version = hashlib.sha256(
     re.sub(r'"generated_at":"[^"]*"', "", web_html).encode("utf-8")
 ).hexdigest()[:12]
-runtime_assets = list(asset_map.values()) + [app_asset]
+# 详情分片不进 SW 预缓存：它只在第一次长按时才用到，不该拖慢首次安装
+runtime_assets = [asset_map[k] for k in ("words", "derivatives", "basic", "insurance")] + [app_asset]
 sw_js = (
     (SOFT / "sw.template.js").read_text(encoding="utf-8")
     .replace("__BUILD_VERSION__", build_version)

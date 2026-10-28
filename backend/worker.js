@@ -121,6 +121,89 @@ async function readJson(request) {
   }
 }
 
+async function readStateBody(request) {
+  if ((request.headers.get('x-ky-encoding') || '').toLowerCase() !== 'gzip') return readJson(request);
+  try {
+    const stream = request.body.pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream, { headers: { 'content-type': 'application/json' } }).json();
+  } catch {
+    return null;
+  }
+}
+
+function mergeState(local, cloud) {
+  const out = {};
+  const keys = new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})]);
+  for (const k of keys) {
+    const a = (local || {})[k];
+    const b = (cloud || {})[k];
+    if (!a) { out[k] = b; continue; }
+    if (!b) { out[k] = a; continue; }
+    const ta = a.t || 0, tb = b.t || 0;
+    if (tb !== ta) { out[k] = tb > ta ? b : a; continue; }
+    if (a.mastered !== b.mastered) { out[k] = a.mastered ? a : b; continue; }
+    out[k] = { ...a, w: Math.max(a.w || 0, b.w || 0), due: Math.max(a.due || 0, b.due || 0) };
+  }
+  return out;
+}
+
+function mergeChapters(local, cloud) {
+  const out = {};
+  const keys = new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})]);
+  for (const k of keys) {
+    const a = (local || {})[k];
+    const b = (cloud || {})[k];
+    if (!a) { out[k] = b; continue; }
+    if (!b) { out[k] = a; continue; }
+    const ta = a.t || 0, tb = b.t || 0;
+    if (ta !== tb) { out[k] = tb > ta ? b : a; continue; }
+    const pa = (a.order || []).length ? (a.pos || 0) : 0;
+    const pb = (b.order || []).length ? (b.pos || 0) : 0;
+    out[k] = pa >= pb ? a : b;
+  }
+  return out;
+}
+
+function latestChapterTime(chapterData) {
+  let latest = 0;
+  for (const rec of Object.values(chapterData || {})) {
+    latest = Math.max(latest, Number(rec && rec.t) || 0);
+  }
+  return latest;
+}
+
+function mergeConf(local, cloud, localChapters, cloudChapters) {
+  const a = local || {};
+  const b = cloud || {};
+  const localAt = Math.max(Number(a.progressAt) || 0, latestChapterTime(localChapters));
+  const cloudAt = Math.max(Number(b.progressAt) || 0, latestChapterTime(cloudChapters));
+  const localForce = Number(a.forceAt) || 0;
+  const cloudForce = Number(b.forceAt) || 0;
+  // forceAt 表示清空/导入覆盖；否则页面位置按最近一次学习活动决定。
+  const chooseCloud = cloudForce > localForce || (cloudForce === localForce && cloudAt >= localAt);
+  const winner = chooseCloud ? b : a;
+  const other = chooseCloud ? a : b;
+  return {
+    ...other,
+    ...winner,
+    deckChapter: { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) },
+  };
+}
+
+function mergeSnapshots(local, cloud) {
+  const localForce = (local.conf && local.conf.forceAt) || 0;
+  const cloudForce = (cloud.conf && cloud.conf.forceAt) || 0;
+  if (cloudForce > localForce) {
+    return { state: cloud.state || {}, chapterData: cloud.chapterData || {}, conf: cloud.conf };
+  }
+  return {
+    state: mergeState(local.state, cloud.state),
+    chapterData: mergeChapters(local.chapterData, cloud.chapterData),
+    conf: mergeConf(local.conf, cloud.conf, local.chapterData, cloud.chapterData),
+  };
+}
+
+
 const USER_RE = /^[A-Za-z0-9_一-龥]{3,24}$/;
 const AUDIO_WORD_RE = /^[A-Za-z][A-Za-z'-]{1,40}$/;
 // 音频请求量远高于其它接口，不走 D1 限流（每词一次写库太贵），
@@ -331,6 +414,58 @@ async function handleApi(request, env, ctx) {
       });
     }
 
+    if (path === '/state/sync' && method === 'POST') {
+      const token = cookieFrom(request, 'ky_sid');
+      if (!token) return json({ error: '未登录' }, 401);
+      if (!stateBudget('sync:' + clientIp(request))) {
+        return json({ error: '同步太频繁，请稍后再试' }, 429);
+      }
+      const body = await readStateBody(request);
+      if (!body || typeof body.payload !== 'object' || body.payload === null) {
+        return json({ error: '数据格式不对' }, 400);
+      }
+      const localText = JSON.stringify(body.payload);
+      if (localText.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
+
+      // 首次登录/冲突后的权威合并：一次请求完成读取、合并、写回。
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const row = await env.DB.prepare(
+          'SELECT s.user_id, s.expires_at, p.payload, p.updated_at ' +
+          'FROM sessions s ' +
+          'LEFT JOIN progress p ON p.user_id = s.user_id ' +
+          'WHERE s.token = ?',
+        ).bind(token).first();
+        if (!row || Number(row.expires_at) < Date.now()) return json({ error: '未登录' }, 401);
+        const now = Date.now();
+        if (!row.payload) {
+          const inserted = await env.DB.prepare(
+            'INSERT INTO progress (user_id, payload, updated_at) VALUES (?, ?, ?) ' +
+            'ON CONFLICT(user_id) DO NOTHING RETURNING updated_at',
+          ).bind(row.user_id, localText, now).first();
+          if (inserted) {
+            return json({ ok: true, payload: body.payload, updatedAt: inserted.updated_at, merged: false });
+          }
+          continue;
+        }
+        let remote;
+        try { remote = JSON.parse(row.payload); }
+        catch { return json({ error: '云端进度损坏' }, 500); }
+        const merged = mergeSnapshots(body.payload, remote);
+        const mergedText = JSON.stringify(merged);
+        if (mergedText === row.payload) {
+          return json({ ok: true, payload: remote, updatedAt: row.updated_at, merged: false });
+        }
+        const updated = await env.DB.prepare(
+          'UPDATE progress SET payload = ?, updated_at = ? ' +
+          'WHERE user_id = ? AND updated_at = ? RETURNING updated_at',
+        ).bind(mergedText, now, row.user_id, row.updated_at).first();
+        if (updated) {
+          return json({ ok: true, payload: merged, updatedAt: updated.updated_at, merged: true });
+        }
+      }
+      return json({ error: 'conflict' }, 409);
+    }
+
     if (path === '/state') {
       const token = cookieFrom(request, 'ky_sid');
       if (!token) return json({ error: '未登录' }, 401);
@@ -355,7 +490,7 @@ async function handleApi(request, env, ctx) {
       if (method === 'PUT' || method === 'POST') {
         const len = Number(request.headers.get('content-length') || 0);
         if (len > MAX_PAYLOAD * 1.2) return json({ error: '进度数据过大' }, 413);
-        const body = await readJson(request);
+        const body = await readStateBody(request);
         if (!body || typeof body.payload !== 'object' || body.payload === null) {
           return json({ error: '数据格式不对' }, 400);
         }

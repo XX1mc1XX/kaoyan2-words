@@ -107,7 +107,7 @@ def main():
 
     # 3. 产物体积
     size = os.path.getsize(BUILT) if os.path.exists(BUILT) else 0
-    checks.append({"name": "体积 < 600KB", "ok": 0 < size < 600 * 1024, "weight": 1.0,
+    checks.append({"name": "体积 < 1.2MB", "ok": 0 < size < 1200 * 1024, "weight": 1.0,
                    "detail": "%dKB" % (size // 1024)})
 
     # 4. 首屏：只解析当前词库，其余数据块保持未解析

@@ -678,6 +678,7 @@ function pruneDaily(d) {
   const cut = todayTs() - (DAILY_KEEP_DAYS - 1) * DAY;
   const out = {};
   for (const [k, v] of Object.entries(d || {})) {
+    if (k === '__proto__') continue;
     const ts = new Date(k + 'T00:00:00').getTime();
     if (Number.isFinite(ts) && ts >= cut) out[k] = v;
   }
@@ -693,6 +694,17 @@ function bumpDaily(known, isNewMaster) {
   daily = pruneDaily(daily);
   save(LS_DAILY, daily);
 }
+// 撤销时把刚才加的数量减回去，否则误滑一次会永久多算一天的学习量
+function revertDaily(delta) {
+  if (!delta) return;
+  const key = dayKey(Date.now());
+  const rec = daily[key];
+  if (!rec) return;
+  rec.s = Math.max(0, (rec.s || 0) - (delta.s || 0));
+  rec.m = Math.max(0, (rec.m || 0) - (delta.m || 0));
+  daily[key] = rec;
+  save(LS_DAILY, daily);
+}
 // 连续学习天数：今天还没学就从昨天起算，中间断一天就停
 function streakDays(d) {
   const recs = d || {};
@@ -705,12 +717,14 @@ function streakDays(d) {
 const mergeDaily = (local, cloud) => {
   const out = {};
   for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    if (key === '__proto__') continue;
     const a = (local || {})[key] || {};
     const b = (cloud || {})[key] || {};
-    // 同一端可能重复上报，取较大值而不是相加
+    // 两端是同一份进度的快照，取较大值而不是相加；相加会在回写后被反复累加
     out[key] = { s: Math.max(a.s || 0, b.s || 0), m: Math.max(a.m || 0, b.m || 0) };
   }
-  return out;
+  // 合并结果也按本机的保留窗口裁剪，云端才不会无限增长
+  return pruneDaily(out);
 };
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
@@ -1312,7 +1326,7 @@ function restoreMastered(word) {
   loadChapter(curChapter, undefined, at);
   savePos();
   updateStats();
-  showUndo(word, 'restored');
+  showUndo(word, 'restored', { s: 1, m: 0 });
 }
 // 左滑/左键、右滑/右键统一走这里，滑动和键盘不再各有一套语义
 function applyWordAction(word, dir) {
@@ -1336,7 +1350,7 @@ function mark(word, known) {
   save(LS_STATE, state);
   bumpDaily(known, known && !wasMastered);
   if (known) {
-    showUndo(word);
+    showUndo(word, undefined, { s: 1, m: wasMastered ? 0 : 1 });
     // 移出当前队列：进度条总数同步减少，下一个词自动顶上原位
     queue = queue.filter(w => w.word !== word.word);
     if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
@@ -1371,7 +1385,7 @@ function renderRhythm() {
   const todayRec = daily[dayKey(Date.now())] || {};
   streakEl.textContent = String(streakDays(daily));
   todayEl.textContent = todayRec.s
-    ? '今天过了 ' + todayRec.s + ' 个词' + (todayRec.m ? '，新掌握 ' + todayRec.m + ' 个' : '') + '。'
+    ? '今天过了 ' + todayRec.s + ' 次卡' + (todayRec.m ? '，新掌握 ' + todayRec.m + ' 个' : '') + '。'
     : '今天还没开始背。';
   const days = [];
   for (let i = 6; i >= 0; i -= 1) days.push(todayTs() - i * DAY);
@@ -1608,16 +1622,19 @@ function gotoChapter(i) {
   loadChapter(i);
 }
 let undoTimer = null, undoWord = null, undoKind = 'mastered', undoChapter = null, undoIdx = 0;
+let undoDelta = null;   // 这一步给 daily 加了多少，撤销时要原样减回去
 function clearUndoBar() {
   clearTimeout(undoTimer);
   undoWord = null;
   undoChapter = null;
+  undoDelta = null;
   const bar = document.getElementById('undoBar');
   if (bar) bar.classList.add('hidden');
 }
-function showUndo(word, kind) {
+function showUndo(word, kind, delta) {
   undoWord = word;
   undoKind = kind || 'mastered';
+  undoDelta = delta || null;
   undoChapter = chapterKey(curChapter);
   // 记住它被移走时的位次，撤销时插回原位，而不是插到用户后来翻到的位置
   undoIdx = Math.min(idx, queue.length);
@@ -1643,6 +1660,8 @@ function doUndo() {
     state[word.word] = st;
     save(LS_STATE, state);
   }
+  revertDaily(undoDelta);
+  undoDelta = null;
   queue.splice(Math.min(undoIdx, queue.length), 0, word);
   undoIdx = 0;
   $('undoBar').classList.add('hidden');
@@ -2190,6 +2209,7 @@ $('weightBadge').onclick = event => {
   if (!st || !st.w) return;
   st.w = Math.max(0, st.w - 1);
   save(LS_STATE, state);
+  bumpDaily(false, false);
   renderStudy();
 };
 // 点单词朗读；阻止冒泡避免触发卡片的翻面
@@ -2597,10 +2617,12 @@ function mergeConf(local, cloud, localChapters, cloudChapters) {
   const other = chooseCloud ? a : b;
   const deck = winner.deck || other.deck || 'core';
   const deckChapter = { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) };
-  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新
-  const chapter = Number.isInteger(winner.chapter)
-    ? winner.chapter
-    : (Number.isInteger(deckChapter[deck]) ? deckChapter[deck] : 0);
+  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新。
+  // 老快照/手改的导入文件里可能是字符串，统一转成整数再判断。
+  const asChapter = v => (v === null || v === undefined || v === '')
+    ? null
+    : (Number.isInteger(Number(v)) ? Number(v) : null);
+  const chapter = asChapter(winner.chapter) ?? asChapter(deckChapter[deck]) ?? 0;
   // 两者必须一致，否则下次恢复会从另一边读到别的章
   deckChapter[deck] = chapter;
   return {
@@ -2623,6 +2645,16 @@ function mergeSnapshots(local, cloud) {
       chapterData: cloud.chapterData || {},
       daily: cloud.daily || {},
       conf: cloud.conf,
+    };
+  }
+  // 本机做过「清空 / 导入」而云端还没跟上：以本机为准，
+  // 否则逐词合并会把刚删掉的词按「云端有、本机没有」原样拼回来
+  if (localForce > cloudForce) {
+    return {
+      state: local.state || {},
+      chapterData: local.chapterData || {},
+      daily: local.daily || {},
+      conf: local.conf,
     };
   }
   return {

@@ -164,10 +164,14 @@ function mergeChapters(local, cloud) {
   return out;
 }
 
-// 每日学习节奏：同一天取较大值，不把两端相加（重复上报会算重）
+// 每日学习节奏：同一天取较大值，不把两端相加（是同一份进度的两份快照）
 function mergeDaily(local, cloud) {
   const out = {};
+  const cut = Date.now() - 119 * 864e5;
   for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    if (key === '__proto__') continue;
+    const ts = new Date(key + 'T00:00:00').getTime();
+    if (!Number.isFinite(ts) || ts < cut) continue;
     const a = (local || {})[key] || {};
     const b = (cloud || {})[key] || {};
     out[key] = { s: Math.max(a.s || 0, b.s || 0), m: Math.max(a.m || 0, b.m || 0) };
@@ -201,10 +205,12 @@ function mergeConf(local, cloud, localChapters, cloudChapters) {
   const other = chooseCloud ? a : b;
   const deck = winner.deck || other.deck || 'core';
   const deckChapter = { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) };
-  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新
-  const chapter = Number.isInteger(winner.chapter)
-    ? winner.chapter
-    : (Number.isInteger(deckChapter[deck]) ? deckChapter[deck] : 0);
+  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新。
+  // 老快照/手改的导入文件里可能是字符串，统一转成整数再判断。
+  const asChapter = v => (v === null || v === undefined || v === '')
+    ? null
+    : (Number.isInteger(Number(v)) ? Number(v) : null);
+  const chapter = asChapter(winner.chapter) ?? asChapter(deckChapter[deck]) ?? 0;
   // 两者必须一致，否则恢复时前端会从另一边读到别的章
   deckChapter[deck] = chapter;
   return {
@@ -225,6 +231,16 @@ function mergeSnapshots(local, cloud) {
       chapterData: cloud.chapterData || {},
       daily: cloud.daily || {},
       conf: cloud.conf,
+    };
+  }
+  // 本机做过「清空 / 导入」而云端还没跟上：以本机为准，
+  // 否则逐词合并会把刚删掉的词按「云端有、本机没有」原样拼回来
+  if (localForce > cloudForce) {
+    return {
+      state: local.state || {},
+      chapterData: local.chapterData || {},
+      daily: local.daily || {},
+      conf: local.conf,
     };
   }
   return {

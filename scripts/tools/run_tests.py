@@ -445,6 +445,21 @@ setTimeout(function () {
           out.merge_daily_max = mergedD[dk(0)].s === 5 && mergedD[dk(0)].m === 2 && mergedD[dk(1)].s === 1;
           out.snapshot_has_daily = !!snapshot().daily;
           out.daily_scoped = typeof scopedKey(LS_DAILY) === 'string' && SCOPED_KEYS.has(LS_DAILY);
+          // 本机做过清空/导入（forceAt 更新）而云端没跟上：云端的旧词不能被拼回来
+          out.merge_local_force_wins = !('beta' in mergeSnapshots(
+            { state: { alpha: {} }, chapterData: {}, daily: {}, conf: { forceAt: 999 } },
+            { state: { alpha: {}, beta: {} }, chapterData: {}, daily: {}, conf: { forceAt: 0 } }).state);
+          // 撤销要把 daily 一起回滚，否则误滑一次会永久多算
+          const undoBase = (daily[dayKey(Date.now())] || {}).s || 0;
+          if (queue[idx]) {
+            mark(queue[idx], true);
+            const afterMark = (daily[dayKey(Date.now())] || {}).s || 0;
+            doUndo();
+            const afterUndo = (daily[dayKey(Date.now())] || {}).s || 0;
+            out.undo_rolls_daily = afterMark === undoBase + 1 && afterUndo === undoBase;
+          } else {
+            out.undo_rolls_daily = true;
+          }
           switchView('Stat');
           out.rhythm_rendered = document.querySelectorAll('#sWeek .week-day').length === 7
             && document.getElementById('sStreak').textContent !== ''
@@ -617,17 +632,18 @@ setTimeout(async function(){
     // —— 学习节奏（每日统计） ——
     out.web_daily_scoped = SCOPED_KEYS.has('ky_daily_v1');
     out.web_snapshot_daily = !!(snapshot().daily && typeof snapshot().daily === 'object');
-    localStorage.setItem('ky_daily_v1', JSON.stringify({ '2026-01-01': { s: 4, m: 1 } }));
-    localStorage.setItem('ky_daily_v1@probe', JSON.stringify({ '2026-01-01': { s: 2, m: 2 } }));
+    localStorage.setItem('ky_daily_v1', JSON.stringify({ [dayKey(Date.now())]: { s: 4, m: 1 } }));
+    localStorage.setItem('ky_daily_v1@probe', JSON.stringify({ [dayKey(Date.now())]: { s: 2, m: 2 } }));
     adoptGuestProgress('probe');
     const adoptedDaily = JSON.parse(localStorage.getItem('ky_daily_v1@probe') || '{}');
-    const ad = adoptedDaily['2026-01-01'] || {};
+    const ad = adoptedDaily[dayKey(Date.now())] || {};
     out.web_daily_adopt = ad.s === 4 && ad.m === 2;
-    // 同步合并后不能丢每日记录
+    // 同步合并后不能丢每日记录（用当天日期：合并结果会按 120 天窗口裁剪）
+    const dkToday = dayKey(Date.now());
     const dailyMerged = mergeSnapshots(
-      { state: {}, chapterData: {}, daily: { '2026-01-01': { s: 3, m: 0 } }, conf: { forceAt: 0 } },
-      { state: {}, chapterData: {}, daily: { '2026-01-01': { s: 5, m: 2 } }, conf: { forceAt: 0 } });
-    out.web_daily_merge = dailyMerged.daily['2026-01-01'].s === 5 && dailyMerged.daily['2026-01-01'].m === 2;
+      { state: {}, chapterData: {}, daily: { [dkToday]: { s: 3, m: 0 } }, conf: { forceAt: 0 } },
+      { state: {}, chapterData: {}, daily: { [dkToday]: { s: 5, m: 2 } }, conf: { forceAt: 0 } });
+    out.web_daily_merge = dailyMerged.daily[dkToday].s === 5 && dailyMerged.daily[dkToday].m === 2;
   } catch (e) {
     out.error = e.stack || e.message;
   }
@@ -722,6 +738,7 @@ def runtime_checks():
     check("同步支持增量拉取", "unchanged: true" in worker_text and "searchParams.get('since')" in worker_text)
     check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(body.payload, remote)" in worker_text)
     check("服务端合并每日节奏", "function mergeDaily(" in worker_text and "daily: mergeDaily(" in worker_text)
+    check("服务端 force 双向生效", "cloudForce > localForce" in worker_text and "localForce > cloudForce" in worker_text)
     check("服务端章节与 deckChapter 自洽", "deckChapter[deck] = chapter;" in worker_text)
     check("同步支持压缩上传", "DecompressionStream" in worker_text and "x-ky-encoding" in worker_text)
 
@@ -766,6 +783,7 @@ def browser_checks():
             "daily_bump": True, "daily_master_bump": True,
             "streak_three": True, "streak_broken": True, "streak_yesterday": True,
             "merge_daily_max": True, "snapshot_has_daily": True, "daily_scoped": True,
+            "merge_local_force_wins": True, "undo_rolls_daily": True,
             "rhythm_rendered": True,
             "desktop_click_flips": True, "touch_synth_click_ignored": True,
             "cross_next": True, "cross_prev": True,

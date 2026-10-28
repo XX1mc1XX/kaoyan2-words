@@ -206,6 +206,14 @@ setTimeout(function () {
           tapEl(document.querySelector('.badges .weight-badge') || document.querySelector('.badges .priority'));
           out.badge_no_flip = vis() === visNow;
 
+          // L. 从单词上起手的触摸不会被吞（否则滑动判定的 touchend 丢失）
+          let cardGotTouchEnd = false;
+          card.addEventListener('touchend', () => { cardGotTouchEnd = true; }, { once: true });
+          const wordEl = document.getElementById('word');
+          fire(wordEl, 'touchstart', 300, 400);
+          fire(wordEl, 'touchend', 300, 400);
+          out.word_touchend_reaches_card = cardGotTouchEnd;
+
           document.title = 'RESULT:' + JSON.stringify(out);
         }, 200);
       }, 150);
@@ -251,7 +259,7 @@ def browser_checks():
             "weight_down": True, "weight_badge_val": True,
             "mastered_has_words": True, "mastered_restored": True,
             "cross_next": True, "cross_prev": True,
-            "badge_no_flip": True,
+            "badge_no_flip": True, "word_touchend_reaches_card": True,
         }
         for k, v in expect.items():
             check("行为·" + k, data.get(k) == v, "实际=%s" % data.get(k))

@@ -279,6 +279,11 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       </div>
     </div>
     <div class="panel">
+      <div class="panel-title">发音</div>
+      <div class="daily"><button id="testSpeak">点这里测试发音</button></div>
+      <div class="note" id="speakDiag">点一下会读 hello。如果听不到，看下面提示。</div>
+    </div>
+    <div class="panel">
       <div class="panel-title">进度备份</div>
       <div class="daily">
         <button id="exportProgress">导出进度</button>
@@ -562,7 +567,7 @@ function renderStudy() {
   $('meaningToggle').setAttribute('aria-pressed', String(!!conf.showByDefault));
   $('speakToggle').textContent = conf.speak ? '朗读开' : '朗读关';
   $('speakToggle').setAttribute('aria-pressed', String(!!conf.speak));
-  if (conf.speak && !dragging && lastSpoken !== word.word) { lastSpoken = word.word; speak(word.word); }
+  if (conf.speak && !dragging && lastSpoken !== word.word && speak(word.word)) lastSpoken = word.word;
   $('swipeHint').textContent = activeDeck === 'mastered'
     ? '左滑 = 降权重 · 右滑 = 恢复到原词库'
     : '左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）';
@@ -627,11 +632,22 @@ if (window.speechSynthesis) {
 }
 // 关键：不要提前 speak 预热。部分浏览器在没有用户手势时 speak 会让引擎进入
 // 错误状态，之后所有朗读都静默失败——这正是「听不到声音」的原因。
+// 浏览器禁止「没有用户手势」的语音播放（错误码 not-allowed），
+// 页面一加载就自动朗读会被引擎拉黑，之后用户点词也不出声 —— 必须先等一次真实手势。
+let userGestured = false;
+const markGesture = () => { userGestured = true; };
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', markGesture, { once: true, passive: true });
+  document.addEventListener('mousedown', markGesture, { once: true });
+  document.addEventListener('keydown', markGesture, { once: true });
+}
+
 function speak(word) {
   try {
     const synth = window.speechSynthesis;
-    if (!synth) { speechFail('浏览器不支持语音合成'); return; }
-    if (!word) return;
+    if (!synth) { speechFail('浏览器不支持语音合成'); return false; }
+    if (!word) return false;
+    if (!userGestured) return false;      // 还没交互过，浏览器不放行，静默跳过
     if (!voiceReady) refreshVoice();
     if (synth.speaking || synth.pending) synth.cancel();
     const u = new SpeechSynthesisUtterance(word);
@@ -642,14 +658,18 @@ function speak(word) {
     if (speakVoice) u.voice = speakVoice;
     u.onerror = event => {
       const err = event && event.error;
-      if (err && err !== 'interrupted' && err !== 'canceled') speechFail(err);
+      // not-allowed 是没有手势时的正常拒绝，不是故障，别弹红条
+      if (!err || err === 'interrupted' || err === 'canceled' || err === 'not-allowed') return;
+      speechFail(err);
     };
     // cancel() 之后同一轮里立刻 speak() 会被部分浏览器丢掉，隔一帧再播
     setTimeout(() => {
       try { synth.speak(u); } catch (err) { speechFail(err.message || String(err)); }
     }, 30);
+    return true;
   } catch (e) {
     speechFail(e.message || String(e));
+    return false;
   }
 }
 function toggleMeaning() {
@@ -1048,6 +1068,20 @@ document.querySelectorAll('.filter').forEach(button => {
     renderList();
   };
 });
+$('testSpeak').onclick = () => {
+  const synth = window.speechSynthesis;
+  const diag = $('speakDiag');
+  if (!synth || typeof SpeechSynthesisUtterance === 'undefined') {
+    diag.textContent = '这个浏览器不支持语音合成。微信里打开经常被禁用，请用系统自带浏览器（Safari / Edge / Chrome）打开本页。';
+    return;
+  }
+  refreshVoice();
+  const voices = synth.getVoices() || [];
+  speak('hello');
+  const name = speakVoice ? speakVoice.name + '（' + speakVoice.lang + '）' : '浏览器默认音色';
+  diag.textContent = '可用音色 ' + voices.length + ' 个，正在使用：' + name
+    + '。听不到时依次检查：手机静音开关、媒体音量、微信内置浏览器（它常禁语音）。';
+};
 $('exportProgress').onclick = () => {
   const dump = {
     v: 1,

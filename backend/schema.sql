@@ -18,3 +18,10 @@ CREATE TABLE IF NOT EXISTS progress (
   payload    TEXT    NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- 设备配对码：电脑生成 6 位码，手机输入即登录同一账号（10 分钟有效）
+CREATE TABLE IF NOT EXISTS pair_codes (
+  code       TEXT    PRIMARY KEY,
+  user_id    INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);

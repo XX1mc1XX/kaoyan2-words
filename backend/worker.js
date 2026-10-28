@@ -147,6 +147,41 @@ async function handleApi(request, env) {
       return json({ user: user ? { username: user.username } : null });
     }
 
+    // 配对码：电脑已登录后生成 6 位码，手机输入即登录同一账号
+    if (path === '/pair/new' && method === 'POST') {
+      const user = await currentUser(request, env);
+      if (!user) return json({ error: '未登录' }, 401);
+      const now = Date.now();
+      await env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(now).run();
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code = String(Math.floor(100000 + Math.random() * 900000));
+        const dup = await env.DB.prepare('SELECT code FROM pair_codes WHERE code = ?').bind(code).first();
+        if (!dup) break;
+      }
+      const expiresAt = now + 10 * 60 * 1000;
+      await env.DB.prepare('INSERT INTO pair_codes (code, user_id, expires_at) VALUES (?, ?, ?)')
+        .bind(code, user.id, expiresAt).run();
+      return json({ code, expiresAt });
+    }
+
+    if (path === '/pair/claim' && method === 'POST') {
+      const body = await readJson(request);
+      const code = String(body?.code || '').trim();
+      if (!/^\d{6}$/.test(code)) return json({ error: '配对码是 6 位数字' }, 400);
+      const row = await env.DB.prepare('SELECT user_id, expires_at FROM pair_codes WHERE code = ?').bind(code).first();
+      if (!row || row.expires_at < Date.now()) return json({ error: '配对码无效或已过期' }, 400);
+      const u = await env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(row.user_id).first();
+      await env.DB.prepare('DELETE FROM pair_codes WHERE code = ?').bind(code).run();
+      const token = randomHex(24);
+      const exp = Date.now() + SESSION_DAYS * 86400_000;
+      await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
+        .bind(token, row.user_id, exp).run();
+      return json({ ok: true, username: u.username }, 200, {
+        'set-cookie': sessionCookie(token, SESSION_DAYS * 86400),
+      });
+    }
+
     if (path === '/state') {
       const user = await currentUser(request, env);
       if (!user) return json({ error: '未登录' }, 401);

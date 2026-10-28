@@ -93,6 +93,12 @@ function tap(card) {
   card.dispatchEvent(new TouchEvent('touchstart', { touches: [t], targetTouches: [t], changedTouches: [t], bubbles: true, cancelable: true }));
   card.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [t], bubbles: true, cancelable: true }));
 }
+function tapEl(el) {
+  const t = new Touch({ identifier: 11, target: el, clientX: 200, clientY: 400,
+                        pageX: 200, pageY: 400, screenX: 200, screenY: 200 });
+  el.dispatchEvent(new TouchEvent('touchstart', { touches: [t], targetTouches: [t], changedTouches: [t], bubbles: true, cancelable: true }));
+  el.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [t], bubbles: true, cancelable: true }));
+}
 function swipe(card, x1, x2) {
   fire(card, 'touchstart', x1, 400);
   fire(card, 'touchmove', (x1 + x2) / 2, 401);
@@ -174,6 +180,32 @@ setTimeout(function () {
           delete state[w3.word];
           renderStudy();
 
+          // I. 已认识库有词，右滑恢复
+          switchDeck('core');
+          const mw = queue[idx];
+          state[mw.word] = { w: 0, mastered: true, seen: 1 };
+          save(LS_STATE, state);
+          switchDeck('mastered');
+          out.mastered_has_words = queue.length > 0;
+          const mv = queue[0];
+          restoreMastered(mv);
+          out.mastered_restored = state[mv.word] && state[mv.word].mastered === false;
+          switchDeck('core');
+
+          // J. 跨章翻页：本章末词按下一个 → 下一章首词
+          gotoChapter(0);
+          idx = queue.length - 1;
+          renderStudy();
+          navigate(1);
+          out.cross_next = curChapter === 1 && idx === 0;
+          navigate(-1);
+          out.cross_prev = curChapter === 0 && idx === queue.length - 1;
+
+          // K. 点角标不触发翻面
+          const visNow = vis();
+          tapEl(document.querySelector('.badges .weight-badge') || document.querySelector('.badges .priority'));
+          out.badge_no_flip = vis() === visNow;
+
           document.title = 'RESULT:' + JSON.stringify(out);
         }, 200);
       }, 150);
@@ -217,6 +249,9 @@ def browser_checks():
             "deck_chapter": True, "resume_ok": True,
             "order_stable": True, "order_shuffled": True, "order_restored": True,
             "weight_down": True, "weight_badge_val": True,
+            "mastered_has_words": True, "mastered_restored": True,
+            "cross_next": True, "cross_prev": True,
+            "badge_no_flip": True,
         }
         for k, v in expect.items():
             check("行为·" + k, data.get(k) == v, "实际=%s" % data.get(k))

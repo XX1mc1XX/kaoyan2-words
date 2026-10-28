@@ -161,6 +161,10 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .auth-status.err{color:var(--bad)}
 .auth-status.ok{color:var(--ok)}
 .auth-sync{display:flex;flex-direction:column;gap:8px}
+.auth-pair{display:flex;flex-direction:column;gap:8px}
+.pair-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:800;
+  letter-spacing:.18em;text-align:center;color:var(--brand);padding:10px 0}
+.pair-tip{font-size:12px;color:var(--muted);text-align:center;line-height:1.5}
 .danger{border:1px solid color-mix(in srgb,var(--bad) 38%,var(--line));background:transparent;color:var(--bad);border-radius:12px;padding:10px;font:inherit;font-size:13px;cursor:pointer}
 @media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:12px 13px 42px}.meaning-toggle{font-size:12px}}
 @media (max-height:620px){
@@ -175,12 +179,12 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 </head>
 <body>
 <header>
+  <button class="account-btn" id="accountBtn">登录</button>
   <span class="brand">英语二词汇</span><span class="spacer"></span>
   <div class="tabs">
     <button class="tab active" id="tabStudy">学习</button>
     <button class="tab" id="tabList">词表</button>
     <button class="tab" id="tabStat">统计</button>
-    <button class="account-btn" id="accountBtn">登录</button>
   </div>
 </header>
 <div class="storage-warn hidden" id="storageWarn">进度保存失败：浏览器存储已满或处于隐私模式，刷新后可能丢失。</div>
@@ -218,7 +222,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       </div>
       <div class="rule"></div>
       <div class="meaning" id="meaning"></div>
-      <div class="swipe-hint">左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）</div>
+      <div class="swipe-hint" id="swipeHint">左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）</div>
     </article>
     <div class="nav-row">
       <button class="nav-btn" id="prevWord">← 上一个</button>
@@ -294,6 +298,15 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     <button class="auth-switch" id="authMode">没有账号？注册一个</button>
     <div class="auth-sep"><span>或</span></div>
     <button class="wx-btn" id="wxLogin" disabled title="需微信开放平台网站应用资质">微信扫码登录（暂不可用）</button>
+    <button class="auth-switch" id="pairClaimToggle">用配对码登录（在电脑上生成）</button>
+    <div class="auth-pair hidden" id="pairClaimBox">
+      <input class="auth-input" id="pairCode" inputmode="numeric" maxlength="6" placeholder="6 位配对码">
+      <button class="btn" id="pairClaimBtn">登录</button>
+    </div>
+    <div class="auth-pair hidden" id="pairNewBox">
+      <button class="btn" id="pairNewBtn">在另一台设备登录</button>
+      <div class="pair-code hidden" id="pairCodeShow"></div>
+    </div>
     <div class="auth-status" id="authStatus"></div>
     <div class="auth-sync hidden" id="authSync">
       <button class="btn" id="syncUp">用本机进度覆盖云端</button>
@@ -315,13 +328,29 @@ let authUser = null;          // 登录状态要早于 save() 声明，否则初
 let syncTimer = null;
 let syncing = false;
 const DAY = 864e5;
+// 极简事件总线（发布/订阅）：数据一变就广播，谁关心谁订阅，避免到处手动串调用
+const bus = (() => {
+  const subs = new Map();
+  return {
+    on(type, fn) {
+      if (!subs.has(type)) subs.set(type, new Set());
+      subs.get(type).add(fn);
+      return () => subs.get(type).delete(fn);
+    },
+    emit(type, payload) {
+      const set = subs.get(type);
+      if (!set) return;
+      for (const fn of [...set]) { try { fn(payload); } catch (e) {} }
+    },
+  };
+})();
 const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 let storageWarned = false;
 const save = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     try { localStorage.setItem(LS_STAMP, String(Date.now())); } catch {}
-    scheduleCloudSync();
+    bus.emit('data:change', key);
   } catch (e) {
     if (!storageWarned) {
       storageWarned = true;
@@ -418,11 +447,14 @@ function loadChapter(ch, mode) {   // mode: 'shuffle' 打乱 / 'natural' 原序 
   const key = chapterKey(ch);
   const now = todayTs();
   // 未掌握的照常出现；已掌握但到了 7 天复习期的，也重新出现
-  const pending = chapterSlice(ch).filter(w => {
-    if (!isMastered(w)) return true;
-    const st = state[w.word];
-    return !!(st && st.due && st.due <= now);
-  });
+  // 「已认识」库里所有词本来就是已掌握，不能再过滤，否则一章 0 词
+  const pending = activeDeck === 'mastered'
+    ? chapterSlice(ch).slice()
+    : chapterSlice(ch).filter(w => {
+        if (!isMastered(w)) return true;
+        const st = state[w.word];
+        return !!(st && st.due && st.due <= now);
+      });
   let rec = chapterData[key];
   if (mode === 'shuffle') {
     rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true };
@@ -509,18 +541,37 @@ function renderStudy() {
   $('speakToggle').textContent = conf.speak ? '朗读开' : '朗读关';
   $('speakToggle').setAttribute('aria-pressed', String(!!conf.speak));
   if (conf.speak && lastSpoken !== word.word) { lastSpoken = word.word; speak(word.word); }
+  $('swipeHint').textContent = activeDeck === 'mastered'
+    ? '左滑 = 降权重 · 右滑 = 恢复到原词库'
+    : '左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）';
   $('chapterSelect').value = String(currentChapter());
-  $('prevWord').disabled = idx <= 0;
-  $('nextWord').disabled = idx >= total - 1;
+  $('prevWord').disabled = idx <= 0 && curChapter <= 0;
+  $('nextWord').disabled = idx >= total - 1 && curChapter >= chapterCount() - 1;
 }
 function navigate(delta) {
-  if (!queue.length || idx >= queue.length) return;
   const next = idx + delta;
-  if (next < 0 || next >= queue.length) return;
+  // 到章节边界就翻到相邻章节：上一章停最后一词，下一章停第一词
+  if (next < 0) { crossChapter(-1); return; }
+  if (next >= queue.length) { crossChapter(1); return; }
   idx = next;
   revealed = null;
   savePos();
   renderStudy();
+}
+function crossChapter(dir) {
+  const target = curChapter + dir;
+  if (target < 0 || target >= chapterCount()) return false;
+  savePos();
+  conf.chapter = target;
+  conf.deckChapter = conf.deckChapter || {};
+  conf.deckChapter[activeDeck] = target;
+  save(LS_CONF, conf);
+  loadChapter(target);
+  idx = dir < 0 ? Math.max(queue.length - 1, 0) : 0;
+  savePos();
+  renderStudy();
+  renderChapters();
+  return true;
 }
 let lastSpoken = '';
 let speakVoice = null;
@@ -584,6 +635,29 @@ function toggleMeaning() {
 }
 // 左滑 = 认识：标记掌握，之后不再出现
 // 右滑 = 不认识：权重 +1，下次重排越靠前
+// 已认识库：左滑降权重
+function lowerWeight(word) {
+  if (!word) return;
+  const st = state[word.word];
+  if (!st || !st.w) return;
+  st.w = Math.max(0, st.w - 1);
+  save(LS_STATE, state);
+  if (navigator.vibrate) navigator.vibrate(18);
+  renderStudy();
+}
+// 已认识库：右滑恢复，放回原词库
+function restoreMastered(word) {
+  if (!word) return;
+  const st = state[word.word];
+  if (st) { st.mastered = false; st.due = 0; save(LS_STATE, state); }
+  queue = queue.filter(w => w.word !== word.word);
+  if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
+  revealed = null;
+  savePos();
+  renderStudy();
+  updateStats();
+  showUndo(word, 'restored');
+}
 function mark(word, known) {
   if (!word) return;
   const st = state[word.word] || { w: 0, mastered: false, seen: 0 };
@@ -719,9 +793,7 @@ function switchDeck(value) {
   conf.chapter = resume;
   save(LS_CONF, conf);
   loadChapter(resume);
-  renderChapters();
-  updateStats();
-  updateDeckMeta();
+  bus.emit('deck:change');
   if (!$('viewList').classList.contains('hidden')) renderList();
 }
 function switchView(name) {
@@ -755,10 +827,11 @@ function gotoChapter(i) {
   save(LS_CONF, conf);
   loadChapter(i);
 }
-let undoTimer = null, undoWord = null;
-function showUndo(word) {
+let undoTimer = null, undoWord = null, undoKind = 'mastered';
+function showUndo(word, kind) {
   undoWord = word;
-  $('undoText').textContent = '已认识：' + word.word;
+  undoKind = kind || 'mastered';
+  $('undoText').textContent = (undoKind === 'restored' ? '已恢复：' : '已认识：') + word.word;
   $('undoBar').classList.remove('hidden');
   clearTimeout(undoTimer);
   undoTimer = setTimeout(() => { $('undoBar').classList.add('hidden'); undoWord = null; }, 5000);
@@ -767,7 +840,12 @@ function doUndo() {
   const word = undoWord;
   if (!word) return;
   const st = state[word.word];
-  if (st) { st.mastered = false; st.due = 0; state[word.word] = st; save(LS_STATE, state); }
+  if (st) {
+    if (undoKind === 'restored') { st.mastered = true; st.due = todayTs() + 7 * DAY; }
+    else { st.mastered = false; st.due = 0; }
+    state[word.word] = st;
+    save(LS_STATE, state);
+  }
   queue.splice(Math.min(idx, queue.length), 0, word);
   $('undoBar').classList.add('hidden');
   clearTimeout(undoTimer);
@@ -781,6 +859,7 @@ $('undoBtn').onclick = doUndo;
 let touchStart = null;
 const card = $('card');
 card.addEventListener('touchstart', event => {
+  if (event.target.closest && event.target.closest('.badges')) { touchStart = null; return; }
   if (event.touches.length !== 1) return;
   const t = event.touches[0];
   touchStart = { x: t.clientX, y: t.clientY, time: Date.now(), moved: false };
@@ -804,6 +883,7 @@ card.addEventListener('touchmove', event => {
   }
 }, { passive: false });
 card.addEventListener('touchend', event => {
+  if (event.target.closest && event.target.closest('.badges')) { touchStart = null; return; }
   if (!touchStart || event.changedTouches.length !== 1) { touchStart = null; return; }
   const t = event.changedTouches[0];
   const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
@@ -819,8 +899,8 @@ card.addEventListener('touchend', event => {
   const absX = Math.abs(dx), absY = Math.abs(dy);
   const word = queue[idx];
   if (word && absX >= 34 && absX >= absY && startX > 26) {
-    if (dx < 0) {
-      // 左滑：跟手 → 130ms 滑出 → 切下一词
+    const inMastered = activeDeck === 'mastered';
+    const slideOut = action => {
       card.style.transition = 'transform .13s ease-out, opacity .13s ease-out';
       card.style.transform = 'translateX(-110%)';
       card.style.opacity = '0';
@@ -829,17 +909,25 @@ card.addEventListener('touchend', event => {
         card.style.transform = '';
         card.style.opacity = '';
         card.style.borderColor = '';
-        mark(word, true);
+        action();
         requestAnimationFrame(() => { card.style.transition = ''; });
       }, 130);
-    } else {
-      // 右滑：回弹 + 权重 +1，停在当前词
+    };
+    const bounce = () => {
       card.style.transition = 'transform .16s ease, opacity .16s ease, border-color .16s ease';
       card.style.transform = '';
       card.style.opacity = '';
-      card.style.borderColor = 'var(--bad)';
+      card.style.borderColor = dx < 0 ? 'var(--ok)' : 'var(--bad)';
       setTimeout(() => { card.style.borderColor = ''; card.style.transition = ''; }, 260);
-      mark(word, false);
+    };
+    if (dx < 0) {
+      // 左滑：普通库=认识；已认识库=降权重（停在当前词）
+      if (inMastered) { bounce(); lowerWeight(word); }
+      else slideOut(() => mark(word, true));
+    } else {
+      // 右滑：普通库=不认识（权重+1）；已认识库=恢复原词库
+      if (inMastered) slideOut(() => restoreMastered(word));
+      else { bounce(); mark(word, false); }
     }
     return;
   }
@@ -1091,6 +1179,10 @@ function renderAuth() {
   btn.textContent = authUser ? authUser : '登录';
   btn.classList.toggle('online', !!authUser);
   $('authSync').classList.toggle('hidden', !authUser);
+  $('pairNewBox').classList.toggle('hidden', !authUser);
+  $('pairClaimToggle').classList.toggle('hidden', !!authUser);
+  if (authUser) $('pairClaimBox').classList.add('hidden');
+  else $('pairCodeShow').classList.add('hidden');
   $('authForm').classList.toggle('hidden', !!authUser);
   $('authMode').classList.toggle('hidden', !!authUser);
   $('wxLogin').classList.toggle('hidden', !!authUser);
@@ -1188,6 +1280,33 @@ $('authLogout').onclick = async () => {
   renderAuth();
   authSay('已退出登录，本机进度保留', 'ok');
 };
+$('pairClaimToggle').onclick = () => {
+  $('pairClaimBox').classList.toggle('hidden');
+};
+$('pairClaimBtn').onclick = async () => {
+  const code = $('pairCode').value.replace(/\D/g, '');
+  if (code.length !== 6) { authSay('配对码是 6 位数字', 'err'); return; }
+  try {
+    const r = await api('/pair/claim', { body: { code } });
+    $('pairCode').value = '';
+    $('pairClaimBox').classList.add('hidden');
+    await afterLogin(r.username);
+  } catch (e) {
+    authSay(e.message, 'err');
+  }
+};
+$('pairNewBtn').onclick = async () => {
+  try {
+    const r = await api('/pair/new', { method: 'POST' });
+    const box = $('pairCodeShow');
+    box.classList.remove('hidden');
+    box.textContent = r.code;
+    const mins = Math.max(1, Math.round((r.expiresAt - Date.now()) / 60000));
+    authSay('在另一台设备输入这 6 位码，' + mins + ' 分钟内有效', 'ok');
+  } catch (e) {
+    authSay(e.message, 'err');
+  }
+};
 $('syncUp').onclick = () => uploadProgress(false);
 $('syncDown').onclick = async () => {
   try {
@@ -1215,6 +1334,14 @@ api('/wx').then(r => {
   }
 }).catch(() => {});
 refreshAuth();
+
+// ---- 订阅：谁需要响应数据变化，就在这里登记，不再散落在各处 ----
+bus.on('data:change', () => scheduleCloudSync());
+bus.on('data:change', () => updateStats());
+bus.on('deck:change', () => {
+  renderChapters();
+  updateDeckMeta();
+});
 </script>
 </body>
 </html>

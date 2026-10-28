@@ -146,7 +146,34 @@ def main():
     checks.append({"name": "断网后仍可背单词", "ok": bool(offline.get("ok")), "weight": 2.0,
                    "detail": offline.get("reason") or offline.get("offline_word", "")})
 
-    # 7. 回归测试（含数量门槛）
+    # 8. 长按详情覆盖率：每个词有音标/词典义项，每个词形有注释
+    detail_block = {}
+    if os.path.exists(BUILT):
+        html = io.open(BUILT, encoding="utf-8").read()
+        m = re.search(r'id="ky-deck-detail">(.*?)</script>', html, re.S)
+        if m:
+            try:
+                detail_block = json.loads(m.group(1))
+            except Exception:
+                detail_block = {}
+    all_rows = [x for rows_ in data.values() for x in rows_]
+    detail_ratio = len(detail_block) / len(all_rows) if all_rows else 0
+    forms_total = forms_noted = 0
+    for x in all_rows:
+        fmap = (detail_block.get(x["word"]) or {}).get("f") or {}
+        for form in x.get("forms") or []:
+            if not form or form.lower() == x["word"]:
+                continue
+            forms_total += 1
+            if fmap.get(form.lower()):
+                forms_noted += 1
+    forms_ratio = forms_noted / forms_total if forms_total else 0
+    checks.append({"name": "详情覆盖率 ≥ 99%", "ok": detail_ratio >= 0.99, "weight": 1.0,
+                   "detail": "%d/%d = %.1f%%" % (len(detail_block), len(all_rows), detail_ratio * 100)})
+    checks.append({"name": "词形注释覆盖 ≥ 99%", "ok": forms_ratio >= 0.99, "weight": 1.0,
+                   "detail": "%d/%d = %.1f%%" % (forms_noted, forms_total, forms_ratio * 100)})
+
+    # 9. 回归测试（含数量门槛）
     passed, tested = run_tests()
     checks.append({"name": "回归测试全过", "ok": tested > 0 and passed == tested, "weight": 3.0,
                    "detail": "%d/%d" % (passed, tested)})

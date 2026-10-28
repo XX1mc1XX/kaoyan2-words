@@ -16,6 +16,23 @@ PROJECT = "kaoyan2-words"
 PROXY = "http://127.0.0.1:7897"
 
 
+def cf_env():
+    """优先用 .wrangler/.cf_token（已被 git 忽略）里的 API Token。
+
+    OAuth 登录会过期，而且回调要占 localhost:8976，机器上被占用时根本登录不了；
+    API Token 没有这两个问题。
+    """
+    env = dict(os.environ)
+    for key, name in (("CLOUDFLARE_API_TOKEN", ".cf_token"), ("CLOUDFLARE_ACCOUNT_ID", ".cf_account")):
+        path = os.path.join(ROOT, ".wrangler", name)
+        try:
+            if os.path.exists(path):
+                env[key] = open(path, encoding="utf-8").read().strip()
+        except Exception:
+            pass
+    return env
+
+
 def run(cmd, **kw):
     return subprocess.run(cmd, cwd=ROOT, **kw)
 
@@ -54,7 +71,7 @@ def main():
     r = subprocess.run(
         ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
         cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
-        errors="replace", timeout=600,
+        errors="replace", timeout=600, env=cf_env(),
     )
     tail = (r.stdout or "") + (r.stderr or "")
     ok = "Deployment complete" in tail or "Success" in tail

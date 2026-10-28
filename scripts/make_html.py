@@ -121,15 +121,73 @@ FORM_MARKS = {
 }
 
 
-def short_meaning(translation):
-    """取第一个义项里最靠前的一小段，给词形做简短注释用。"""
-    for line in (translation or "").split("\n"):
+def normalize_translation(text):
+    """ECDICT 的换行是字面的「反斜杠 + n」两个字符，不转成真换行，面板会原样显示出来。"""
+    return (text or "").replace("\\n", "\n")
+
+
+def is_verb_word(text):
+    """判断这个词是否真的当动词用。
+
+    名词/形容词的 exchange 里也常带着 p/d/i/3（词典收了罕见动词义），
+    像 companion → companioned、stable → stabled，考研永远不会考，显示出来只是噪音。
+    """
+    return bool(re.search(r"(?:^|\n)\s*(?:v|vt|vi)\.", text))
+
+
+# 派生词常见后缀 → 该派生词自己的词性；查释义时优先取同词性的义项行
+SUFFIX_POS = (
+    ("ity", "n"), ("ness", "n"), ("tion", "n"), ("sion", "n"), ("ment", "n"),
+    ("ance", "n"), ("ence", "n"), ("ship", "n"), ("hood", "n"), ("ism", "n"),
+    ("ist", "n"), ("er", "n"), ("or", "n"),
+    ("able", "a"), ("ible", "a"), ("ive", "a"), ("ful", "a"), ("ous", "a"),
+    ("less", "a"), ("al", "a"), ("ic", "a"), ("ary", "a"),
+    ("ly", "ad"),
+    ("ise", "v"), ("ize", "v"), ("ify", "v"),
+)
+
+
+def pos_for_form(form):
+    for suffix, pos in SUFFIX_POS:
+        # 留够词干：stable 不能被当成 -able 的派生词
+        if form.endswith(suffix) and len(form) > len(suffix) + 3:
+            return pos
+    return ""
+
+
+def short_meaning(translation, prefer_pos=""):
+    """给词形做简短注释：优先取与派生词词性一致的那一行，再取最靠前的两个义项。
+
+    不这么做会闹笑话：stable 的第一行是「n. 马房, 牛棚」，
+    但 stability（名词）真正对应的是「a. 稳定的」那一行。
+    """
+    lines = []
+    for line in normalize_translation(translation).split("\n"):
         line = line.strip()
         if not line or line.startswith("["):
             continue
-        line = re.sub(r"^[a-z]+\.\s*", "", line)
-        return line.split(",")[0].strip()[:14]
-    return ""
+        lines.append(line)
+    if prefer_pos:
+        matched = [line for line in lines if re.match(r"^%s\." % prefer_pos, line)]
+        if matched:
+            lines = matched
+        else:
+            lines.sort(key=len, reverse=True)
+    else:
+        # 词性看不出来时取最长的一行：短行往往是「马房, 牛棚」这种冷门义
+        lines.sort(key=len, reverse=True)
+    items = []
+    for line in lines:
+        body = re.sub(r"^[a-z]+\.\s*", "", line)
+        for part in re.split(r"[,，、;；]", body):
+            part = part.strip()
+            if part and part not in items:
+                items.append(part)
+            if len(items) >= 2:
+                break
+        if len(items) >= 2:
+            break
+    return "·".join(items)[:16]
 
 
 def build_detail(rows):
@@ -163,8 +221,9 @@ def build_detail(rows):
         row = ecdict.get(word)
         if not row:
             continue
+        translation = normalize_translation(row.get("translation"))
         groups = []
-        for line in (row.get("translation") or "").split("\n"):
+        for line in translation.split("\n"):
             line = line.strip()
             if not line or line.startswith("["):   # 跳过 [计] [医] 这类领域行
                 continue
@@ -181,12 +240,16 @@ def build_detail(rows):
             item["g"] = tags
 
         # 词形释义：形态变化只存码（前端映射成中文），真派生词才查自己的释义
+        verb = is_verb_word(translation)
         marks = {}
         for part in (row.get("exchange") or "").split("/"):
             if ":" not in part:
                 continue
             code, value = part.split(":", 1)
             if code not in FORM_MARKS:
+                continue
+            # 原词基本不当动词用时，过去式 / 分词 / 三单对考研没意义
+            if code in ("p", "d", "i", "3") and not verb:
                 continue
             for name in value.split("/"):
                 key = name.strip().lower()
@@ -199,7 +262,8 @@ def build_detail(rows):
             if form in marks:
                 form_info[form] = "|".join(marks[form])
             else:
-                form_info[form] = short_meaning((ecdict.get(form) or {}).get("translation"))
+                form_info[form] = short_meaning(
+                    (ecdict.get(form) or {}).get("translation"), pos_for_form(form))
         if form_info:
             item["f"] = form_info
 

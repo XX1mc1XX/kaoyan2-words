@@ -311,6 +311,9 @@ const DATA_META = __META__;
 const LS_STATE = 'ky_words_v1';
 const LS_CONF = 'ky_conf_v1';
 const LS_STAMP = 'ky_stamp_v1';
+let authUser = null;          // 登录状态要早于 save() 声明，否则初始化时会踩暂时性死区
+let syncTimer = null;
+let syncing = false;
 const DAY = 864e5;
 const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 let storageWarned = false;
@@ -1022,10 +1025,7 @@ $('word').addEventListener('touchend', event => {
 $('deckSelect').onchange = event => switchDeck(event.target.value);
 
 // ---------- 账号与云同步 ----------
-let authUser = null;
 let authMode = 'login';
-let syncTimer = null;
-let syncing = false;
 
 async function api(path, options) {
   const opt = options || {};

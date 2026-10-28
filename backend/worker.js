@@ -93,6 +93,23 @@ async function sweepExpired(env) {
     env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(now),
   ]);
 }
+const stateHits = new Map();
+function stateBudget(ip) {
+  const now = Date.now();
+  const cur = stateHits.get(ip);
+  if (!cur || cur.resetAt < now) {
+    if (stateHits.size > 2000) {
+      for (const [key, value] of stateHits) if (value.resetAt <= now) stateHits.delete(key);
+      if (stateHits.size > 4000) stateHits.clear();
+    }
+    stateHits.set(ip, { n: 1, resetAt: now + 600000 });
+    return true;
+  }
+  if (cur.n >= 400) return false;
+  cur.n += 1;
+  return true;
+}
+
 const clientIp = request =>
   request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || 'unknown';
 
@@ -315,14 +332,26 @@ async function handleApi(request, env, ctx) {
     }
 
     if (path === '/state') {
-      const user = await currentUser(request, env);
-      if (!user) return json({ error: '未登录' }, 401);
+      const token = cookieFrom(request, 'ky_sid');
+      if (!token) return json({ error: '未登录' }, 401);
+
       if (method === 'GET') {
-        const row = await env.DB.prepare('SELECT payload, updated_at FROM progress WHERE user_id = ?')
-          .bind(user.id).first();
-        if (!row) return json({ payload: null, updatedAt: 0 });
-        return json({ payload: JSON.parse(row.payload), updatedAt: row.updated_at });
+        // 一次查询同时完成会话校验和进度读取，避免原来两次 D1 往返。
+        const row = await env.DB.prepare(
+          'SELECT s.expires_at, p.payload, p.updated_at ' +
+          'FROM sessions s ' +
+          'LEFT JOIN progress p ON p.user_id = s.user_id ' +
+          'WHERE s.token = ?',
+        ).bind(token).first();
+        if (!row || Number(row.expires_at) < Date.now()) return json({ error: '未登录' }, 401);
+        const updatedAt = Number(row.updated_at || 0);
+        if (!row.payload) return json({ payload: null, updatedAt: 0 });
+        // 轮询时只带 since：云端没变化就不返回整份进度。
+        const since = Number(url.searchParams.get('since') || 0);
+        if (since > 0 && updatedAt <= since) return json({ unchanged: true, updatedAt });
+        return json({ payload: JSON.parse(row.payload), updatedAt });
       }
+
       if (method === 'PUT' || method === 'POST') {
         const len = Number(request.headers.get('content-length') || 0);
         if (len > MAX_PAYLOAD * 1.2) return json({ error: '进度数据过大' }, 413);
@@ -332,22 +361,38 @@ async function handleApi(request, env, ctx) {
         }
         const text = JSON.stringify(body.payload);
         if (text.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
-        if (!(await allowRate(env, 'state:' + user.id, 120, 600_000))) {
+        if (!stateBudget('state:' + clientIp(request))) {
           return json({ error: '同步太频繁，请稍后再试' }, 429);
         }
-        // 乐观锁：客户端带上它读到的 updatedAt；服务端已被别的设备写新了就回 409，让它重新合并再写
-        const base = Number(body.baseUpdatedAt || 0);
-        const current = await env.DB.prepare('SELECT updated_at FROM progress WHERE user_id = ?')
-          .bind(user.id).first();
-        if (base && current && current.updated_at > base) {
-          return json({ error: 'conflict', updatedAt: current.updated_at }, 409);
-        }
+
+        // 乐观锁 + 写入合并成一条 SQL：常见情况下一次 D1 往返完成同步。
+        const base = Math.max(0, Number(body.baseUpdatedAt || 0));
+        // 兼容旧版前端：旧请求没有 baseUpdatedAt，仍按原来的覆盖行为处理。
+        const force = body.force === true || !Object.prototype.hasOwnProperty.call(body, 'baseUpdatedAt');
         const now = Date.now();
-        await env.DB.prepare(
-          `INSERT INTO progress (user_id, payload, updated_at) VALUES (?, ?, ?)
-           ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
-        ).bind(user.id, text, now).run();
-        return json({ ok: true, updatedAt: now });
+        const written = await env.DB.prepare(
+          'INSERT INTO progress (user_id, payload, updated_at) ' +
+          'SELECT s.user_id, ?, ? ' +
+          'FROM sessions s ' +
+          'WHERE s.token = ? AND s.expires_at >= ? ' +
+          'ON CONFLICT(user_id) DO UPDATE SET ' +
+          'payload = excluded.payload, updated_at = excluded.updated_at ' +
+          'WHERE ? = 1 OR progress.updated_at <= ? ' +
+          'RETURNING updated_at',
+        ).bind(text, now, token, now, force ? 1 : 0, base).first();
+        if (written) return json({ ok: true, updatedAt: written.updated_at });
+
+        // 没写成功通常是版本冲突；把云端最新数据一起返回，客户端一次合并后重试。
+        const row = await env.DB.prepare(
+          'SELECT s.expires_at, p.payload, p.updated_at ' +
+          'FROM sessions s ' +
+          'LEFT JOIN progress p ON p.user_id = s.user_id ' +
+          'WHERE s.token = ?',
+        ).bind(token).first();
+        if (!row || Number(row.expires_at) < Date.now()) return json({ error: '未登录' }, 401);
+        let payload = null;
+        try { payload = row.payload ? JSON.parse(row.payload) : null; } catch {}
+        return json({ error: 'conflict', updatedAt: Number(row.updated_at || 0), payload }, 409);
       }
     }
 

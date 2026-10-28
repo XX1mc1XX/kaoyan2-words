@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" id="appleTouchIcon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2036%2036%22%20aria-hidden%3D%22true%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22kyLogoBg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2303141d%22%2F%3E%3Cstop%20offset%3D%22.7%22%20stop-color%3D%22%2307343d%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23115e59%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22kyLogoLeft%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2322d3ee%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2367e8f9%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22kyLogoRight%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2399f6e4%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2236%22%20height%3D%2236%22%20fill%3D%22url%28%23kyLogoBg%29%22%2F%3E%3Cpath%20d%3D%22M7.5%209.3%2012.1%2026l5.9-10.4v4.2%22%20fill%3D%22none%22%20stroke%3D%22url%28%23kyLogoLeft%29%22%20stroke-width%3D%223.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M18%2019.8v-4.2L23.9%2026l4.6-16.7%22%20fill%3D%22none%22%20stroke%3D%22url%28%23kyLogoRight%29%22%20stroke-width%3D%223.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2228.5%22%20cy%3D%229.3%22%20r%3D%221.7%22%20fill%3D%22%23fbbf24%22%2F%3E%3C%2Fsvg%3E">
-<title>考研英语二核心词汇</title>
+<title>考研核心词汇</title>
 <style>
 :root{
   --bg:#f4f6f3;--card:#fff;--ink:#17201d;--muted:#66736e;--line:#dde4df;
@@ -361,7 +361,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       <div class="panel-title">背诵优先级</div>
       <div class="note">
         <b>S 必背</b> → <b>A 重点</b> → <b>B 次重点</b><br>右滑（不认识）会给这个词加权重，卡片上显示「错 N 次」；点「打乱本章」时权重越高越可能排前面，但不会强制置顶。<br>
-        系统已综合英语二（主）、英语一（低权重）、词书分层和五书共识，按优先级从高到低排好。你不需要自己再看次数、覆盖套数和频段。
+        系统已综合真题权重、词书分层和五书共识，按优先级从高到低排好。你不需要自己再看次数、覆盖套数和频段。
       </div>
     </div>
     <div class="panel">
@@ -559,6 +559,11 @@ const savedAuthUser = (() => { try { return localStorage.getItem(LS_AUTH) || nul
 let authUser = savedAuthUser; // 先用上次账号打开本地进度；联网后再校验会话
 let syncTimer = null;
 let syncing = false;
+let syncInitialized = false;
+let syncDirty = false;
+let localRevision = 0;
+let applyingRemote = false;
+let syncEpoch = 0;
 const DAY = 864e5;
 // 极简事件总线（发布/订阅）：数据一变就广播，谁关心谁订阅，避免到处手动串调用
 const bus = (() => {
@@ -1588,6 +1593,18 @@ card.addEventListener('touchcancel', () => {
   setTimeout(() => { swipeTrack.style.transition = ''; card.style.transition = ''; }, 220);
 }, { passive: true });
 
+// 桌面（鼠标）点卡片空白处翻面。触摸结束后浏览器还会补发一次 click，
+// 用时间窗挡掉，手机上的手感完全不变。
+let lastCardTouchAt = 0;
+card.addEventListener('touchend', () => { lastCardTouchAt = Date.now(); }, { passive: true });
+card.addEventListener('click', event => {
+  if (Date.now() - lastCardTouchAt < 800) return;
+  if (studyLoading || !queue[idx]) return;
+  if (event.target.closest && event.target.closest('.badges')) return;   // 角标自带行为
+  if (event.target.closest && event.target.closest('#word')) return;     // 点单词只朗读
+  toggleMeaning();
+});
+
 // 鼠标滚轮翻词：向下滚下一个，向上滚上一个；节流避免触控板一次跳过多个词。
 let wheelLockedUntil = 0;
 card.addEventListener('wheel', event => {
@@ -1889,7 +1906,12 @@ async function api(path, options) {
   }
   let data = null;
   try { data = await res.json(); } catch {}
-  if (!res.ok) throw new Error((data && data.error) || ('请求失败 ' + res.status));
+  if (!res.ok) {
+    const err = new Error((data && data.error) || ('请求失败 ' + res.status));
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data || {};
 }
 
@@ -1963,6 +1985,15 @@ function reloadSpace() {
   renderList();
   renderIconSettings();
   syncFavicon(currentIcon());
+  // 账号切换后开启一轮全新的会话；旧请求即使晚回来也不能影响新账号。
+  clearTimeout(syncTimer);
+  syncEpoch += 1;
+  syncing = false;
+  pendingSync = false;
+  syncInitialized = false;
+  lastSyncAt = 0;
+  syncDirty = !!authUser;
+  localRevision += 1;
 }
 // 第一次登录某账号时，把未登录状态下背的进度带进该账号，避免看起来清零
 function adoptGuestProgress(username) {
@@ -2113,6 +2144,12 @@ function scheduleCloudSync(delay) {
 let pendingSync = false;
 let lastSyncAt = 0;
 
+function noteLocalChange() {
+  if (applyingRemote) return;
+  syncDirty = true;
+  localRevision += 1;
+}
+
 // 按词合并：同一词取修改时间较新的那份，谁都不会被整体覆盖
 function mergeState(local, cloud) {
   const out = {};
@@ -2170,48 +2207,128 @@ function sameJson(a, b) {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
 }
 
-async function putState(payload) {
-  const r = await api('/state', { method: 'PUT', body: { payload } });
+async function putState(payload, baseUpdatedAt, force) {
+  const body = {
+    payload,
+    baseUpdatedAt: Math.max(0, Number(baseUpdatedAt) || 0),
+  };
+  if (force) body.force = true;
+  const r = await api('/state', { method: 'PUT', body });
   lastSyncAt = r.updatedAt || Date.now();
   return r;
 }
 
-// 微信式：登录后自动双向合并，用户不需要点任何按钮
+function applyMergedSnapshot(merged, local) {
+  const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData);
+  if (changedLocally) {
+    applyingRemote = true;
+    try { applySnapshot(merged); }
+    finally { applyingRemote = false; }
+  }
+  return changedLocally;
+}
+
+// 把一次 GET/PUT 拿到的云端快照并入本机；只有确实有差异时才回写。
+async function mergeRemoteIntoLocal(local, remote) {
+  const remoteUpdatedAt = Number(remote.updatedAt || 0);
+  const forceLocal = !!(local.conf.forceAt && local.conf.forceAt > remoteUpdatedAt);
+  if (forceLocal) {
+    await putState(local, remoteUpdatedAt, true);
+    return 'pushed';
+  }
+  if (!remote.payload) {
+    await putState(local, remoteUpdatedAt);
+    return 'pushed';
+  }
+  const merged = mergeSnapshots(local, remote.payload);
+  const changedLocally = applyMergedSnapshot(merged, local);
+  if (!sameJson(merged, remote.payload)) await putState(merged, remoteUpdatedAt);
+  else lastSyncAt = remoteUpdatedAt || lastSyncAt;
+  return changedLocally ? 'merged' : 'pulled';
+}
+
+// 微信式：登录后自动双向合并，用户不需要点任何按钮。
+// 常见路径是单次 PUT：云端版本没变时直接上传，不再先 GET 再 PUT。
 async function syncNow(quiet) {
   if (!authUser) return;
   if (syncing) { pendingSync = true; return; }
   syncing = true;
-  // 记下这次同步是替谁跑的：中途退出或换号，结果一律丢弃，绝不给新账号写别人的进度
+  const epoch = syncEpoch;
   const startedAs = authUser;
-  const stale = () => authUser !== startedAs;
+  const revision = localRevision;
+  const stale = () => epoch !== syncEpoch || authUser !== startedAs;
+  if (!quiet) {
+    $('syncNowBtn').disabled = true;
+    authSay('正在同步…');
+  }
   try {
-    const remote = await api('/state');
-    if (stale()) return;
-    const local = snapshot();
-    // 本机刚清空或刚导入：直接覆盖云端，不参与合并
-    if (local.conf.forceAt && local.conf.forceAt > (remote.updatedAt || 0)) {
-      await putState(local);
-      if (!quiet) authSay('已把本机进度同步到云端', 'ok');
-      return;
-    }
-    if (!remote.payload) {
-      await putState(local);
-      if (!quiet) authSay('已把本机进度同步到云端', 'ok');
-    } else {
-      const merged = mergeSnapshots(local, remote.payload);
+    let result = 'pulled';
+    if (!syncInitialized && syncDirty) {
+      const local = snapshot();
+      try {
+        // 新账号或本地有离线改动：先尝试单请求上传。
+        await putState(local, 0);
+        syncInitialized = true;
+        result = 'pushed';
+      } catch (e) {
+        if (e.status !== 409 || !e.data || !('payload' in e.data)) throw e;
+        syncInitialized = true;
+        await mergeRemoteIntoLocal(snapshot(), {
+          payload: e.data.payload,
+          updatedAt: e.data.updatedAt,
+        });
+        result = 'merged';
+      }
+    } else if (!syncInitialized) {
+      const remote = await api('/state');
       if (stale()) return;
-      const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData);
-      if (changedLocally) applySnapshot(merged);
-      // 没有变化就不要回写，避免每 40 秒空转一次写库
-      if (!sameJson(merged, remote.payload)) await putState(merged);
-      else lastSyncAt = remote.updatedAt || lastSyncAt;
-      if (!quiet) authSay(changedLocally ? '已合并云端进度' : '进度已同步', 'ok');
+      syncInitialized = true;
+      result = await mergeRemoteIntoLocal(snapshot(), remote);
+    } else if (syncDirty) {
+      const local = snapshot();
+      try {
+        await putState(local, lastSyncAt);
+        result = 'pushed';
+      } catch (e) {
+        if (e.status !== 409 || !e.data || !('payload' in e.data)) throw e;
+        await mergeRemoteIntoLocal(snapshot(), {
+          payload: e.data.payload,
+          updatedAt: e.data.updatedAt,
+        });
+        result = 'merged';
+      }
+    } else {
+      const path = lastSyncAt ? '/state?since=' + encodeURIComponent(lastSyncAt) : '/state';
+      const remote = await api(path);
+      if (stale()) return;
+      if (remote.unchanged) {
+        lastSyncAt = remote.updatedAt || lastSyncAt;
+        result = 'unchanged';
+      } else {
+        syncInitialized = true;
+        result = await mergeRemoteIntoLocal(snapshot(), remote);
+      }
+    }
+    if (stale()) return;
+    if (localRevision === revision) syncDirty = false;
+    if (!quiet) {
+      authSay(result === 'pushed' ? '已上传本机进度'
+        : result === 'merged' ? '已合并云端进度'
+        : '进度已同步', 'ok');
     }
   } catch (e) {
-    if (!quiet) authSay('同步失败：' + e.message, 'err');
+    if (!stale() && !quiet) authSay('同步失败：' + e.message, 'err');
   } finally {
-    syncing = false;
-    if (pendingSync) { pendingSync = false; scheduleCloudSync(); }
+    if (epoch === syncEpoch) {
+      syncing = false;
+      $('syncNowBtn').disabled = false;
+      if (pendingSync) {
+        pendingSync = false;
+        scheduleCloudSync();
+      } else if (syncDirty && localRevision !== revision) {
+        scheduleCloudSync(500);
+      }
+    }
   }
 }
 
@@ -2236,6 +2353,7 @@ async function refreshAuth() {
     authUser = before;
   }
   renderAuth();
+  if (authUser && !syncInitialized) scheduleCloudSync(200);
 }
 
 async function afterLogin(username) {
@@ -2350,7 +2468,7 @@ const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
 idle(() => refreshAuth());
 
 // ---- 订阅：谁需要响应数据变化，就在这里登记，不再散落在各处 ----
-bus.on('data:change', () => scheduleCloudSync());
+bus.on('data:change', () => { noteLocalChange(); scheduleCloudSync(); });
 bus.on('data:change', () => updateStats());
 bus.on('deck:change', () => {
   renderChapters();

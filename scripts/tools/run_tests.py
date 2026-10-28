@@ -52,6 +52,8 @@ def static_checks():
     check("含 deckChapter 记忆", "deckChapter" in t)
     check("含登录面板", "authModal" in t and "accountBtn" in t)
     check("含云同步接口", "/state" in t and "snapshot" in t)
+    check("同步单请求快路径", all(x in t for x in ("baseUpdatedAt", "mergeRemoteIntoLocal", "/state?since=")))
+    check("同步变更追踪", all(x in t for x in ("syncDirty", "localRevision", "noteLocalChange")))
     check("含恢复原序按钮", "restoreOrder" in t)
     check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
     check("含鼠标滚轮翻词", "wheelLockedUntil" in t and "addEventListener('wheel'" in t)
@@ -124,6 +126,8 @@ def static_checks():
 
     check("顶栏合并词库与词数", "deck-inline" in t and "deck-bar" not in t and "deck-label" not in t)
     check("顶栏无品牌文字与当前词库标签", "英语二词汇" not in t and "当前词库" not in t)
+    check("页面标题不含英语二", "<title>考研核心词汇</title>" in t)
+    check("应用名称不含英语二", "英语二" not in mf)
 
 
 def json_block_value(html, deck_id):
@@ -391,6 +395,20 @@ setTimeout(function () {
           };
           out.merge_cloud_force_wins = !('beta' in mergeSnapshots(snapPlain, snapForce).state);
 
+          // R. 桌面鼠标点卡片翻面；触摸结束后补发的合成 click 不能多翻一次
+          const cardEl = document.getElementById('card');
+          const meanEl = document.getElementById('meaning');
+          const meaningShown = () => !meanEl.classList.contains('meaning-placeholder');
+          const beforeClick = meaningShown();
+          // 前面的手势测试刚触发过 touchend；把时间窗标记清零，等价于「等过了 800ms」
+          lastCardTouchAt = 0;
+          cardEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          out.desktop_click_flips = meaningShown() !== beforeClick;
+          const afterTouchFlip = meaningShown();
+          fire(cardEl, 'touchend', 200, 400);
+          cardEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          out.touch_synth_click_ignored = meaningShown() === afterTouchFlip;
+
           // M. 词表首屏只渲染一页，避免移动端一次创建上千个节点
           switchView('List');
           out.list_first_page = document.querySelectorAll('#wordList li').length === 100;
@@ -574,6 +592,10 @@ def runtime_checks():
     r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True)
     check("发音代理可返回音频", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
 
+    worker_text = io.open(worker, encoding="utf-8").read()
+    check("同步写入合并为单次 D1", "RETURNING updated_at" in worker_text and "ON CONFLICT(user_id) DO UPDATE" in worker_text)
+    check("同步支持增量拉取", "unchanged: true" in worker_text and "searchParams.get('since')" in worker_text)
+
 
 def browser_checks():
     if not os.path.exists(BUILT):
@@ -612,6 +634,7 @@ def browser_checks():
             "mastered_has_words": True, "mastered_restored": True,
             "restore_len_minus_one": True, "restore_on_next_word": True,
             "merge_cloud_force_wins": True,
+            "desktop_click_flips": True, "touch_synth_click_ignored": True,
             "cross_next": True, "cross_prev": True,
             "badge_no_flip": True, "word_touchend_reaches_card": True,
             "list_first_page": True, "list_has_more": True, "list_load_more": True,

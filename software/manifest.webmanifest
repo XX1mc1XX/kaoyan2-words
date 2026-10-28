@@ -1,7 +1,7 @@
 {
-  "name": "考研英语二核心词汇",
-  "short_name": "英语二词汇",
-  "description": "考研英语二核心词、派生词与基础词离线背诵",
+  "name": "考研核心词汇",
+  "short_name": "核心词汇",
+  "description": "考研核心词、派生词与基础词离线背诵",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",

@@ -25,3 +25,10 @@ CREATE TABLE IF NOT EXISTS pair_codes (
   user_id    INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+-- 简单限流：key = 动作:IP，窗口期内计数
+CREATE TABLE IF NOT EXISTS rate (
+  key      TEXT    PRIMARY KEY,
+  n        INTEGER NOT NULL,
+  reset_at INTEGER NOT NULL
+);

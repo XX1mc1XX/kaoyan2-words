@@ -462,7 +462,6 @@ function savePos() {
   if (!chapterData[key]) return;
   chapterData[key].pos = idx;
   chapterData[key].posWord = idx < queue.length ? queue[idx].word : null;
-  chapterData[key].done = queue.length > 0 && idx >= queue.length;
   save('ky_chapter_v1', chapterData);
 }
 function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
@@ -497,8 +496,6 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
   queue = ordered;
   if (typeof idxAt === 'number' && queue.length) {
     idx = idxAt < 0 ? queue.length - 1 : Math.min(idxAt, queue.length - 1);
-  } else if (rec.done && queue.length) {
-    idx = queue.length;                       // 保持「已过完」状态
   } else if (rec.posWord) {
     const j = queue.findIndex(w => w.word === rec.posWord);
     idx = j >= 0 ? j : 0;                     // 按词定位，队列变短也不会错位
@@ -695,11 +692,9 @@ function restoreMastered(word) {
   if (!word) return;
   const st = state[word.word];
   if (st) { st.mastered = false; st.due = 0; st.t = Date.now(); save(LS_STATE, state); }
-  queue = queue.filter(w => w.word !== word.word);
-  if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
-  revealed = null;
-  savePos();
-  renderStudy();
+  // 重建当前章队列：deckWords() 会因掌握数变化而重算切片，
+  // 只改 queue 会导致切片与队列不一致、恢复的词本轮永远轮不到
+  loadChapter(curChapter);
   updateStats();
   showUndo(word, 'restored');
 }

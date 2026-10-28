@@ -65,6 +65,23 @@ function sessionCookie(token, maxAge) {
   return `ky_sid=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
 
+// 简单限流：同一 IP 在窗口期内超过次数就拒绝
+async function allowRate(env, key, limit, windowMs) {
+  const now = Date.now();
+  const row = await env.DB.prepare('SELECT n, reset_at FROM rate WHERE key = ?').bind(key).first();
+  if (!row || row.reset_at < now) {
+    await env.DB.prepare(
+      'INSERT INTO rate (key, n, reset_at) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET n = 1, reset_at = excluded.reset_at',
+    ).bind(key, now + windowMs).run();
+    return true;
+  }
+  if (row.n >= limit) return false;
+  await env.DB.prepare('UPDATE rate SET n = n + 1 WHERE key = ?').bind(key).run();
+  return true;
+}
+const clientIp = request =>
+  request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || 'unknown';
+
 async function readJson(request) {
   try {
     return await request.json();
@@ -94,6 +111,9 @@ async function handleApi(request, env) {
     }
 
     if (path === '/register' && method === 'POST') {
+      if (!(await allowRate(env, 'reg:' + clientIp(request), 5, 3600_000))) {
+        return json({ error: '注册太频繁，请稍后再试' }, 429);
+      }
       const body = await readJson(request);
       const username = String(body?.username || '').trim();
       const password = String(body?.password || '');
@@ -118,6 +138,9 @@ async function handleApi(request, env) {
     }
 
     if (path === '/login' && method === 'POST') {
+      if (!(await allowRate(env, 'login:' + clientIp(request), 30, 600_000))) {
+        return json({ error: '登录尝试太频繁，请 10 分钟后再试' }, 429);
+      }
       const body = await readJson(request);
       const username = String(body?.username || '').trim();
       const password = String(body?.password || '');
@@ -159,13 +182,16 @@ async function handleApi(request, env) {
         const dup = await env.DB.prepare('SELECT code FROM pair_codes WHERE code = ?').bind(code).first();
         if (!dup) break;
       }
-      const expiresAt = now + 10 * 60 * 1000;
+      const expiresAt = now + 5 * 60 * 1000;
       await env.DB.prepare('INSERT INTO pair_codes (code, user_id, expires_at) VALUES (?, ?, ?)')
         .bind(code, user.id, expiresAt).run();
       return json({ code, expiresAt });
     }
 
     if (path === '/pair/claim' && method === 'POST') {
+      if (!(await allowRate(env, 'pair:' + clientIp(request), 10, 600_000))) {
+        return json({ error: '尝试太频繁，请 10 分钟后再试' }, 429);
+      }
       const body = await readJson(request);
       const code = String(body?.code || '').trim();
       if (!/^\d{6}$/.test(code)) return json({ error: '配对码是 6 位数字' }, 400);
@@ -192,6 +218,8 @@ async function handleApi(request, env) {
         return json({ payload: JSON.parse(row.payload), updatedAt: row.updated_at });
       }
       if (method === 'PUT' || method === 'POST') {
+        const len = Number(request.headers.get('content-length') || 0);
+        if (len > MAX_PAYLOAD * 1.2) return json({ error: '进度数据过大' }, 413);
         const body = await readJson(request);
         if (!body || typeof body.payload !== 'object' || body.payload === null) {
           return json({ error: '数据格式不对' }, 400);

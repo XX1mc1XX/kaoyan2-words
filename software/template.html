@@ -49,12 +49,17 @@ header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1
 main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 14px 10px;display:flex}
 .view{display:flex;flex-direction:column;gap:10px;width:100%;min-height:0;flex:1}
 .hidden{display:none!important}
-.study-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:center;flex-shrink:0}
+.study-head{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:6px;align-items:center;flex-shrink:0}
 .position{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
 .position b{color:var(--ink);font-size:14px}
 .meaning-toggle{justify-self:end;border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));background:var(--card);
   color:var(--brand);font:inherit;font-size:12.5px;font-weight:750;border-radius:999px;padding:7px 10px;cursor:pointer;
   white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
+@media (prefers-color-scheme:dark){.meaning-toggle[aria-pressed="true"]{color:#0b1714}}
+.meaning-toggle{justify-self:end;border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));
+  background:var(--card);color:var(--brand);font:inherit;font-size:12px;font-weight:700;
+  border-radius:999px;padding:7px 10px;cursor:pointer;white-space:nowrap}
 .meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
 @media (prefers-color-scheme:dark){.meaning-toggle[aria-pressed="true"]{color:#0b1714}}
 .chapter-select{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;
@@ -166,6 +171,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     <div class="study-head">
       <div class="position" id="position">第 <b>1</b> / 1 个</div>
       <select class="chapter-select" id="chapterSelect" aria-label="跳转章节"></select>
+      <button class="meaning-toggle" id="meaningToggle" aria-pressed="false">释义关</button>
     </div>
     <input class="progress" id="progressBar" type="range" min="0" max="0" value="0" step="1" aria-label="进度，可拖动跳转">
     <article class="card" id="card">
@@ -265,7 +271,7 @@ const save = (key, value) => {
 const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
-let conf = Object.assign({ deck: 'core', deckChapter: {} }, load(LS_CONF, {}));
+let conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false }, load(LS_CONF, {}));
 delete conf.autoShow;   // 旧版本遗留的全局开关，彻底废弃
 const DECKS = {
   core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', words: WORDS },
@@ -287,7 +293,7 @@ const deckWords = () => (activeDeck === 'mastered'
   : DECKS[activeDeck].words);
 let queue = [];
 let idx = 0;
-let revealed = false;
+let revealed = null;   // null=跟随「默认显示」设置；true/false=当前词手动覆盖
 let dragging = false;
 let chapterData = load('ky_chapter_v1', {});
 let curChapter = 0;
@@ -363,7 +369,7 @@ function loadChapter(ch, reshuffle) {
   } else {
     idx = Math.min(Math.max(rec.pos || 0, 0), Math.max(queue.length - 1, 0));
   }
-  revealed = false;
+  revealed = null;
   renderStudy();
 }
 function renderStudy() {
@@ -411,7 +417,7 @@ function renderStudy() {
   const slice = chapterSlice(curChapter);
   const done = slice.filter(w => isMastered(w)).length;
   $('wordId').textContent = '本章 ' + done + '/' + slice.length;
-  const show = revealed;
+  const show = revealed === null ? !!conf.showByDefault : revealed;
   const meaning = $('meaning');
   if (show) {
     meaning.className = 'meaning';
@@ -420,6 +426,8 @@ function renderStudy() {
     meaning.className = 'meaning meaning-placeholder';
     meaning.textContent = '点一下看释义';
   }
+  $('meaningToggle').textContent = conf.showByDefault ? '释义开' : '释义关';
+  $('meaningToggle').setAttribute('aria-pressed', String(!!conf.showByDefault));
   $('chapterSelect').value = String(currentChapter());
   $('prevWord').disabled = idx <= 0;
   $('nextWord').disabled = idx >= total - 1;
@@ -429,7 +437,7 @@ function navigate(delta) {
   const next = idx + delta;
   if (next < 0 || next >= queue.length) return;
   idx = next;
-  revealed = false;
+  revealed = null;
   savePos();
   renderStudy();
 }
@@ -451,7 +459,8 @@ function speak(word) {
   } catch (e) {}
 }
 function toggleMeaning() {
-  revealed = !revealed;
+  const cur = revealed === null ? !!conf.showByDefault : revealed;
+  revealed = !cur;
   renderStudy();
 }
 // 左滑 = 认识：标记掌握，之后不再出现
@@ -469,14 +478,14 @@ function mark(word, known) {
     // 移出当前队列：进度条总数同步减少，下一个词自动顶上原位
     queue = queue.filter(w => w.word !== word.word);
     if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
-    revealed = false;
+    revealed = null;
     savePos();
     renderStudy();
   } else {
     if (activeDeck === 'mastered') {                   // 已掌握库里取消掌握 -> 立即移出列表
       queue = queue.filter(w => w.word !== word.word);
       if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
-      revealed = false;
+      revealed = null;
       savePos();
       renderStudy();
     }
@@ -644,7 +653,7 @@ function doUndo() {
   $('undoBar').classList.add('hidden');
   clearTimeout(undoTimer);
   undoWord = null;
-  revealed = false;
+  revealed = null;
   savePos();
   renderStudy();
   updateStats();
@@ -732,7 +741,7 @@ card.addEventListener('touchcancel', () => {
 $('progressBar').oninput = event => {
   if (!queue.length) return;
   idx = Math.min(Math.max(Number(event.target.value), 0), queue.length - 1);
-  revealed = false;
+  revealed = null;
   dragging = true;
   renderStudy();
 };
@@ -787,7 +796,7 @@ $('exportProgress').onclick = () => {
     exported: new Date().toISOString(),
     state,
     chapterData,
-    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {} }
+    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, showByDefault: !!conf.showByDefault }
   };
   const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -811,6 +820,7 @@ $('importFile').onchange = event => {
         if (d.conf.deck && DECKS[d.conf.deck]) { activeDeck = d.conf.deck; conf.deck = d.conf.deck; }
         conf.chapter = d.conf.chapter || 0;
         if (d.conf.deckChapter) conf.deckChapter = d.conf.deckChapter;
+        conf.showByDefault = !!d.conf.showByDefault;
         save(LS_CONF, conf);
       }
       updateDeckMeta();
@@ -851,6 +861,12 @@ loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || conf.chapter |
 renderChapters();
 updateStats();
 $('chapterSelect').onchange = event => gotoChapter(Number(event.target.value));
+$('meaningToggle').onclick = () => {
+  conf.showByDefault = !conf.showByDefault;
+  save(LS_CONF, conf);
+  revealed = null;
+  renderStudy();
+};
 // 点单词朗读；阻止冒泡避免触发卡片的翻面
 $('word').addEventListener('click', event => {
   event.stopPropagation();

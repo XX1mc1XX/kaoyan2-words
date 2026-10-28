@@ -110,10 +110,38 @@ def main():
     checks.append({"name": "体积 < 600KB", "ok": 0 < size < 600 * 1024, "weight": 1.0,
                    "detail": "%dKB" % (size // 1024)})
 
-    # 4. 回归测试
+    # 4. 首屏：只解析当前词库，其余数据块保持未解析
+    first_screen = 0
+    if os.path.exists(BUILT):
+        html = io.open(BUILT, encoding="utf-8").read()
+        head = '<script type="application/json" id="ky-deck-words">'
+        start = html.find(head)
+        if start >= 0:
+            start += len(head)
+            end = html.find("</script>", start)
+            first_screen = end - start if end > start else 0
+    checks.append({"name": "首屏解析数据 < 250KB", "ok": 0 < first_screen < 250 * 1024,
+                   "weight": 1.5, "detail": "%dKB" % (first_screen // 1024)})
+
+    # 5. 离线资源齐备
+    sw_path = os.path.join(ROOT, "software", "sw.js")
+    sw = io.open(sw_path, encoding="utf-8").read() if os.path.exists(sw_path) else ""
+    offline_ok = (
+        sw != "" and "__BUILD_VERSION__" not in sw
+        and "cacheFirstAudio" in sw and "离线缓存尚未完成" in sw
+        and os.path.exists(os.path.join(ROOT, "software", "manifest.webmanifest"))
+        and os.path.exists(os.path.join(ROOT, "software", "icon-192.png"))
+        and os.path.exists(os.path.join(ROOT, "software", "icon-512.png"))
+    )
+    checks.append({"name": "离线资源齐备", "ok": offline_ok, "weight": 1.0,
+                   "detail": "%d bytes sw" % len(sw)})
+
+    # 6. 回归测试（含数量门槛）
     passed, tested = run_tests()
     checks.append({"name": "回归测试全过", "ok": tested > 0 and passed == tested, "weight": 3.0,
                    "detail": "%d/%d" % (passed, tested)})
+    checks.append({"name": "测试项 ≥ 100", "ok": tested >= 100, "weight": 1.0,
+                   "detail": "%d 项" % tested})
 
     total_w = sum(c["weight"] for c in checks)
     got = sum(c["weight"] for c in checks if c["ok"])
@@ -124,6 +152,7 @@ def main():
         "checks": checks,
         "metrics": {"words": total, "suspect_ratio": round(ratio, 4),
                     "suspect": len(suspect), "size_kb": size // 1024,
+                    "first_screen_kb": first_screen // 1024,
                     "tests": "%d/%d" % (passed, tested)},
     }
     print(json.dumps(result, ensure_ascii=False, indent=1))

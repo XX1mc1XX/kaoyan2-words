@@ -95,11 +95,12 @@ npx wrangler pages deploy deploy --project-name=kaoyan2-words --branch=main
 | 撤销 | 左滑后 5 秒内可撤销 |
 | 已掌握 | 词表页单独分区，可恢复 |
 | 备份 | 统计页支持导出/导入进度 JSON |
+| 图标 | 统计页可切换 5 个内置图标或上传自定义图片，立即应用到左上角和浏览器标签页 |
 
 状态全部存在浏览器 localStorage：
 - `ky_words_v1` — 每词状态 `{w: 权重, mastered: 已掌握, due: 到期时间, seen: 次数}`
 - `ky_chapter_v1` — 每章的队列顺序与位置
-- `ky_conf_v1` — 当前词库、当前章节
+- `ky_conf_v1` — 当前词库、当前章节、显示/朗读设置与自定义图标
 
 ## 版本历史
 
@@ -109,3 +110,13 @@ npx wrangler pages deploy deploy --project-name=kaoyan2-words --branch=main
 git log --oneline        # 看历史
 git checkout <commit>    # 回退到某个版本
 ```
+
+## 发音、离线与性能
+
+- 已预加载的真人发音直接秒播；新词首次先用系统语音立即发声，同时后台缓存真人音频，之后可秒播并离线重播。
+- 听过的词以及后续 3 个词会由 Service Worker 缓存发音，之后离线也能重播。
+- 首次通过 HTTPS 打开后，页面、词库与图标会进入离线缓存；之后断网仍可学习和记录进度。
+- `file://` 直接打开的单文件版本原本就支持离线学习；局域网 HTTP 无法启用 Service Worker，需要 HTTPS 才有完整离线能力。
+- 登录账号会缓存在本机，离线打开时仍使用该账号自己的进度；联网后再校验会话并同步。
+- 词表首屏只渲染 100 条，滚动/点击“显示更多”继续加载，避免移动端一次创建上千个 DOM 节点。
+- `python scripts/make_html.py` 会同时生成 `software/考研核心词.html` 与 `deploy/index.html`，并复制 `sw.js`、PWA 图标和最新 Worker，部署时不需要再手工复制。

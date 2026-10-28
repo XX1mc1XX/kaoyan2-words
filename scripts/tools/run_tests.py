@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -50,6 +51,67 @@ def static_checks():
     check("含云同步接口", "/state" in t and "snapshot" in t)
     check("含恢复原序按钮", "restoreOrder" in t)
     check("含合成权重", "scoreOf" in t)
+    check("含发音代理", "/api/audio?word=" in t)
+    check("发音预加载可秒播", all(x in t for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
+    check("发音 Blob 内存缓存", "audioBlobUrls" in t and "URL.createObjectURL(blob)" in t)
+    check("新词发音不等待网络", "新词不等待网络" in t and "1800" not in t)
+    check("含 Service Worker 注册", "navigator.serviceWorker.register('./sw.js'" in t)
+    check("含离线缓存资源", os.path.exists(os.path.join(ROOT, "software", "sw.js"))
+          and os.path.exists(os.path.join(ROOT, "software", "manifest.webmanifest")))
+    check("离线账号可恢复", "LS_AUTH" in t and "savedAuthUser" in t)
+    check("词表分批渲染", "LIST_PAGE_SIZE" in t and "list-more" in t)
+    check("移除首屏毛玻璃", "backdrop-filter:blur(12px)" not in t)
+    check("含自定义图标", all(x in t for x in ("iconChoices", "iconUpload", "ICON_PRESETS", "appFavicon")))
+
+    # --- 首屏：词库走 JSON 数据块，按需解析 ---
+    check("词库改用 JSON 数据块", t.count('type="application/json"') == 5)
+    check("无内联词表字面量", "const WORDS =" not in t)
+    first_screen = json_block_bytes(t, "words")
+    check("首屏解析数据量 < 250KB", 0 < first_screen < 250 * 1024, "%.0fKB" % (first_screen / 1024))
+    check("全量表惰性构建", "const allWords =" in t and "allWordsCache" in t)
+    check("词位索引惰性构建", "wordLocationCache" in t)
+    check("首卡渲染打点", "__firstCardAt" in t)
+
+    # --- 离线 ---
+    sw_path = os.path.join(ROOT, "software", "sw.js")
+    sw = io.open(sw_path, encoding="utf-8").read() if os.path.exists(sw_path) else ""
+    check("SW 版本号已注入", sw != "" and "__BUILD_VERSION__" not in sw)
+    check("SW 导航离线回退", "离线缓存尚未完成" in sw)
+    check("SW 发音优先缓存", "cacheFirstAudio" in sw)
+    check("SW 不拦接口请求", "url.pathname.includes('/api/')" in sw)
+    check("SW 注册禁缓存", "updateViaCache: 'none'" in t)
+    mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
+    mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""
+    check("manifest 独立显示", '"display": "standalone"' in mf)
+    check("manifest 图标齐备",
+          os.path.exists(os.path.join(ROOT, "software", "icon-192.png"))
+          and os.path.exists(os.path.join(ROOT, "software", "icon-512.png")))
+
+    # --- 构建产物 ---
+    deploy = os.path.join(ROOT, "deploy")
+    allowed = {"index.html", "sw.js", "_worker.js", "_headers", "manifest.webmanifest",
+               "icon-192.png", "icon-512.png"}
+    if os.path.isdir(deploy):
+        extra = sorted(set(os.listdir(deploy)) - allowed)
+        check("部署目录无多余文件", not extra, str(extra[:5]))
+        check("部署含 _worker.js", os.path.exists(os.path.join(deploy, "_worker.js")))
+    else:
+        check("部署目录无多余文件", False, "先跑 make_html.py")
+        check("部署含 _worker.js", False)
+
+    check("顶栏合并词库与词数", "deck-inline" in t and "deck-bar" not in t and "deck-label" not in t)
+    check("顶栏无品牌文字与当前词库标签", "英语二词汇" not in t and "当前词库" not in t)
+
+
+def json_block_bytes(html, deck_id):
+    """算出某个数据块在首屏需要 JSON.parse 的字节数。"""
+    head = '<script type="application/json" id="ky-deck-%s">' % deck_id
+    start = html.find(head)
+    if start < 0:
+        return 0
+    start += len(head)
+    end = html.find("</script>", start)
+    return end - start if end > start else 0
 
 
 # ---------- 数据完整性 ----------
@@ -68,11 +130,19 @@ def data_checks():
         check("%s id 1..N 连续" % d, ids == list(range(1, len(data) + 1)), "%d 词" % len(data))
         empty = [x["word"] for x in data if not (x.get("meaning") or "").strip()]
         check("%s 无空释义" % d, not empty, str(empty[:5]))
+        bad_word = [x["word"] for x in data if not re.fullmatch(r"[a-z][a-z'\- ]*", x["word"])]
+        check("%s 词形规范" % d, not bad_word, str(bad_word[:5]))
+        bad_pri = [x["word"] for x in data if not re.fullmatch(r"[SABC]( .*)?", x.get("priority") or "")]
+        check("%s priority 合法" % d, not bad_pri, str(bad_pri[:5]))
+        bad_forms = [x["word"] for x in data if not isinstance(x.get("forms"), list)]
+        check("%s forms 为数组" % d, not bad_forms, str(bad_forms[:5]))
         for x in data:
             allw.setdefault(x["word"], []).append(d)
     dup = {w: v for w, v in allw.items() if len(v) > 1}
     check("跨库无重复词", not dup, str(list(dup.items())[:3]))
     check("总词数 > 3000", total > 3000, "%d 词" % total)
+    stub = [w for w in allw if len(w) < 2]
+    check("无词根碎片", not stub, str(stub[:5]))
 
 
 # ---------- 浏览器内行为测试 ----------
@@ -107,6 +177,9 @@ function swipe(card, x1, x2) {
 }
 setTimeout(function () {
   const out = {};
+  // 页面加载后到这里还没切过库，此时缓存里应该只有首屏真正用到的那一个词库
+  out.lazy_cached_before = Object.keys(_deckCache).sort().join(',');
+  out.all_words_lazy_at_boot = allWordsCache === null;
   try {
     const card = document.getElementById('card');
     const mean = document.getElementById('meaning');
@@ -225,6 +298,71 @@ setTimeout(function () {
           fire(wordEl, 'touchend', 300, 400);
           out.word_touchend_reaches_card = cardGotTouchEnd;
 
+          // N. 词库惰性解析：同一库只解析一次，切到别的库才解析
+          const words1 = deckJson('words'), words2 = deckJson('words');
+          out.lazy_same_ref = words1 === words2;
+          out.lazy_words_count = words1.length;
+          out.lazy_insurance_count = deckJson('insurance').length;
+          out.lazy_after_has_insurance = 'insurance' in _deckCache;
+          const metaBefore = document.getElementById('deckMeta').textContent;
+          switchDeck('insurance');
+          out.deck_meta_insurance = document.getElementById('deckMeta').textContent;
+          switchDeck('core');
+          out.deck_meta_core = document.getElementById('deckMeta').textContent;
+          out.deck_meta_restored = document.getElementById('deckMeta').textContent === metaBefore;
+          out.all_words_count = allWords().length;
+          out.all_words_ready = allWordsCache !== null;
+          out.first_card_marked = typeof window.__firstCardAt === 'number';
+          const firstWord = words1[0].word;
+          out.word_location = (wordLocation().get(firstWord) || {}).deck;
+
+          // M. 词表首屏只渲染一页，避免移动端一次创建上千个节点
+          switchView('List');
+          out.list_first_page = document.querySelectorAll('#wordList li').length === 100;
+          const moreBtn = document.querySelector('.list-more');
+          out.list_has_more = !!moreBtn;
+          if (moreBtn) moreBtn.click();
+          out.list_load_more = document.querySelectorAll('#wordList li').length === 200;
+          switchView('Study');
+
+          // M. 自主更换图标（默认 Logo + 登录态 + 内置图标 + 自定义图片 + 恢复）
+          const iconBackup = conf.icon;
+          const authBackup = authUser;
+          authUser = 'tester';
+          conf.icon = null;
+          renderAuth(); renderIconSettings();
+          out.icon_login_logo = !!document.querySelector('#accountAvatar svg')
+            && !document.querySelector('#accountAvatar img')
+            && document.getElementById('accountBtn').classList.contains('online')
+            && document.getElementById('iconCurrentName').textContent === '默认 Logo'
+            && !!document.querySelector('.icon-choice.active');
+          authUser = authBackup;
+          conf.icon = { kind: 'preset', id: 'book' };
+          renderAuth(); renderIconSettings(); syncFavicon(currentIcon());
+          out.icon_preset = !!document.querySelector('#accountAvatar img')
+            && !!document.querySelector('.icon-choice.active')
+            && document.getElementById('iconCurrentName').textContent === '书本'
+            && document.getElementById('appFavicon').href.startsWith('data:image/svg+xml');
+          conf.icon = { kind: 'image', data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=' };
+          renderAuth(); renderIconSettings();
+          out.icon_custom = !!document.querySelector('#accountAvatar img')
+            && document.getElementById('iconCurrentName').textContent.startsWith('自定义');
+          conf.icon = iconBackup;
+          renderAuth(); renderIconSettings(); syncFavicon(currentIcon());
+          out.icon_restore = true;
+
+          // N. 顶栏单行：Logo + 词库下拉框 + 词数 + 页签
+          const deckBackup = activeDeck;
+          switchDeck('derivative');
+          out.header_compact = !!document.querySelector('header #deckSelect')
+            && !!document.querySelector('header #deckMeta')
+            && !document.querySelector('.deck-bar')
+            && !document.querySelector('header .brand')
+            && !document.querySelector('.deck-label');
+          out.header_deck_count = document.getElementById('deckSelect').value === 'derivative'
+            && document.getElementById('deckMeta').textContent === DECKS.derivative.words.length + ' 词';
+          switchDeck(deckBackup);
+
           document.title = 'RESULT:' + JSON.stringify(out);
         }, 200);
       }, 150);
@@ -235,6 +373,32 @@ setTimeout(function () {
 }, 1400);
 </script>
 """
+
+
+def runtime_checks():
+    sw = os.path.join(ROOT, "software", "sw.js")
+    worker = os.path.join(ROOT, "backend", "worker.js")
+    for label, path in (("Service Worker", sw), ("Worker", worker)):
+        if not os.path.exists(path):
+            check(label + "存在", False)
+            continue
+        r = subprocess.run(["node", "--check", path], capture_output=True)
+        check(label + "语法有效", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
+
+    worker_url = "file:///" + worker.replace("\\", "/")
+    js = (
+        "globalThis.fetch = async () => new Response(new Uint8Array([73,68,51]), "
+        "{status:200, headers:{'content-type':'audio/mpeg','content-length':'3'}});"
+        "globalThis.caches = {default:{match:async()=>null, put:async()=>{}}};"
+        "const {default:worker} = await import(%r);"
+        "const req = new Request('https://example.com/api/audio?word=hello');"
+        "const res = await worker.fetch(req, {ASSETS:{fetch:async()=>new Response('')}});"
+        "const n = (await res.arrayBuffer()).byteLength;"
+        "if (res.status !== 200 || res.headers.get('content-type') !== 'audio/mpeg' || n !== 3) process.exit(1);"
+        % worker_url
+    )
+    r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True)
+    check("发音代理可返回音频", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
 
 
 def browser_checks():
@@ -273,12 +437,40 @@ def browser_checks():
             "mastered_has_words": True, "mastered_restored": True,
             "cross_next": True, "cross_prev": True,
             "badge_no_flip": True, "word_touchend_reaches_card": True,
+            "list_first_page": True, "list_has_more": True, "list_load_more": True,
+            "icon_login_logo": True, "icon_preset": True, "icon_custom": True, "icon_restore": True,
+            "header_compact": True, "header_deck_count": True,
+            "lazy_same_ref": True, "lazy_cached_before": "words",
+            "lazy_after_has_insurance": True,
+            "deck_meta_insurance": "1545 词", "deck_meta_core": "1342 词",
+            "deck_meta_restored": True,
+            "all_words_lazy_at_boot": True, "all_words_ready": True, "all_words_count": 3364,
+            "lazy_words_count": 1342, "lazy_insurance_count": 1545,
+            "first_card_marked": True, "word_location": "core",
         }
         for k, v in expect.items():
             check("行为·" + k, data.get(k) == v, "实际=%s" % data.get(k))
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
+
+
+def perf_checks():
+    """用 Edge headless 实测首屏，失败时按未达标记（不阻断其它检查）。"""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import measure_perf
+        data = measure_perf.measure()
+    except Exception as e:
+        data = None
+        check("首屏性能可测量", False, str(e)[:120])
+        return
+    if not data:
+        check("首屏性能可测量", False, "Edge headless 未返回性能标记")
+        return
+    check("首卡渲染 < 800ms", 0 < data.get("firstCard", 0) < 800, "%sms" % data.get("firstCard"))
+    check("首屏 DOM 节点 < 400", 0 < data.get("nodes", 0) < 400, "%s 个" % data.get("nodes"))
+    check("DOMContentLoaded < 800ms", 0 < data.get("dcl", 0) < 800, "%sms" % data.get("dcl"))
 
 
 def main():
@@ -291,9 +483,17 @@ def main():
     print("=" * 56)
     data_checks()
     print("=" * 56)
+    print("运行时资源")
+    print("=" * 56)
+    runtime_checks()
+    print("=" * 56)
     print("浏览器行为")
     print("=" * 56)
     browser_checks()
+    print("=" * 56)
+    print("首屏性能")
+    print("=" * 56)
+    perf_checks()
 
     print("=" * 56)
     passed = sum(1 for _, ok, _ in results if ok)

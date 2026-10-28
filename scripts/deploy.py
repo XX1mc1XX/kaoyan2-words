@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 
@@ -28,35 +27,22 @@ def main():
     except Exception:
         pass
 
-    print("[1/4] 构建")
+    print("[1/3] 构建")
     r = run([sys.executable, os.path.join("scripts", "make_html.py")])
     if r.returncode != 0:
         print("构建失败")
         return 1
 
     if not skip_test:
-        print("[2/4] 回归测试")
+        print("[2/3] 回归测试")
         r = run([sys.executable, os.path.join("scripts", "tools", "run_tests.py")])
         if r.returncode != 0:
             print("测试未通过，已中止部署")
             return 1
     else:
-        print("[2/4] 跳过测试")
+        print("[2/3] 跳过测试")
 
-    print("[3/4] 同步到 deploy/")
-    shutil.copyfile(
-        os.path.join(ROOT, "software", "考研核心词.html"),
-        os.path.join(ROOT, "deploy", "index.html"),
-    )
-    src_worker = os.path.join(ROOT, "backend", "worker.js")
-    if os.path.exists(src_worker):
-        shutil.copyfile(src_worker, os.path.join(ROOT, "deploy", "_worker.js"))
-        print("  已同步 _worker.js（登录与同步接口）")
-    shutil.rmtree(os.path.join(ROOT, "deploy", "functions"), ignore_errors=True)
-    # deploy/ 是生成目录，残留的 .git 会污染上传
-    shutil.rmtree(os.path.join(ROOT, "deploy", ".git"), ignore_errors=True)
-
-    print("[4/4] 部署到 Cloudflare Pages")
+    print("[3/3] 部署到 Cloudflare Pages")
     # 用 PowerShell 执行，避开 python subprocess 调 npx 的兼容问题
     ps = (
         '$env:HTTP_PROXY="http://127.0.0.1:7897";'

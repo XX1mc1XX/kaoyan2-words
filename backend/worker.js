@@ -91,12 +91,70 @@ async function readJson(request) {
 }
 
 const USER_RE = /^[A-Za-z0-9_一-龥]{3,24}$/;
+const AUDIO_WORD_RE = /^[A-Za-z][A-Za-z'-]{1,40}$/;
+// 音频请求量远高于其它接口，不走 D1 限流（每词一次写库太贵），
+// 用 isolate 内的轻量计数挡住随机刷词；命中缓存的请求不计数。
+const audioHits = new Map();
+function audioBudget(ip) {
+  const now = Date.now();
+  const cur = audioHits.get(ip);
+  if (!cur || cur.resetAt < now) {
+    if (audioHits.size > 5000) audioHits.clear();
+    audioHits.set(ip, { n: 1, resetAt: now + 600000 });
+    return true;
+  }
+  if (cur.n >= 400) return false;
+  cur.n += 1;
+  return true;
+}
 
-async function handleApi(request, env) {
+// 同源代理词典发音：避免浏览器 CORS/混合内容问题，也让 Service Worker 能缓存。
+async function handleAudio(request, env, ctx) {
+  const url = new URL(request.url);
+  const word = url.searchParams.get('word') || '';
+  if (!AUDIO_WORD_RE.test(word)) return json({ error: '发音词格式不对' }, 400);
+
+  const cacheKey = new Request(url.toString());
+  if (request.method === 'GET') {
+    const hit = await caches.default.match(cacheKey);
+    if (hit) return hit;
+  }
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  if (!audioBudget(ip)) return json({ error: '请求过于频繁，请稍后再试' }, 429);
+
+  try {
+    const target = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2';
+    const upstream = await fetch(target, {
+      headers: { 'user-agent': 'Mozilla/5.0', 'referer': 'https://dict.youdao.com/' },
+      cf: { cacheEverything: true, cacheTtl: 31536000 },
+    });
+    const type = upstream.headers.get('content-type') || '';
+    if (!upstream.ok || !type.startsWith('audio/')) {
+      return json({ error: '在线发音暂时不可用' }, 502);
+    }
+    const headers = {
+      'content-type': type,
+      'cache-control': 'public, max-age=31536000, immutable',
+    };
+    const length = upstream.headers.get('content-length');
+    if (length) headers['content-length'] = length;
+    if (request.method === 'HEAD') return new Response(null, { status: 200, headers });
+    const response = new Response(upstream.body, { status: 200, headers });
+    if (ctx && typeof ctx.waitUntil === 'function') {
+      ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+    }
+    return response;
+  } catch {
+    return json({ error: '在线发音加载失败' }, 502);
+  }
+}
+
+async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '').replace(/^\/api/, '') || '/';
   const method = request.method;
 
+  if (path === '/audio' && (method === 'GET' || method === 'HEAD')) return handleAudio(request, env, ctx);
   if (!env.DB) return json({ error: '数据库未绑定' }, 500);
 
   try {
@@ -247,10 +305,10 @@ async function handleApi(request, env) {
 
 // Pages 高级模式：/api/* 走后端，其余交给静态资源
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
-      return handleApi(request, env);
+      return handleApi(request, env, ctx);
     }
     const asset = await env.ASSETS.fetch(request);
     const type = asset.headers.get('content-type') || '';

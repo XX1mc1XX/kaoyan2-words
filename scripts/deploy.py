@@ -23,6 +23,10 @@ def run(cmd, **kw):
 
 def main():
     skip_test = "--skip-test" in sys.argv
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
     print("[1/4] 构建")
     r = run([sys.executable, os.path.join("scripts", "make_html.py")])

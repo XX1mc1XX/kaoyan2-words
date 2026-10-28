@@ -52,14 +52,12 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .study-head{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:6px;align-items:center;flex-shrink:0}
 .position{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
 .position b{color:var(--ink);font-size:14px}
-.meaning-toggle{justify-self:end;border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));background:var(--card);
-  color:var(--brand);font:inherit;font-size:12.5px;font-weight:750;border-radius:999px;padding:7px 10px;cursor:pointer;
-  white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.head-btns{justify-self:end;display:flex;gap:5px;min-width:0}
+.meaning-toggle{border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));background:var(--card);
+  color:var(--brand);font:inherit;font-size:12.5px;font-weight:750;border-radius:999px;padding:7px 9px;cursor:pointer;
+  white-space:nowrap}
 .meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
 @media (prefers-color-scheme:dark){.meaning-toggle[aria-pressed="true"]{color:#0b1714}}
-.meaning-toggle{justify-self:end;border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));
-  background:var(--card);color:var(--brand);font:inherit;font-size:12px;font-weight:700;
-  border-radius:999px;padding:7px 10px;cursor:pointer;white-space:nowrap}
 .meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
 @media (prefers-color-scheme:dark){.meaning-toggle[aria-pressed="true"]{color:#0b1714}}
 .chapter-select{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;
@@ -69,14 +67,15 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   font:inherit;font-size:12px;padding:6px;cursor:pointer;flex-shrink:0}
 .shuffle-btn:active{border-color:var(--brand);color:var(--brand)}
 .card{position:relative;flex:1;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:22px;
-  box-shadow:var(--shadow);padding:36px 18px 40px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);padding:20px 18px 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;gap:12px;overflow:hidden;touch-action:none;user-select:none}
 .card::after{content:"";position:absolute;inset:auto -25% -45% -25%;height:60%;background:radial-gradient(circle,var(--brand-soft),transparent 68%);opacity:.65;pointer-events:none}
 .card>*{position:relative;z-index:1}
 .badges{position:absolute;top:10px;left:10px;display:flex;gap:5px;align-items:center;z-index:2}
-.weight-badge{font-size:11px;font-weight:800;color:var(--bad);
-  background:color-mix(in srgb,var(--bad) 15%,transparent);border-radius:999px;
-  padding:4px 7px;line-height:1.1;min-width:20px;text-align:center}
+.weight-badge{font:inherit;font-size:11px;font-weight:800;color:var(--bad);
+  background:color-mix(in srgb,var(--bad) 15%,transparent);border:0;border-radius:999px;
+  padding:4px 8px;line-height:1.1;min-width:22px;text-align:center;cursor:pointer}
+.weight-badge:active{transform:scale(.92)}
 @keyframes pulseW{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
 .weight-badge.pulse{animation:pulseW .45s ease}
 .priority{font-size:11px;font-weight:700;border-radius:999px;padding:4px 8px;line-height:1.1;letter-spacing:.02em}
@@ -134,10 +133,10 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .note{font-size:12.5px;line-height:1.7;color:var(--muted)}
 .note b{color:var(--ink)}
 .danger{border:1px solid color-mix(in srgb,var(--bad) 38%,var(--line));background:transparent;color:var(--bad);border-radius:12px;padding:10px;font:inherit;font-size:13px;cursor:pointer}
-@media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:15px 13px}.meaning-toggle{font-size:12px}}
+@media (max-width:430px){.brand{display:none}.brand{font-size:14px}.card{padding:12px 13px 42px}.meaning-toggle{font-size:12px}}
 @media (max-height:620px){
   header{padding:6px 10px}main{padding:6px 10px 7px}.view{gap:6px}
-  .card{padding:9px 12px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
+  .card{padding:8px 12px 34px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
   .forms{font-size:11.5px}
   .deck-bar{padding:5px 9px}.family-note{font-size:11px}
   .meaning{font-size:clamp(18px,5vh,24px)}.rule{margin:0}.swipe-hint{display:none}
@@ -171,13 +170,16 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     <div class="study-head">
       <div class="position" id="position">第 <b>1</b> / 1 个</div>
       <select class="chapter-select" id="chapterSelect" aria-label="跳转章节"></select>
-      <button class="meaning-toggle" id="meaningToggle" aria-pressed="false">释义关</button>
+      <div class="head-btns">
+        <button class="meaning-toggle" id="speakToggle" aria-pressed="true">朗读开</button>
+        <button class="meaning-toggle" id="meaningToggle" aria-pressed="false">释义关</button>
+      </div>
     </div>
     <input class="progress" id="progressBar" type="range" min="0" max="0" value="0" step="1" aria-label="进度，可拖动跳转">
     <article class="card" id="card">
       <div class="badges">
         <span class="priority b" id="priorityBadge">B 次重点</span>
-        <span class="weight-badge hidden" id="weightBadge"></span>
+        <button type="button" class="weight-badge hidden" id="weightBadge" title="点一下减 1 次权重"></button>
       </div>
       <div class="word" id="word">加载中</div>
       <div class="family-note hidden" id="familyNote"></div>
@@ -271,7 +273,7 @@ const save = (key, value) => {
 const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
-let conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false }, load(LS_CONF, {}));
+let conf = Object.assign({ deck: 'core', deckChapter: {}, showByDefault: false, speak: true }, load(LS_CONF, {}));
 delete conf.autoShow;   // 旧版本遗留的全局开关，彻底废弃
 const DECKS = {
   core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', words: WORDS },
@@ -315,8 +317,11 @@ function weightOf(word) {
   const st = state[word.word];
   return st ? (st.w || 0) : 0;
 }
-// 加权洗牌：权重只提高「靠前」的概率，不是强制置顶
-// 权重 0/1/4 进前 25% 的概率约 23%/32%/53%（基准 25%）
+// 默认顺序：确定性排序，权重高的靠前，同级按词表原序（每次打开完全一致）
+function priorityOrder(list) {
+  return list.slice().sort((a, b) => (weightOf(b) - weightOf(a)) || (a.id - b.id));
+}
+// 加权洗牌：仅「打乱本章顺序」按钮使用
 function shuffleByWeight(list) {
   const arr = list.map(word => ({
     word,
@@ -349,8 +354,11 @@ function loadChapter(ch, reshuffle) {
     return !!(st && st.due && st.due <= now);
   });
   let rec = chapterData[key];
-  if (!rec || reshuffle || !Array.isArray(rec.order)) {
-    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0 };
+  if (reshuffle) {
+    rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true };
+    save('ky_chapter_v1', chapterData);
+  } else if (!rec || !Array.isArray(rec.order)) {
+    rec = chapterData[key] = { order: priorityOrder(pending).map(w => w.word), pos: 0 };
     save('ky_chapter_v1', chapterData);
   }
   const byName = new Map(pending.map(w => [w.word, w]));
@@ -428,6 +436,9 @@ function renderStudy() {
   }
   $('meaningToggle').textContent = conf.showByDefault ? '释义开' : '释义关';
   $('meaningToggle').setAttribute('aria-pressed', String(!!conf.showByDefault));
+  $('speakToggle').textContent = conf.speak ? '朗读开' : '朗读关';
+  $('speakToggle').setAttribute('aria-pressed', String(!!conf.speak));
+  if (conf.speak && lastSpoken !== word.word) { lastSpoken = word.word; speak(word.word); }
   $('chapterSelect').value = String(currentChapter());
   $('prevWord').disabled = idx <= 0;
   $('nextWord').disabled = idx >= total - 1;
@@ -442,6 +453,7 @@ function navigate(delta) {
   renderStudy();
 }
 let speakCache = null;
+let lastSpoken = '';
 function speak(word) {
   try {
     if (!window.speechSynthesis) return;
@@ -796,7 +808,7 @@ $('exportProgress').onclick = () => {
     exported: new Date().toISOString(),
     state,
     chapterData,
-    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, showByDefault: !!conf.showByDefault }
+    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, showByDefault: !!conf.showByDefault, speak: conf.speak !== false }
   };
   const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -821,6 +833,7 @@ $('importFile').onchange = event => {
         conf.chapter = d.conf.chapter || 0;
         if (d.conf.deckChapter) conf.deckChapter = d.conf.deckChapter;
         conf.showByDefault = !!d.conf.showByDefault;
+        if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
         save(LS_CONF, conf);
       }
       updateDeckMeta();
@@ -867,15 +880,36 @@ $('meaningToggle').onclick = () => {
   revealed = null;
   renderStudy();
 };
+$('speakToggle').onclick = () => {
+  conf.speak = !conf.speak;
+  save(LS_CONF, conf);
+  if (conf.speak) { const w = queue[idx]; if (w) speak(w.word); }
+  renderStudy();
+};
+// 点红点：权重 -1，用于误判右滑后回退
+$('weightBadge').onclick = event => {
+  event.stopPropagation();
+  const w = queue[idx];
+  if (!w) return;
+  const st = state[w.word];
+  if (!st || !st.w) return;
+  st.w = Math.max(0, st.w - 1);
+  save(LS_STATE, state);
+  renderStudy();
+};
 // 点单词朗读；阻止冒泡避免触发卡片的翻面
 $('word').addEventListener('click', event => {
   event.stopPropagation();
+  if (Date.now() - wordTouchedAt < 500) return;   // touchend 已读过，避免读两遍
   const w = queue[idx];
   if (w) speak(w.word);
 });
+let wordTouchedAt = 0;
 $('word').addEventListener('touchend', event => {
   event.stopPropagation();
   touchStart = null;      // 防止残留导致下一次手势误判
+  const w = queue[idx];
+  if (w) { wordTouchedAt = Date.now(); speak(w.word); }
 });
 $('deckSelect').onchange = event => switchDeck(event.target.value);
 </script>

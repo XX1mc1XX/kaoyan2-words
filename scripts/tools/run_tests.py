@@ -146,6 +146,28 @@ setTimeout(function () {
           loadChapter(curChapter);
           out.resume_ok = queue[idx] && queue[idx].word === target.word;
 
+          // G. 默认顺序稳定，只有手动打乱才变
+          const k0 = chapterKey(0);
+          delete chapterData[k0];
+          loadChapter(0);
+          const ord1 = queue.slice(0, 15).map(x => x.word).join();
+          delete chapterData[k0];
+          loadChapter(0);
+          out.order_stable = ord1.length > 0 && ord1 === queue.slice(0, 15).map(x => x.word).join();
+          loadChapter(0, true);
+          out.order_shuffled = ord1 !== queue.slice(0, 15).map(x => x.word).join();
+          delete chapterData[k0];
+
+          // H. 点红点减权重
+          const w3 = queue[idx];
+          state[w3.word] = { w: 2, mastered: false, seen: 1 };
+          renderStudy();
+          document.getElementById('weightBadge').click();
+          out.weight_down = (state[w3.word].w === 1);
+          out.weight_badge_val = document.getElementById('weightBadge').textContent === '1';
+          delete state[w3.word];
+          renderStudy();
+
           document.title = 'RESULT:' + JSON.stringify(out);
         }, 200);
       }, 150);
@@ -187,6 +209,8 @@ def browser_checks():
             "undo_cleared": True, "undo_back": True,
             "right_same": True, "right_weight": True, "weight_badge": True,
             "deck_chapter": True, "resume_ok": True,
+            "order_stable": True, "order_shuffled": True,
+            "weight_down": True, "weight_badge_val": True,
         }
         for k, v in expect.items():
             check("行为·" + k, data.get(k) == v, "实际=%s" % data.get(k))

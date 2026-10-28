@@ -547,6 +547,41 @@ setTimeout(async function(){
     await switchDeck('derivative');
     out.deriv_meta = document.getElementById('deckMeta').textContent;
     out.deriv_count = deckJson('derivatives').length;
+
+    // —— 学习进度持久化 ——
+    // 切库 + 跳章 + 翻词之后，词书/章节/章内位次必须同时落盘，
+    // 否则刷新或登录同步时会跳回旧章。
+    await switchDeck('core');
+    await ensureDeckData('core');   // 第 2 章要整表，先等词库就绪
+    gotoChapter(2);
+    navigate(3);
+    const savedConf = JSON.parse(localStorage.getItem('ky_conf_v1') || '{}');
+    out.pos_deck = savedConf.deck;
+    out.pos_chapter = savedConf.chapter;
+    out.pos_deck_chapter = savedConf.deckChapter && savedConf.deckChapter.core;
+    out.pos_resume = resumePosition();
+    out.pos_idx = idx;
+    out.pos_word = queue[idx] && queue[idx].word;
+    // 每本词书各记各的章，来回切换不能互相带跑
+    await switchDeck('derivative');
+    out.deriv_chapter = curChapter;
+    await switchDeck('core');
+    out.back_chapter = curChapter;
+    // 合并：本地位置更新时必须赢，而且 chapter 与 deckChapter 要一致
+    const m = mergeConf(
+      { deck: 'core', chapter: 4, deckChapter: { core: 1 }, progressAt: 900 },
+      { deck: 'core', chapter: 1, deckChapter: { core: 1 }, progressAt: 100 }, {}, {});
+    out.merge_chapter = m.chapter;
+    out.merge_deck_chapter = m.deckChapter.core;
+    // 登录：游客进度按时间并进账号，不能因为账号里有旧数据就整体丢弃
+    localStorage.setItem('ky_words_v1@probe', JSON.stringify({ apple: { w: 3, t: 100, mastered: false } }));
+    localStorage.setItem('ky_words_v1', JSON.stringify({
+      apple: { w: 3, t: 500, mastered: true }, banana: { w: 1, t: 400 },
+    }));
+    adoptGuestProgress('probe');
+    const adopted = JSON.parse(localStorage.getItem('ky_words_v1@probe') || '{}');
+    out.adopt_apple_mastered = !!(adopted.apple && adopted.apple.mastered);
+    out.adopt_banana = !!adopted.banana;
   } catch (e) {
     out.error = e.stack || e.message;
   }
@@ -558,7 +593,7 @@ setTimeout(async function(){
         url = "http://127.0.0.1:%d/_webcheck.html" % port
         r = subprocess.run(
             [EDGE, "--headless=new", "--disable-gpu", "--no-first-run",
-             "--user-data-dir=" + profile, "--virtual-time-budget=12000", "--dump-dom", url],
+             "--user-data-dir=" + profile, "--virtual-time-budget=20000", "--dump-dom", url],
             capture_output=True, timeout=120,
         )
         dom = r.stdout.decode("utf-8", "replace")
@@ -584,6 +619,18 @@ setTimeout(async function(){
         check("网页词表加载完整", data.get("list_count") == 100, "实际=%s" % data.get("list_count"))
         check("网页切库加载成功", data.get("deriv_meta") == "128 词" and data.get("deriv_count") == 128,
               "实际=%s/%s" % (data.get("deriv_meta"), data.get("deriv_count")))
+        check("切章翻词后章节落盘", data.get("pos_chapter") == 2 and data.get("pos_deck") == "core",
+              "章=%s 库=%s" % (data.get("pos_chapter"), data.get("pos_deck")))
+        check("章号同时写进 deckChapter", data.get("pos_deck_chapter") == 2,
+              "实际=%s" % data.get("pos_deck_chapter"))
+        check("恢复位置与当前章节一致", data.get("pos_resume") == 2, "实际=%s" % data.get("pos_resume"))
+        check("章内位次落盘", data.get("pos_idx") == 3, "实际=%s" % data.get("pos_idx"))
+        check("切库各记各的章", data.get("deriv_chapter") == 0 and data.get("back_chapter") == 2,
+              "派生=%s 回核心=%s" % (data.get("deriv_chapter"), data.get("back_chapter")))
+        check("合并进度取更新的一端", data.get("merge_chapter") == 4 and data.get("merge_deck_chapter") == 4,
+              "章=%s deckChapter=%s" % (data.get("merge_chapter"), data.get("merge_deck_chapter")))
+        check("登录采纳游客进度", data.get("adopt_apple_mastered") is True and data.get("adopt_banana") is True,
+              "apple=%s banana=%s" % (data.get("adopt_apple_mastered"), data.get("adopt_banana")))
     finally:
         server.terminate()
         try:

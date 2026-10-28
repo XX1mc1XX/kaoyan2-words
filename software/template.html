@@ -747,17 +747,29 @@ function chapterSlice(ch) {
 }
 function chapterKey(ch) { return activeDeck + ':' + ch; }
 function savePos() {
-  const key = chapterKey(curChapter);
-  if (!chapterData[key]) return;
   const now = Date.now();
-  chapterData[key].pos = idx;
-  chapterData[key].posWord = idx < queue.length ? queue[idx].word : null;
-  chapterData[key].t = now;
+  // 词书 / 章节 / 章内位次三件事必须同时落盘：
+  // 恢复时读的是 deckChapter[activeDeck]，只写 conf.chapter 会让刷新后跳回旧章。
   conf.deck = activeDeck;
   conf.chapter = curChapter;
+  conf.deckChapter = conf.deckChapter || {};
+  conf.deckChapter[activeDeck] = curChapter;
   conf.progressAt = now;
-  save('ky_chapter_v1', chapterData);
+  const key = chapterKey(curChapter);
+  const rec = chapterData[key];
+  if (rec) {
+    rec.pos = idx;
+    rec.posWord = idx < queue.length ? queue[idx].word : null;
+    rec.t = now;
+    save('ky_chapter_v1', chapterData);
+  }
   save(LS_CONF, conf);
+}
+// 恢复位置时唯一入口：先看该词书记住的章，再退回 conf.chapter
+function resumePosition() {
+  const byDeck = conf.deckChapter || {};
+  const ch = byDeck[activeDeck];
+  return Number.isInteger(ch) ? ch : (Number(conf.chapter) || 0);
 }
 let studyLoading = false;
 function showStudyLoading(message) {
@@ -812,6 +824,8 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
     rec = chapterData[key] = { order: shuffleByWeight(pending).map(w => w.word), pos: 0, shuffled: true, t: now };
     conf.deck = activeDeck;
     conf.chapter = ch;
+    conf.deckChapter = conf.deckChapter || {};
+    conf.deckChapter[activeDeck] = ch;
     conf.progressAt = now;
     save('ky_chapter_v1', chapterData);
     save(LS_CONF, conf);
@@ -821,6 +835,8 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
     if (mode === 'natural') {
       conf.deck = activeDeck;
       conf.chapter = ch;
+      conf.deckChapter = conf.deckChapter || {};
+      conf.deckChapter[activeDeck] = ch;
       conf.progressAt = now;
       save(LS_CONF, conf);
     }
@@ -1230,6 +1246,7 @@ function restoreMastered(word) {
   // 只改 queue 会导致切片与队列不一致、恢复的词本轮永远轮不到
   // 不能用 posWord 定位——刚恢复的词已不在队列里，找不到就会跳回第一个
   loadChapter(curChapter, undefined, at);
+  savePos();
   updateStats();
   showUndo(word, 'restored');
 }
@@ -1434,8 +1451,11 @@ async function switchDeck(value) {
   // 先切当前词书，再保存旧章节位置：savePos() 内也不能把 activeDeck 写回旧值。
   activeDeck = value;
   conf.deck = value;
-  const resume = (conf.deckChapter && conf.deckChapter[value]) || 0;
+  conf.deckChapter = conf.deckChapter || {};
+  // 每本词书各记各的章号，没记过就从第 0 章开始，不要沿用上一本的章号
+  const resume = Number.isInteger(conf.deckChapter[value]) ? conf.deckChapter[value] : 0;
   conf.chapter = resume;
+  conf.deckChapter[value] = resume;
   conf.progressAt = Date.now();
   save(LS_CONF, conf);
   if (WEB_MODE && !deckCanShowChapter(value, resume)) {
@@ -1999,7 +2019,8 @@ $('importFile').onchange = event => {
       save(LS_CONF, conf);
       updateDeckMeta();
       renderChapters();
-      loadChapter(conf.chapter || 0);
+      loadChapter(resumePosition());
+      savePos();                 // 导入的位置也要落进 deckChapter，否则刷新就丢
       updateStats();
       alert('进度已导入');
     } catch (e) {
@@ -2019,6 +2040,7 @@ $('resetAll').onclick = () => {
   chapterData = {};
   save('ky_chapter_v1', chapterData);
   loadChapter(curChapter, 'natural');
+  savePos();
   updateStats();
 };
 window.addEventListener('keydown', event => {
@@ -2040,7 +2062,7 @@ window.addEventListener('keydown', event => {
   if (event.key === 'ArrowRight') { event.preventDefault(); applyWordAction(queue[idx], 'right'); return; }
 });
 updateDeckMeta();
-loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || conf.chapter || 0);
+loadChapter(resumePosition());
 renderChapters();
 updateStats();
 renderIconSettings();
@@ -2171,8 +2193,12 @@ function applySnapshot(d) {
     updateDeckMeta();
   }
   // 同步回来的进度是权威位置：直接跳到云端当前词库、章节和单词，不保留本机旧位置。
-  const targetChapter = conf.deckChapter && conf.deckChapter[activeDeck];
-  loadChapter(typeof targetChapter === 'number' ? targetChapter : (Number(conf.chapter) || 0));
+  loadChapter(resumePosition());
+  // 章号可能被 clamp（「已认识」库的词数会变），把落定后的章号写回，两边保持一致
+  conf.deckChapter = conf.deckChapter || {};
+  conf.deckChapter[activeDeck] = curChapter;
+  conf.chapter = curChapter;
+  save(LS_CONF, conf);
   renderChapters();
   updateStats();
   renderList();
@@ -2196,7 +2222,12 @@ function reloadSpace() {
   $('deckSelect').value = activeDeck;
   updateDeckMeta();
   renderChapters();
-  loadChapter((conf.deckChapter && conf.deckChapter[activeDeck]) || 0);
+  loadChapter(resumePosition());
+  conf.deckChapter = conf.deckChapter || {};
+  conf.deckChapter[activeDeck] = curChapter;
+  conf.chapter = curChapter;
+  save(LS_CONF, conf);
+  renderChapters();
   updateStats();
   renderList();
   renderIconSettings();
@@ -2211,13 +2242,37 @@ function reloadSpace() {
   syncDirty = !!authUser;
   localRevision += 1;
 }
-// 第一次登录某账号时，把未登录状态下背的进度带进该账号，避免看起来清零
+function parseStore(raw) {
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === 'object' ? v : {};
+  } catch { return {}; }
+}
+// 登录时把游客空间里背的进度并进账号空间：逐词、逐章按时间取新。
+// 以前是「账号空间存在就整体放弃游客进度」，注册过一次再以游客身份背词就会丢。
 function adoptGuestProgress(username) {
   try {
-    if (localStorage.getItem(LS_STATE + '@' + username)) return;
-    for (const key of ['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1']) {
-      const v = localStorage.getItem(key);
-      if (v) localStorage.setItem(key + '@' + username, v);
+    const stateKey = LS_STATE + '@' + username;
+    const chapterStoreKey = 'ky_chapter_v1@' + username;
+    const confKey = LS_CONF + '@' + username;
+
+    const mergedState = mergeState(parseStore(localStorage.getItem(stateKey)),
+                                   parseStore(localStorage.getItem(LS_STATE)));
+    if (Object.keys(mergedState).length) {
+      localStorage.setItem(stateKey, JSON.stringify(mergedState));
+    }
+
+    const mergedChapters = mergeChapters(parseStore(localStorage.getItem(chapterStoreKey)),
+                                         parseStore(localStorage.getItem('ky_chapter_v1')));
+    if (Object.keys(mergedChapters).length) {
+      localStorage.setItem(chapterStoreKey, JSON.stringify(mergedChapters));
+    }
+
+    // 位置（哪本词书 / 第几章）留给 progressAt 更新的一方
+    const guestConf = parseStore(localStorage.getItem(LS_CONF));
+    const accountConf = parseStore(localStorage.getItem(confKey));
+    if ((Number(guestConf.progressAt) || 0) > (Number(accountConf.progressAt) || 0)) {
+      localStorage.setItem(confKey, JSON.stringify(guestConf));
     }
   } catch {}
 }
@@ -2426,12 +2481,19 @@ function mergeConf(local, cloud, localChapters, cloudChapters) {
   const winner = chooseCloud ? b : a;
   const other = chooseCloud ? a : b;
   const deck = winner.deck || other.deck || 'core';
+  const deckChapter = { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) };
+  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新
+  const chapter = Number.isInteger(winner.chapter)
+    ? winner.chapter
+    : (Number.isInteger(deckChapter[deck]) ? deckChapter[deck] : 0);
+  // 两者必须一致，否则下次恢复会从另一边读到别的章
+  deckChapter[deck] = chapter;
   return {
     ...other,
     ...winner,
     deck,
-    chapter: Number(winner.chapter ?? (winner.deckChapter || {})[deck] ?? 0) || 0,
-    deckChapter: { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) },
+    chapter,
+    deckChapter,
     progressAt: Math.max(localAt, cloudAt),
   };
 }
@@ -2453,8 +2515,18 @@ function mergeSnapshots(local, cloud) {
     conf: mergeConf(local.conf, cloud.conf, local.chapterData, cloud.chapterData),
   };
 }
+// 键序无关的比较：合并后的对象与本地对象键序常常不同，
+// 用 JSON.stringify 直接比会永远判定「有变化」，每次同步都重放位置。
 function sameJson(a, b) {
-  try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+  const norm = v => {
+    try {
+      return JSON.stringify(v, (k, val) => (val && typeof val === 'object' && !Array.isArray(val))
+        ? Object.keys(val).sort().reduce((o, key) => { o[key] = val[key]; return o; }, {})
+        : val);
+    } catch { return null; }
+  };
+  const x = norm(a), y = norm(b);
+  return x !== null && x === y;
 }
 
 async function putState(payload, baseUpdatedAt, force) {
@@ -2468,8 +2540,17 @@ async function putState(payload, baseUpdatedAt, force) {
   return r;
 }
 
+// 只取「进度位置」相关的字段：合并后的 conf 还带着图标等设置，
+// 全量比较会把每次同步都判成有变化，然后把用户拉到旧位置。
+function progressKey(c) {
+  const x = c || {};
+  return [x.deck || '', Number(x.chapter) || 0, x.deckChapter || {},
+    Number(x.progressAt) || 0, Number(x.forceAt) || 0];
+}
 function applyMergedSnapshot(merged, local) {
-  const changedLocally = !sameJson(merged.state, local.state) || !sameJson(merged.chapterData, local.chapterData) || !sameJson(merged.conf, local.conf);
+  const changedLocally = !sameJson(merged.state, local.state)
+    || !sameJson(merged.chapterData, local.chapterData)
+    || !sameJson(progressKey(merged.conf), progressKey(local.conf));
   if (changedLocally) {
     applyingRemote = true;
     try { applySnapshot(merged); }

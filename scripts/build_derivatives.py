@@ -119,10 +119,12 @@ def main() -> None:
         pct = index / max(1, n)
         if pct <= 0.20:
             level = "S 必背"
-        elif pct <= 0.50:
+        elif pct <= 0.45:
             level = "A 重点"
-        else:
+        elif pct <= 0.70:
             level = "B 次重点"
+        else:
+            level = "C 补充"
         row["id"] = index
         row["priority"] = level
         row["priority_rank"] = index

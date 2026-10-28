@@ -14,9 +14,9 @@
 ├── scripts/            构建脚本（共 11 个，按执行顺序）
 ├── data/               数据
 │   ├── words.json          阶段一 · 核心词 1342
-│   ├── derivatives.json    阶段二 · 核心派生 128
+│   ├── derivatives.json    阶段二 · 核心派生 120（S/A/B/C 四档）
 │   ├── basic.json          基础词自测 349
-│   ├── insurance.json      保险库 1560
+│   ├── insurance.json      保险库 1545
 │   ├── ky2_freq.json       英语二真题词频
 │   ├── ky1_freq.json       英语一词频（低权重参考）
 │   ├── ecdict.csv          词典源数据（77 万条，需单独下载）
@@ -73,16 +73,37 @@ python scripts/make_html.py         # -> software/考研核心词.html
 python scripts/make_pdf.py          # -> 打印版 PDF（可选）
 
 # 5. 部署到 Cloudflare Pages（需要代理）
-copy software\考研核心词.html deploy\index.html
+#    make_html.py 已经把 deploy/ 写成可直接上传的形态（含 index.html、_worker.js、分片资源），
+#    不要再把 software\考研核心词.html 复制进去 —— 那会把按需加载版覆盖成单文件版。
 $env:HTTP_PROXY="http://127.0.0.1:7897"
 npx wrangler pages deploy deploy --project-name=kaoyan2-words --branch=main
 ```
 
 **只改前端**（不动数据）的话，只需跑第 4、5 步。
 
+构建失败会直接报错退出（包括 terser 压缩失败），不会静默产出未压缩或半成品的产物。
+确实要跳过压缩时显式设置 `$env:KY_NO_MINIFY="1"`。
+
 `data/ecdict.csv` 和 `data/lemma.en.txt` 不在仓库里，需要从 [ECDICT](https://github.com/skywind3000/ECDICT) 下载。
 
 `scripts/archive/` 是已完成使命的一次性脚本，内部路径已失效，仅供追溯历史改动，**不要执行**。
+
+`shared/merge.js` 是前后端共用的进度合并实现（含删除墓碑）。`software/template.html` 和
+`backend/worker.js` 里只留 `/*__MERGE__*/` 占位符，由 `make_html.py` 在构建时注入——
+**改合并逻辑只改 shared/merge.js，不要在两边各写一份**。
+
+数据库结构变更放在 `backend/migrations/`，部署前手工执行一次，例如：
+
+```powershell
+npx wrangler d1 execute kaoyan2-users --remote --file backend/migrations/002_username_nocase.sql
+```
+
+回归测试跑的是构建产物，先构建再测：
+
+```powershell
+python scripts/make_html.py
+python scripts/tools/run_tests.py
+```
 
 
 ## 应用功能
@@ -98,9 +119,11 @@ npx wrangler pages deploy deploy --project-name=kaoyan2-words --branch=main
 | 图标 | 统计页可切换 5 个内置图标或上传自定义图片，立即应用到左上角和浏览器标签页 |
 
 状态全部存在浏览器 localStorage：
-- `ky_words_v1` — 每词状态 `{w: 权重, mastered: 已掌握, due: 到期时间, seen: 次数}`
-- `ky_chapter_v1` — 每章的队列顺序与位置
+- `ky_words_v1` — 每词状态 `{w: 权重, mastered: 已掌握, due: 到期时间, seen: 次数}`；
+  删除写成墓碑 `{del: 1, t: 删除时间}`，「清空 / 导入」也靠它同步，不靠时间戳压制云端
+- `ky_chapter_v1` — 每章的队列顺序与位置（同样支持墓碑）
 - `ky_conf_v1` — 当前词库、当前章节、显示/朗读设置与自定义图标
+- `ky_daily_v1` — 每日过卡次数与新掌握数，每条带 `t`，撤销减掉的计数不会被合并「取大」复活
 
 ## 版本历史
 
@@ -114,7 +137,7 @@ git checkout <commit>    # 回退到某个版本
 ## 发音、离线与性能
 
 - 已预加载的真人发音直接秒播；新词首次先用系统语音立即发声，同时后台缓存真人音频，之后可秒播并离线重播。
-- 网页首屏只内嵌当前词库首章（200 词），其余词库拆成带哈希的独立 JSON 并由 Service Worker 后台预缓存；首次打开不再等待 3364 个词全部下载。单文件版仍内嵌全部词库，双击即可完整离线使用。
+- 网页首屏只内嵌几十个词，其余词库拆成带哈希的独立 JSON 并由 Service Worker 后台预缓存；首次打开不再等待 3364 个词全部下载。单文件版仍内嵌全部词库，双击即可完整离线使用。
 - 听过的词以及后续 3 个词会由 Service Worker 缓存发音，之后离线也能重播。
 - 首次通过 HTTPS 打开后，页面、词库与图标会进入离线缓存；之后断网仍可学习和记录进度。
 - `file://` 直接打开的单文件版本原本就支持离线学习；局域网 HTTP 无法启用 Service Worker，需要 HTTPS 才有完整离线能力。

@@ -2,8 +2,11 @@
 // 路由前缀 /api/*
 
 const enc = new TextEncoder();
+const dec = new TextDecoder();
 const SESSION_DAYS = 30;
 const MAX_PAYLOAD = 512 * 1024;
+// 登录/注册这类小 JSON 不需要大 body；给个上限挡住「一次带 100MB」的请求
+const MAX_SMALL_BODY = 8 * 1024;
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -42,7 +45,10 @@ function cookieFrom(request, name) {
   for (const part of raw.split(';')) {
     const i = part.indexOf('=');
     if (i < 0) continue;
-    if (part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+    if (part.slice(0, i).trim() === name) {
+      // 手工测试或部分客户端会带引号，不去掉就会读不到 token，表现为随机掉登录
+      return part.slice(i + 1).trim().replace(/^"|"$/g, '');
+    }
   }
   return '';
 }
@@ -113,149 +119,94 @@ function stateBudget(ip) {
 const clientIp = request =>
   request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || 'unknown';
 
-async function readJson(request) {
+// 读请求体时一边读一边累计大小，超限立刻取消。
+// 不能用 request.json()：它会把整个 body 读进内存，一个解压后几百 MB 的
+// gzip 请求就足以把 isolate 打 OOM。
+// 返回 undefined = 超限（调用方回 413），null = 解析失败（回 400）。
+async function readBody(request, limit) {
+  const declared = Number(request.headers.get('content-length') || 0);
+  if (declared > limit) return undefined;
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
   try {
-    return await request.json();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) {
+        await reader.cancel();
+        return undefined;
+      }
+      chunks.push(value);
+    }
   } catch {
     return null;
   }
+  const bytes = new Uint8Array(total);
+  let off = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, off);
+    off += chunk.byteLength;
+  }
+  try { return JSON.parse(dec.decode(bytes)); } catch { return null; }
+}
+
+async function readJson(request) {
+  return readBody(request, MAX_SMALL_BODY);
 }
 
 async function readStateBody(request) {
-  if ((request.headers.get('x-ky-encoding') || '').toLowerCase() !== 'gzip') return readJson(request);
+  if ((request.headers.get('x-ky-encoding') || '').toLowerCase() !== 'gzip') {
+    return readBody(request, MAX_PAYLOAD);
+  }
+  const declared = Number(request.headers.get('content-length') || 0);
+  // 压缩后就不该接近上限，先挡一道，省得白解压
+  if (declared > MAX_PAYLOAD) return undefined;
+  if (!request.body) return null;
+  let stream;
   try {
-    const stream = request.body.pipeThrough(new DecompressionStream('gzip'));
-    return await new Response(stream, { headers: { 'content-type': 'application/json' } }).json();
+    stream = request.body.pipeThrough(new DecompressionStream('gzip'));
   } catch {
     return null;
   }
+  // 解压后的字节同样边读边数：先把解压结果整体读进内存正是 gzip bomb 的攻击点
+  const reader = stream.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_PAYLOAD) {
+        await reader.cancel();
+        return undefined;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+  const bytes = new Uint8Array(total);
+  let off = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, off);
+    off += chunk.byteLength;
+  }
+  try { return JSON.parse(dec.decode(bytes)); } catch { return null; }
 }
 
-function mergeState(local, cloud) {
-  const out = {};
-  const keys = new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})]);
-  for (const k of keys) {
-    const a = (local || {})[k];
-    const b = (cloud || {})[k];
-    if (!a) { out[k] = b; continue; }
-    if (!b) { out[k] = a; continue; }
-    const ta = a.t || 0, tb = b.t || 0;
-    if (tb !== ta) { out[k] = tb > ta ? b : a; continue; }
-    if (a.mastered !== b.mastered) { out[k] = a.mastered ? a : b; continue; }
-    out[k] = { ...a, w: Math.max(a.w || 0, b.w || 0), due: Math.max(a.due || 0, b.due || 0) };
-  }
-  return out;
-}
-
-function mergeChapters(local, cloud) {
-  const out = {};
-  const keys = new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})]);
-  for (const k of keys) {
-    const a = (local || {})[k];
-    const b = (cloud || {})[k];
-    if (!a) { out[k] = b; continue; }
-    if (!b) { out[k] = a; continue; }
-    const ta = a.t || 0, tb = b.t || 0;
-    if (ta !== tb) { out[k] = tb > ta ? b : a; continue; }
-    const pa = (a.order || []).length ? (a.pos || 0) : 0;
-    const pb = (b.order || []).length ? (b.pos || 0) : 0;
-    out[k] = pa >= pb ? a : b;
-  }
-  return out;
-}
-
-// 每日学习节奏：同一天取较大值，不把两端相加（是同一份进度的两份快照）
-function mergeDaily(local, cloud) {
-  const out = {};
-  const cut = Date.now() - 119 * 864e5;
-  for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
-    if (key === '__proto__') continue;
-    const ts = new Date(key + 'T00:00:00').getTime();
-    if (!Number.isFinite(ts) || ts < cut) continue;
-    const a = (local || {})[key] || {};
-    const b = (cloud || {})[key] || {};
-    out[key] = { s: Math.max(a.s || 0, b.s || 0), m: Math.max(a.m || 0, b.m || 0) };
-  }
-  return out;
-}
-
-function latestChapterTime(chapterData) {
-  let latest = 0;
-  for (const rec of Object.values(chapterData || {})) {
-    latest = Math.max(latest, Number(rec && rec.t) || 0);
-  }
-  return latest;
-}
-function mergeConf(local, cloud, localChapters, cloudChapters) {
-  const a = local || {};
-  const b = cloud || {};
-  // conf.progressAt 是用户“切库/切章/翻词”动作的权威时间；
-  // 章节记录里的 t 会包含程序化恢复，不能拿来反推当前该用哪本词书。
-  let localAt = Number(a.progressAt) || 0;
-  let cloudAt = Number(b.progressAt) || 0;
-  if (!localAt && !cloudAt) {
-    // 兼容旧数据：只有完全没有位置时间时，才退回章节活动时间。
-    localAt = latestChapterTime(localChapters);
-    cloudAt = latestChapterTime(cloudChapters);
-  }
-  const localForce = Number(a.forceAt) || 0;
-  const cloudForce = Number(b.forceAt) || 0;
-  const chooseCloud = cloudForce > localForce || (cloudForce === localForce && cloudAt >= localAt);
-  const winner = chooseCloud ? b : a;
-  const other = chooseCloud ? a : b;
-  const deck = winner.deck || other.deck || 'core';
-  const deckChapter = { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) };
-  // winner.chapter 是最后一次落盘时所在的章，比 deckChapter 里的旧值新。
-  // 老快照/手改的导入文件里可能是字符串，统一转成整数再判断。
-  const asChapter = v => (v === null || v === undefined || v === '')
-    ? null
-    : (Number.isInteger(Number(v)) ? Number(v) : null);
-  const chapter = asChapter(winner.chapter) ?? asChapter(deckChapter[deck]) ?? 0;
-  // 两者必须一致，否则恢复时前端会从另一边读到别的章
-  deckChapter[deck] = chapter;
-  return {
-    ...other,
-    ...winner,
-    deck,
-    chapter,
-    deckChapter,
-    progressAt: Math.max(localAt, cloudAt),
-  };
-}
-function mergeSnapshots(local, cloud) {
-  const localForce = (local.conf && local.conf.forceAt) || 0;
-  const cloudForce = (cloud.conf && cloud.conf.forceAt) || 0;
-  if (cloudForce > localForce) {
-    return {
-      state: cloud.state || {},
-      chapterData: cloud.chapterData || {},
-      daily: cloud.daily || {},
-      conf: cloud.conf,
-    };
-  }
-  // 本机做过「清空 / 导入」而云端还没跟上：以本机为准，
-  // 否则逐词合并会把刚删掉的词按「云端有、本机没有」原样拼回来
-  if (localForce > cloudForce) {
-    return {
-      state: local.state || {},
-      chapterData: local.chapterData || {},
-      daily: local.daily || {},
-      conf: local.conf,
-    };
-  }
-  return {
-    state: mergeState(local.state, cloud.state),
-    chapterData: mergeChapters(local.chapterData, cloud.chapterData),
-    daily: mergeDaily(local.daily, cloud.daily),
-    conf: mergeConf(local.conf, cloud.conf, local.chapterData, cloud.chapterData),
-  };
-}
+/*__MERGE__*/
 
 
 const USER_RE = /^[A-Za-z0-9_一-龥]{3,24}$/;
 const AUDIO_WORD_RE = /^[A-Za-z][A-Za-z'-]{1,40}$/;
 // 音频请求量远高于其它接口，不走 D1 限流（每词一次写库太贵），
 // 用 isolate 内的轻量计数挡住随机刷词；命中缓存的请求不计数。
+// 额度按「一次全量离线缓存」估算：四本词库三千多词，400/10 分钟会让下载要跑一个多小时。
+// 跨站调用由 handleAudio 的 Sec-Fetch-Site 拦在前面，这里只兜随机刷词。
 const audioHits = new Map();
 function audioBudget(ip) {
   const now = Date.now();
@@ -269,12 +220,15 @@ function audioBudget(ip) {
     audioHits.set(ip, { n: 1, resetAt: now + 600000 });
     return true;
   }
-  if (cur.n >= 400) return false;
+  if (cur.n >= 4000) return false;
   cur.n += 1;
   return true;
 }
 // 同源代理词典发音：避免浏览器 CORS/混合内容问题，也让 Service Worker 能缓存。
 async function handleAudio(request, env, ctx) {
+  // 只允许自家页面调用：否则任何站点都能把这个代理当免费的词典发音接口用
+  const site = request.headers.get('sec-fetch-site');
+  if (site && site !== 'same-origin') return json({ error: '不允许跨站调用' }, 403);
   const url = new URL(request.url);
   const word = url.searchParams.get('word') || '';
   if (!AUDIO_WORD_RE.test(word)) return json({ error: '发音词格式不对' }, 400);
@@ -339,12 +293,14 @@ async function handleApi(request, env, ctx) {
       }
       await sweepExpired(env);
       const body = await readJson(request);
+      if (body === undefined) return json({ error: '请求内容过大' }, 413);
       const username = typeof body?.username === 'string' ? body.username.trim() : '';
       const password = typeof body?.password === 'string' ? body.password : '';
       if (!USER_RE.test(username)) return json({ error: '用户名需 3-24 位字母、数字、下划线或中文' }, 400);
       if (password.length < 6 || password.length > 72) return json({ error: '密码需 6-72 位' }, 400);
-      // 用户名按不区分大小写判重，避免 Alice / alice 视觉上互相冒充
-      const exists = await env.DB.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').bind(username).first();
+      // 用户名按不区分大小写判重，避免 Alice / alice 视觉上互相冒充。
+      // COLLATE NOCASE 能走唯一索引；LOWER() 用不上索引，并发下也挡不住两个都插进去。
+      const exists = await env.DB.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').bind(username).first();
       if (exists) return json({ error: '用户名已被占用' }, 409);
       const salt = randomHex(16);
       const hash = await hashPassword(password, salt);
@@ -375,26 +331,32 @@ async function handleApi(request, env, ctx) {
       }
       await sweepExpired(env);
       const body = await readJson(request);
+      if (body === undefined) return json({ error: '请求内容过大' }, 413);
       const username = typeof body?.username === 'string' ? body.username.trim() : '';
       const password = typeof body?.password === 'string' ? body.password : '';
       if (!username || !password) return json({ error: '用户名或密码不对' }, 401);
-      // 账号级失败锁定：换 IP 也不能对同一个账号一直试
-      const failKey = 'loginfail:' + username.toLowerCase();
+      // 失败锁定按「IP + 账号」计数：只按账号计数会让任何人靠故意输错把别人锁死，
+      // 15 分钟一次地重复等于永久锁。
+      const failKey = 'loginfail:' + clientIp(request) + ':' + username.toLowerCase();
+      // 再留一道账号级上限，只统计失败次数且阈值放高，挡住换 IP 无限试同一个账号
+      const acctKey = 'loginacct:' + username.toLowerCase();
       const failRow = await env.DB.prepare('SELECT n, reset_at FROM rate WHERE key = ?').bind(failKey).first();
       if (failRow && failRow.reset_at > Date.now() && failRow.n >= 10) {
-        return json({ error: '这个账号尝试次数过多，请 15 分钟后再试' }, 429);
+        return json({ error: '尝试次数过多，请 15 分钟后再试' }, 429);
       }
       const row = await env.DB.prepare(
-        'SELECT id, username, pass_hash, pass_salt FROM users WHERE LOWER(username) = LOWER(?)',
+        'SELECT id, username, pass_hash, pass_salt FROM users WHERE username = ? COLLATE NOCASE',
       ).bind(username).first();
       // 用户不存在时也跑一遍同样开销的哈希，避免靠响应时间探测账号是否存在
       const salt = row ? row.pass_salt : '00000000000000000000000000000000';
       const hash = await hashPassword(password, salt);
       if (!row || hash !== row.pass_hash) {
         await bumpRate(env, failKey, 15 * 60_000);
+        const acctFails = await bumpRate(env, acctKey, 15 * 60_000);
+        if (acctFails > 200) return json({ error: '这个账号尝试次数过多，请 15 分钟后再试' }, 429);
         return json({ error: '用户名或密码不对' }, 401);
       }
-      if (failRow) await env.DB.prepare('DELETE FROM rate WHERE key = ?').bind(failKey).run();
+      await env.DB.prepare('DELETE FROM rate WHERE key IN (?, ?)').bind(failKey, acctKey).run();
       const token = randomHex(24);
       const exp = Date.now() + SESSION_DAYS * 86400_000;
       await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
@@ -413,6 +375,18 @@ async function handleApi(request, env, ctx) {
     if (path === '/me' && method === 'GET') {
       const user = await currentUser(request, env);
       return json({ user: user ? { username: user.username } : null });
+    }
+
+    // 前端错误上报：只进 Worker 日志，不落库、不回错误码，
+    // 免得前端为了上报再产生一层失败重试。
+    if (path === '/log' && method === 'POST') {
+      if (!(await allowRate(env, 'log:' + clientIp(request), 20, 60_000))) return json({ ok: true });
+      const body = await readJson(request);
+      if (body && typeof body.message === 'string') {
+        const clip = v => String(v == null ? '' : v).replace(/[\r\n]+/g, ' ').slice(0, 400);
+        console.error('[client]', clip(body.message), clip(body.source), clip(body.stack));
+      }
+      return json({ ok: true });
     }
 
     // 配对码：电脑已登录后生成 6 位码，手机输入即登录同一账号
@@ -441,10 +415,12 @@ async function handleApi(request, env, ctx) {
     }
 
     if (path === '/pair/claim' && method === 'POST') {
-      if (!(await allowRate(env, 'pair:' + clientIp(request), 10, 600_000))) {
+      // 6 位码 + 5 分钟有效期，按 IP 限次是唯一挡猜测的手段，放宽等于送
+      if (!(await allowRate(env, 'pair:' + clientIp(request), 6, 600_000))) {
         return json({ error: '尝试太频繁，请 10 分钟后再试' }, 429);
       }
       const body = await readJson(request);
+      if (body === undefined) return json({ error: '请求内容过大' }, 413);
       const code = String(body?.code || '').trim();
       if (!/^\d{6}$/.test(code)) return json({ error: '配对码是 6 位数字' }, 400);
       // 先删再签：只有真正删掉这一行的请求才发 session，并发提交同一码不会签出两个
@@ -469,11 +445,14 @@ async function handleApi(request, env, ctx) {
         return json({ error: '同步太频繁，请稍后再试' }, 429);
       }
       const body = await readStateBody(request);
+      if (body === undefined) return json({ error: '进度数据过大' }, 413);
       if (!body || typeof body.payload !== 'object' || body.payload === null) {
         return json({ error: '数据格式不对' }, 400);
       }
-      const localText = JSON.stringify(body.payload);
-      if (localText.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
+      // 体积上限在 readStateBody 里已经按解压后的字节数卡过，这里不必再序列化一遍。
+      // 客户端做过「清空全部 / 导入覆盖」时带上 reset：云端独有的键只有服务端知道，
+      // 墓碑必须由服务端在这一份云端快照上生成，否则别的设备背过的词会原样活过来。
+      const wantsReset = body.reset === true;
 
       // 首次登录/冲突后的权威合并：一次请求完成读取、合并、写回。
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -486,6 +465,8 @@ async function handleApi(request, env, ctx) {
         if (!row || Number(row.expires_at) < Date.now()) return json({ error: '未登录' }, 401);
         const now = Date.now();
         if (!row.payload) {
+          const localText = stableJson(body.payload);
+          if (!localText || localText.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
           const inserted = await env.DB.prepare(
             'INSERT INTO progress (user_id, payload, updated_at) VALUES (?, ?, ?) ' +
             'ON CONFLICT(user_id) DO NOTHING RETURNING updated_at',
@@ -498,13 +479,29 @@ async function handleApi(request, env, ctx) {
         let remote;
         try { remote = JSON.parse(row.payload); }
         catch { return json({ error: '云端进度损坏' }, 500); }
-        const merged = mergeSnapshots(body.payload, remote);
-        const mergedText = JSON.stringify(merged);
+        // 墓碑时间取「服务端 now」和「客户端 resetAt」里更早的一个（最多回溯一天）：
+        // 客户端时钟慢几秒时，「清空之后马上又背的词」才不会被判成旧记录删掉。
+        const resetStamp = Number(body.resetAt);
+        const tombTime = resetStamp > 0
+          ? Math.min(now, Math.max(resetStamp, now - 86400_000))
+          : now;
+        const base = wantsReset ? tombstoneAll(remote, tombTime) : remote;
+        let merged = mergeSnapshots(body.payload, base);
+        // reset 是明确的用户动作，客户端这份就是清空后的权威状态：
+        // 它有的键一律覆盖回来，别让时间戳在一两秒的时钟偏移下误删新词。
+        if (wantsReset) merged = preferPayload(merged, body.payload);
+        // 入库的都是键排序后的规范形态，所以「合并结果 vs 已存文本」可以逐字节比较：
+        // 用原始键序比较会让两台设备交替同步时每次都判定「有变化」，
+        // 于是每轮都重写 updated_at，另一台的 since 轮询永远失效。
+        const mergedText = stableJson(merged);
+        if (!mergedText || mergedText.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
         if (mergedText === row.payload) {
           return json({ ok: true, payload: remote, updatedAt: row.updated_at, merged: false });
         }
+        // updated_at 同时当乐观锁版本号用，必须严格单调：
+        // 同一毫秒的两台设备否则会双双写入成功。
         const updated = await env.DB.prepare(
-          'UPDATE progress SET payload = ?, updated_at = ? ' +
+          'UPDATE progress SET payload = ?, updated_at = MAX(?, updated_at + 1) ' +
           'WHERE user_id = ? AND updated_at = ? RETURNING updated_at',
         ).bind(mergedText, now, row.user_id, row.updated_at).first();
         if (updated) {
@@ -536,14 +533,13 @@ async function handleApi(request, env, ctx) {
       }
 
       if (method === 'PUT' || method === 'POST') {
-        const len = Number(request.headers.get('content-length') || 0);
-        if (len > MAX_PAYLOAD * 1.2) return json({ error: '进度数据过大' }, 413);
         const body = await readStateBody(request);
+        if (body === undefined) return json({ error: '进度数据过大' }, 413);
         if (!body || typeof body.payload !== 'object' || body.payload === null) {
           return json({ error: '数据格式不对' }, 400);
         }
-        const text = JSON.stringify(body.payload);
-        if (text.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
+        const text = stableJson(body.payload);
+        if (!text || text.length > MAX_PAYLOAD) return json({ error: '进度数据过大' }, 413);
         if (!stateBudget('state:' + clientIp(request))) {
           return json({ error: '同步太频繁，请稍后再试' }, 429);
         }
@@ -553,13 +549,16 @@ async function handleApi(request, env, ctx) {
         // 兼容旧版前端：旧请求没有 baseUpdatedAt，仍按原来的覆盖行为处理。
         const force = body.force === true || !Object.prototype.hasOwnProperty.call(body, 'baseUpdatedAt');
         const now = Date.now();
+        // updated_at 兼作乐观锁版本号，写入时必须严格单调，
+        // 否则同一毫秒的两台设备会同时写成功，另一边的增量轮询也会漏更新。
         const written = await env.DB.prepare(
           'INSERT INTO progress (user_id, payload, updated_at) ' +
           'SELECT s.user_id, ?, ? ' +
           'FROM sessions s ' +
           'WHERE s.token = ? AND s.expires_at >= ? ' +
           'ON CONFLICT(user_id) DO UPDATE SET ' +
-          'payload = excluded.payload, updated_at = excluded.updated_at ' +
+          'payload = excluded.payload, ' +
+          'updated_at = MAX(excluded.updated_at, progress.updated_at + 1) ' +
           'WHERE ? = 1 OR progress.updated_at <= ? ' +
           'RETURNING updated_at',
         ).bind(text, now, token, now, force ? 1 : 0, base).first();

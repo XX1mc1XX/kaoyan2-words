@@ -32,3 +32,8 @@ CREATE TABLE IF NOT EXISTS rate (
   n        INTEGER NOT NULL,
   reset_at INTEGER NOT NULL
 );
+
+-- 用户名不区分大小写唯一。UNIQUE(username) 是二进制比较，
+-- 并发注册时 Alice / alice 能双双插入，之后登录会随机命中其中一个，
+-- 两个账号就会互相看到对方进度。判重和登录都走这个索引。
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_nocase ON users (username COLLATE NOCASE);

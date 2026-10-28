@@ -17,8 +17,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 SOFT = ROOT / "software"
-DEPLOY = ROOT / "deploy"
+SHARED = ROOT / "shared"
+# 先往临时目录写，构建完再整体替换：边清空边写会让目录短暂处于半成品状态
+DEPLOY = ROOT / "deploy.tmp"
+DEPLOY_FINAL = ROOT / "deploy"
 OUT = SOFT / "考研核心词.html"
+MERGE_MARKER = "/*__MERGE__*/"
+
+
+def inject(source, marker, value):
+    """替换占位符。
+
+    用 partition 而不是 str.replace：合并模块的源码里一旦出现 $ 符号，
+    str.replace 会把它当成替换模式（$& / $1）静默改写代码。
+    """
+    head, sep, tail = source.partition(marker)
+    if not sep:
+        raise RuntimeError("占位符缺失：" + marker)
+    return head + value + tail
 
 
 def rmtree_force(path):
@@ -90,6 +106,8 @@ insurance_slim = slim_rows(insurance)
 
 
 template = (SOFT / "template.html").read_text(encoding="utf-8")
+# 合并算法只有一份实现，构建时分别注入前端和 Worker
+merge_source = (SHARED / "merge.js").read_text(encoding="utf-8")
 
 
 def json_block(value):
@@ -102,14 +120,18 @@ def json_block(value):
 
 
 def render_html(deck_values, meta_value, detail_value):
-    return (
-        template.replace("__DATA__", json_block(deck_values["words"]))
-        .replace("__DERIVATIVES__", json_block(deck_values["derivatives"]))
-        .replace("__BASIC__", json_block(deck_values["basic"]))
-        .replace("__INSURANCE__", json_block(deck_values["insurance"]))
-        .replace("__META__", json_block(meta_value))
-        .replace("__DETAIL__", json_block(detail_value))
-    )
+    html = template
+    for marker, value in (
+        ("__DATA__", json_block(deck_values["words"])),
+        ("__DERIVATIVES__", json_block(deck_values["derivatives"])),
+        ("__BASIC__", json_block(deck_values["basic"])),
+        ("__INSURANCE__", json_block(deck_values["insurance"])),
+        ("__META__", json_block(meta_value)),
+        ("__DETAIL__", json_block(detail_value)),
+        (MERGE_MARKER, merge_source),
+    ):
+        html = inject(html, marker, value)
+    return html
 
 
 EXAM_TAGS = ("zk", "gk", "cet4", "cet6", "ky", "toefl", "ielts", "gre")
@@ -286,7 +308,7 @@ standalone_html = render_html(
 )
 OUT.write_text(standalone_html, encoding="utf-8", newline="\n")
 
-# deploy/ 是纯生成目录，先清空，防止旧版页面和 .git 残留被一起上传。
+# 临时生成目录：上一次构建失败可能留下残留，先清干净再写。
 DEPLOY.mkdir(parents=True, exist_ok=True)
 for stale in DEPLOY.iterdir():
     if stale.is_dir():
@@ -343,7 +365,9 @@ web_meta.update(
 )
 web_html = render_html(
     {
-        "words": slim[:200],
+        # 首屏只留一章的零头：整本章节靠分片按需加载，内嵌太多会把 HTML 撑大，
+        # 而 Service Worker 又预缓存了完整词库，内容重复没有意义。
+        "words": slim[:40],
         "derivatives": [],
         "basic": [],
         "insurance": [],
@@ -358,19 +382,25 @@ app_match = re.search(r'<script id="ky-app">(.*?)</script>', web_html, re.S)
 if not app_match:
     raise RuntimeError("ky-app script block not found")
 app_js = app_match.group(1)
-# 网页版主程序用 Terser 压缩；本机没有 npx 时自动回退到未压缩源码，不阻断构建。
-if not os.environ.get("KY_NO_MINIFY"):
+# 网页版主程序用 Terser 压缩。压缩失败必须让构建失败：
+# 静默回退到未压缩源码会让产物体积翻倍、且没人发现，构建也不可复现。
+# 确实要跳过压缩时显式设置 KY_NO_MINIFY=1。
+if os.environ.get("KY_NO_MINIFY"):
+    print("minify=skipped")
+else:
     npx = shutil.which("npx")
-    if npx:
-        try:
-            minified = subprocess.run(
-                [npx, "--yes", "terser", "--compress", "--mangle", "--format", "comments=false"],
-                input=app_js.encode("utf-8"), capture_output=True, timeout=90,
-            )
-            if minified.returncode == 0 and minified.stdout.strip():
-                app_js = minified.stdout.decode("utf-8")
-        except Exception:
-            pass
+    if not npx:
+        raise RuntimeError("找不到 npx，无法压缩主程序：装好 Node，或显式 KY_NO_MINIFY=1 跳过压缩")
+    try:
+        minified = subprocess.run(
+            [npx, "--yes", "terser", "--compress", "--mangle", "--format", "comments=false"],
+            input=app_js.encode("utf-8"), capture_output=True, timeout=180,
+        )
+    except Exception as exc:
+        raise RuntimeError("terser 调用失败：%s" % exc) from exc
+    if minified.returncode != 0 or not minified.stdout.strip():
+        raise RuntimeError("terser 压缩失败：%s" % minified.stderr.decode("utf-8", "replace")[:300])
+    app_js = minified.stdout.decode("utf-8")
 app_digest = hashlib.sha256(app_js.encode("utf-8")).hexdigest()[:12]
 app_asset = f"./app.{app_digest}.js"
 (DEPLOY / app_asset[2:]).write_text(app_js, encoding="utf-8", newline="\n")
@@ -387,13 +417,20 @@ web_html = (
 
 # 每次构建都换一个缓存名，保证 Service Worker 能拿到新页面但保留已缓存发音。
 # 构建日期不参与哈希，否则每天都会全量重下页面。
+# Service Worker 自身和合并模块也必须进哈希：只改它们时缓存名不变，
+# 已经打开的页面就永远不会更新。
+sw_template = (SOFT / "sw.template.js").read_text(encoding="utf-8")
 build_version = hashlib.sha256(
-    re.sub(r'"generated_at":"[^"]*"', "", web_html).encode("utf-8")
+    "\n".join((
+        re.sub(r'"generated_at":"[^"]*"', "", web_html),
+        sw_template,
+        merge_source,
+    )).encode("utf-8")
 ).hexdigest()[:12]
 # 详情分片不进 SW 预缓存：它只在第一次长按时才用到，不该拖慢首次安装
 runtime_assets = [asset_map[k] for k in ("words", "derivatives", "basic", "insurance")] + [app_asset]
 sw_js = (
-    (SOFT / "sw.template.js").read_text(encoding="utf-8")
+    sw_template
     .replace("__BUILD_VERSION__", build_version)
     .replace("__DATA_ASSETS__", json.dumps(runtime_assets, ensure_ascii=False))
 )
@@ -403,8 +440,21 @@ sw_js = (
 (DEPLOY / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
 for name in ("manifest.webmanifest", "icon-192.png", "icon-512.png"):
     shutil.copy2(SOFT / name, DEPLOY / name)
-shutil.copy2(ROOT / "backend" / "worker.js", DEPLOY / "_worker.js")
+# Worker 是单文件部署（Pages 高级模式下 _worker.js 不能带外部 import），
+# 合并模块在构建时注入进来，源码里只留一个占位符。
+worker_source = inject(
+    (ROOT / "backend" / "worker.js").read_text(encoding="utf-8"), MERGE_MARKER, merge_source)
+(DEPLOY / "_worker.js").write_text(worker_source, encoding="utf-8", newline="\n")
 (DEPLOY / "_headers").write_text(
+    "/*\n"
+    "  X-Content-Type-Options: nosniff\n"
+    "  Referrer-Policy: same-origin\n"
+    "  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    # media-src 必须放行有道：前端会直接把 <audio> 指向 dict.youdao.com 抢先发声，
+    # 拦掉不会报错，只会静默退化成系统 TTS。
+    "img-src 'self' data:; media-src 'self' blob: data: https://dict.youdao.com; "
+    "connect-src 'self'; manifest-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'\n"
     "/index.html\n  Cache-Control: public, max-age=0, must-revalidate\n"
     "/sw.js\n  Cache-Control: no-cache\n"
     "/manifest.webmanifest\n  Cache-Control: public, max-age=3600\n"
@@ -414,7 +464,19 @@ shutil.copy2(ROOT / "backend" / "worker.js", DEPLOY / "_worker.js")
     newline="\n",
 )
 
+# 临时目录写完再整体替换 deploy/：一边清空一边写会让目录短暂处于半成品状态，
+# 已经打开的旧页面按需去拉旧哈希分片就会 404。
+STALE = ROOT / "deploy.old"
+if STALE.exists():
+    rmtree_force(STALE)
+if DEPLOY_FINAL.exists():
+    os.replace(DEPLOY_FINAL, STALE)
+os.replace(DEPLOY, DEPLOY_FINAL)
+if STALE.exists():
+    rmtree_force(STALE)
+
 print(f"output={OUT}")
-print(f"deploy={DEPLOY / 'index.html'}")
+print(f"deploy={DEPLOY_FINAL / 'index.html'}")
 print(f"words={len(slim)} derivatives={len(derivative_slim)} basic={len(basic_slim)} insurance={len(insurance_slim)}")
-print(f"standalone={OUT.stat().st_size / 1024:.0f}KB web={len(web_html.encode('utf-8')) / 1024:.0f}KB")
+print(f"app={len(app_js.encode('utf-8')) / 1024:.0f}KB standalone={OUT.stat().st_size / 1024:.0f}KB "
+      f"web={len(web_html.encode('utf-8')) / 1024:.0f}KB build={build_version}")

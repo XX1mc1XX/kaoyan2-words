@@ -55,6 +55,19 @@ def static_checks():
     check("含云同步接口", "/state" in t and "snapshot" in t)
     check("同步单请求快路径", all(x in t for x in ("baseUpdatedAt", "syncWithServer", "/state/sync", "/state?since=", "CompressionStream")))
     check("同步变更追踪", all(x in t for x in ("syncDirty", "localRevision", "noteLocalChange")))
+    # 合并算法只有 shared/merge.js 一份实现，前端和 Worker 都是构建时注入的
+    check("合并实现来自共享模块", "function mergeSnapshots" in t and "function isTombstone" in t,
+          "standalone 里应有注入后的合并代码")
+    check("共享模块未被复制回源码",
+          "__MERGE__" in io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read()
+          and "__MERGE__" in io.open(os.path.join(ROOT, "backend", "worker.js"), encoding="utf-8").read())
+    check("清空用墓碑而非 forceAt", "tombstone(now)" in t and "conf.forceAt =" not in t)
+    check("清空/导入请求服务端补墓碑", "overwritePending" in t)
+    check("导入保留备份里的墓碑", "if (rec.del) {" in t and "incoming[name] = { del: 1, t: Number(rec.t) || NOW_T }" in t)
+    check("竞态跳过不推进同步版本",
+          t.index("return { result, changedLocally: false, skipped: true };")
+          < t.index("lastSyncAt = result.updatedAt || Date.now();"),
+          "guard 必须挡在推进 lastSyncAt 之前，否则下一轮会用旧快照 PUT 覆盖")
     check("含恢复原序按钮", "restoreOrder" in t)
     check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
     check("含鼠标滚轮翻词", "wheelLockedUntil" in t and "addEventListener('wheel'" in t)
@@ -74,6 +87,8 @@ def static_checks():
     check("含长按详情面板", all(x in t for x in ("detailMask", "detailSheet", "pressTimer")))
     check("长按详情数据块", 'id="ky-deck-detail"' in t)
     check("详情带音标与真题次数", '"p":' in t and '"freq":' in t)
+    check("详情词典默认展开", "$('detailDictBox').open = true" in t)
+    check("等级只用单字母上卡片", "PRIORITY_LABELS" in t and "el.textContent = level;" in t)
 
     # --- 首屏：词库走 JSON 数据块，按需解析 ---
     check("词库改用 JSON 数据块", t.count('type="application/json"') == 6)
@@ -92,6 +107,9 @@ def static_checks():
     check("SW 发音优先缓存", "cacheFirstAudio" in sw)
     check("SW 不拦接口请求", "url.pathname.includes('/api/')" in sw)
     check("SW 注册禁缓存", "updateViaCache: 'none'" in t and "registration.update()" in t)
+    check("头像弹窗带全量下载入口",
+          all(x in t for x in ("offlineStart", "offlineStop", "runOfflineDownload")))
+    check("SW 音频缓存放得下全量", "AUDIO_CACHE_MAX = 4000" in sw)
     check("SW 新版本自动刷新", "hadOldShell" in sw and "client.navigate(client.url)" in sw)
     mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
     mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""
@@ -113,7 +131,7 @@ def static_checks():
         web_gzip = len(gzip.compress(web_html.encode("utf-8"), 9)) if web_html else 0
         check("网页首包 gzip < 50KB", 0 < web_gzip < 50 * 1024, "%.1fKB" % (web_gzip / 1024))
         web_words = json_block_value(web_html, "words")
-        check("网页首屏只内嵌首章", len(web_words) == 200, "%d 词" % len(web_words))
+        check("网页首屏只内嵌少量词", 0 < len(web_words) <= 50, "%d 词" % len(web_words))
         app_files = [x for x in os.listdir(deploy) if re.fullmatch(r"app\.[0-9a-f]{12}\.js", x)]
         check("网页主程序独立缓存", len(app_files) == 1 and ("src=\"./" + app_files[0] + "\"") in web_html, str(app_files))
         data_dir = os.path.join(deploy, "data")
@@ -129,6 +147,10 @@ def static_checks():
         headers = io.open(os.path.join(deploy, "_headers"), encoding="utf-8").read() if os.path.exists(os.path.join(deploy, "_headers")) else ""
         check("拆分词库长期缓存", "/data/*" in headers and "immutable" in headers)
         check("主程序长期缓存", "/app.*.js" in headers and "immutable" in headers)
+        check("部署带 nosniff 与 CSP",
+              "X-Content-Type-Options: nosniff" in headers
+              and "Content-Security-Policy" in headers
+              and "frame-ancestors 'none'" in headers)
         detail_files = [x for x in data_files if x.startswith("detail-")]
         detail_sizes = [os.path.getsize(os.path.join(data_dir, x)) for x in detail_files]
         check("详情按首字母分片", len(detail_files) >= 24, "%d 片" % len(detail_files))
@@ -200,6 +222,20 @@ def data_checks():
     check("总词数 > 3000", total > 3000, "%d 词" % total)
     stub = [w for w in allw if len(w) < 2]
     check("无词根碎片", not stub, str(stub[:5]))
+
+    # 派生库单独审：重要在前、四档齐全、别把原形词当派生词收进来
+    deriv = json.load(io.open(os.path.join(D, "derivatives.json"), encoding="utf-8"))
+    order = "SABC"
+    levels = [x["priority"][0] for x in deriv]
+    check("派生词分级齐全", set(levels) == set(order), str(sorted(set(levels))))
+    ranks = [order.index(level) for level in levels]
+    check("派生词按等级从高到低排", ranks == sorted(ranks), "首位=%s" % deriv[0]["priority"])
+    scores = [x["priority_score"] for x in deriv]
+    check("派生词按分数从高到低排",
+          all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1)), "首位=%s" % scores[0])
+    pairs = {x["word"]: x["family"] for x in deriv}
+    loops = [word for word, family in pairs.items() if pairs.get(family) == word]
+    check("派生词没有互相指认", not loops, str(loops[:5]))
 
 
 # ---------- 浏览器内行为测试 ----------
@@ -351,6 +387,14 @@ setTimeout(function () {
           tapEl(document.querySelector('.badges .weight-badge') || document.querySelector('.badges .priority'));
           out.badge_no_flip = vis() === visNow;
 
+          // K2. 等级徽章只显示单字母；长按详情里词典默认展开，不用再点一次
+          out.priority_letter = /^[SABC]$/.test(document.getElementById('priorityBadge').textContent);
+          openDetail(queue[idx]);
+          out.dict_open_default = document.getElementById('detailDictBox').open === true;
+          out.detail_shown = !document.getElementById('detailMask').classList.contains('hidden');
+          closeDetail();
+          out.detail_hidden = document.getElementById('detailMask').classList.contains('hidden');
+
           // L. 从单词上起手的触摸不会被吞（否则滑动判定的 touchend 丢失）
           let cardGotTouchEnd = false;
           card.addEventListener('touchend', () => { cardGotTouchEnd = true; }, { once: true });
@@ -401,13 +445,53 @@ setTimeout(function () {
           }
           switchDeck('core');
 
-          // Q. 云端做过「清空 / 导入」时，合并要以云端为准，不能把删掉的词拼回来
-          const snapForce = { state: { alpha: { mastered: true, t: 1 } }, chapterData: {}, conf: { forceAt: 999 } };
-          const snapPlain = {
-            state: { alpha: { mastered: true, t: 1 }, beta: { mastered: true, t: 1 } },
-            chapterData: {}, conf: { forceAt: 0 },
+          // Q. 删除靠墓碑表达：一端清空后，另一端的旧词不能被拼回来
+          const nowMs = Date.now();
+          const snapReset = {
+            state: { alpha: tombstone(nowMs - 1000), beta: tombstone(nowMs - 900) },
+            chapterData: {}, daily: {}, conf: {},
           };
-          out.merge_cloud_force_wins = !('beta' in mergeSnapshots(snapPlain, snapForce).state);
+          const snapOld = {
+            state: { alpha: { mastered: true, t: 1 }, beta: { mastered: true, t: 1 } },
+            chapterData: {}, daily: {}, conf: {},
+          };
+          const resetMerged = mergeSnapshots(snapOld, snapReset).state;
+          out.merge_tombstone_wins = !!resetMerged.alpha && resetMerged.alpha.del === 1
+            && !!resetMerged.beta && resetMerged.beta.del === 1;
+          // 删除与更新的先后由 t 决定：删了之后重新背的词要能复活
+          out.merge_delete_beats_older = mergeState({ beta: { mastered: true, t: 5 } }, { beta: tombstone(50) }).beta.del === 1;
+          out.merge_relearn_beats_delete = mergeState({ beta: { mastered: true, t: 80 } }, { beta: tombstone(50) }).beta.mastered === true;
+          // 过老的墓碑会被清掉，否则 payload 永远被删除记录撑大
+          out.merge_tombstone_pruned = !('beta' in pruneTombstones(
+            { beta: tombstone(nowMs - 500 * 864e5) }, nowMs));
+          // 清空全部：云端独有的键只有服务端知道，必须由服务端补墓碑
+          const covered = tombstoneAll(
+            { state: { aa: { t: 1 }, bb: { t: 1 } }, chapterData: { 'core:0': { t: 1 } }, daily: {}, conf: {} },
+            nowMs);
+          out.tombstone_all_covers_cloud = covered.state.aa.del === 1 && covered.state.bb.del === 1
+            && covered.chapterData['core:0'].del === 1;
+          // 清空之后马上又背的词：客户端时钟落后服务端几秒也不能被墓碑吃掉
+          const resetPayload = {
+            state: { aa: { mastered: true, t: nowMs - 5000 } }, chapterData: {}, daily: {}, conf: {},
+          };
+          const resetMerge = preferPayload(mergeSnapshots(resetPayload, covered), resetPayload);
+          out.reset_prefers_client = resetMerge.state.aa.mastered === true && resetMerge.state.bb.del === 1;
+          // __proto__ 键不能改掉结果对象的原型
+          const polluted = mergeState(JSON.parse('{"__proto__":{"ghost":1},"alpha":{"t":1}}'), {});
+          out.merge_no_proto_pollution = !('ghost' in polluted)
+            && Object.getPrototypeOf(polluted) === Object.prototype;
+          // 快照只写非默认字段，避免 payload 逼近上限
+          const stateBackup = state;
+          state = { zzz: { w: 0, mastered: false, seen: 0, t: 0, due: 0 } };
+          const slimSnap = snapshot();
+          state = stateBackup;
+          out.snapshot_slim = !!slimSnap.state.zzz && Object.keys(slimSnap.state.zzz).length === 0;
+          // 墓碑记录被重新写入进度时必须变回活记录，否则删除标记会跟着新数据上传
+          state = { yyy: tombstone(1) };
+          const revived = liveEntry('yyy');
+          const liveOk = !revived.del && revived.w === 0;
+          state = stateBackup;
+          out.live_entry_revives = liveOk;
           const posOld = {
             state: {}, chapterData: { 'core:0': { order: ['state'], t: 10, pos: 0 } },
             conf: { deck: 'core', chapter: 0, deckChapter: { core: 0 }, progressAt: 10 },
@@ -445,10 +529,10 @@ setTimeout(function () {
           out.merge_daily_max = mergedD[dk(0)].s === 5 && mergedD[dk(0)].m === 2 && mergedD[dk(1)].s === 1;
           out.snapshot_has_daily = !!snapshot().daily;
           out.daily_scoped = typeof scopedKey(LS_DAILY) === 'string' && SCOPED_KEYS.has(LS_DAILY);
-          // 本机做过清空/导入（forceAt 更新）而云端没跟上：云端的旧词不能被拼回来
-          out.merge_local_force_wins = !('beta' in mergeSnapshots(
-            { state: { alpha: {} }, chapterData: {}, daily: {}, conf: { forceAt: 999 } },
-            { state: { alpha: {}, beta: {} }, chapterData: {}, daily: {}, conf: { forceAt: 0 } }).state);
+          // 撤销把当天计数减掉之后，云端较旧的大值不能再把它顶回来
+          out.merge_daily_newer_t = mergeDaily(
+            { [dk(0)]: { s: 5, m: 1, t: 100 } },
+            { [dk(0)]: { s: 2, m: 0, t: 200 } })[dk(0)].s === 2;
           // 撤销要把 daily 一起回滚，否则误滑一次会永久多算
           const undoBase = (daily[dayKey(Date.now())] || {}).s || 0;
           if (queue[idx]) {
@@ -644,6 +728,19 @@ setTimeout(async function(){
       { state: {}, chapterData: {}, daily: { [dkToday]: { s: 3, m: 0 } }, conf: { forceAt: 0 } },
       { state: {}, chapterData: {}, daily: { [dkToday]: { s: 5, m: 2 } }, conf: { forceAt: 0 } });
     out.web_daily_merge = dailyMerged.daily[dkToday].s === 5 && dailyMerged.daily[dkToday].m === 2;
+
+    // 游客空间「清空过」留下的墓碑，登录时不能把账号里同样的词一起删掉
+    localStorage.setItem('ky_words_v1@probe2', JSON.stringify({ cherry: { mastered: true, t: 900 } }));
+    localStorage.setItem('ky_words_v1', JSON.stringify({ cherry: { del: 1, t: 1000 }, date: { w: 1, t: 800 } }));
+    adoptGuestProgress('probe2');
+    const adopted2 = JSON.parse(localStorage.getItem('ky_words_v1@probe2') || '{}');
+    out.adopt_keeps_account_word = !!(adopted2.cherry && adopted2.cherry.mastered);
+    out.adopt_still_merges_live = !!adopted2.date;
+    // 游客的「清空后待同步」标志也不能带进账号，否则登录会顺手清掉云端进度
+    localStorage.setItem('ky_conf_v1', JSON.stringify({ deck: 'core', overwritePending: true, progressAt: 1 }));
+    adoptGuestProgress('probe3');
+    const conf3 = JSON.parse(localStorage.getItem('ky_conf_v1@probe3') || '{}');
+    out.adopt_drops_guest_reset = !conf3.overwritePending;
   } catch (e) {
     out.error = e.stack || e.message;
   }
@@ -669,7 +766,7 @@ setTimeout(async function(){
             check("网页版首次加载测试", False, data["error"][:160])
             return
         check("网页版进入按需加载模式", data.get("web_mode") is True)
-        check("网页首屏只解析首章", data.get("partial_len") == 200, "实际=%s" % data.get("partial_len"))
+        check("网页首屏只解析少量词", 0 < (data.get("partial_len") or 0) <= 50, "实际=%s" % data.get("partial_len"))
         check("网页首卡快速出现", 0 < data.get("first_card", 0) < 800, "%sms" % data.get("first_card"))
         app_name = next((x for x in os.listdir(deploy) if re.fullmatch(r"app\.[0-9a-f]{12}\.js", x)), "")
         app_text = io.open(os.path.join(deploy, app_name), encoding="utf-8").read() if app_name else ""
@@ -679,7 +776,7 @@ setTimeout(async function(){
         check("网页切章加载成功", data.get("chapter") == 1 and data.get("chapter_queue", 0) > 0,
               "实际=%s/%s" % (data.get("chapter"), data.get("chapter_queue")))
         check("网页词表加载完整", data.get("list_count") == 100, "实际=%s" % data.get("list_count"))
-        check("网页切库加载成功", data.get("deriv_meta") == "128 词" and data.get("deriv_count") == 128,
+        check("网页切库加载成功", data.get("deriv_meta") == "120 词" and data.get("deriv_count") == 120,
               "实际=%s/%s" % (data.get("deriv_meta"), data.get("deriv_count")))
         check("切章翻词后章节落盘", data.get("pos_chapter") == 2 and data.get("pos_deck") == "core",
               "章=%s 库=%s" % (data.get("pos_chapter"), data.get("pos_deck")))
@@ -697,6 +794,10 @@ setTimeout(async function(){
         check("每日节奏进入同步快照", data.get("web_snapshot_daily") is True)
         check("登录采纳游客每日节奏", data.get("web_daily_adopt") is True)
         check("每日节奏合并取较大值", data.get("web_daily_merge") is True)
+        check("游客墓碑不删账号的词", data.get("adopt_keeps_account_word") is True,
+              "实际=%s" % data.get("adopt_keeps_account_word"))
+        check("游客有效进度仍然并入", data.get("adopt_still_merges_live") is True)
+        check("游客清空标志不串账号", data.get("adopt_drops_guest_reset") is True)
     finally:
         server.terminate()
         try:
@@ -710,7 +811,11 @@ setTimeout(async function(){
 
 def runtime_checks():
     sw = os.path.join(ROOT, "software", "sw.js")
-    worker = os.path.join(ROOT, "backend", "worker.js")
+    # Worker 的合并逻辑是构建时从 shared/merge.js 注入的，
+    # 所以能跑的产物是 deploy/_worker.js，源码 backend/worker.js 里只有占位符。
+    worker = os.path.join(ROOT, "deploy", "_worker.js")
+    if not os.path.exists(worker):
+        check("Worker 产物存在", False, "先跑 make_html.py")
     for label, path in (("Service Worker", sw), ("Worker", worker)):
         if not os.path.exists(path):
             check(label + "存在", False)
@@ -718,29 +823,67 @@ def runtime_checks():
         r = subprocess.run(["node", "--check", path], capture_output=True)
         check(label + "语法有效", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
 
-    worker_url = "file:///" + worker.replace("\\", "/")
-    js = (
-        "globalThis.fetch = async () => new Response(new Uint8Array([73,68,51]), "
-        "{status:200, headers:{'content-type':'audio/mpeg','content-length':'3'}});"
-        "globalThis.caches = {default:{match:async()=>null, put:async()=>{}}};"
-        "const {default:worker} = await import(%r);"
-        "const req = new Request('https://example.com/api/audio?word=hello');"
-        "const res = await worker.fetch(req, {ASSETS:{fetch:async()=>new Response('')}});"
-        "const n = (await res.arrayBuffer()).byteLength;"
-        "if (res.status !== 200 || res.headers.get('content-type') !== 'audio/mpeg' || n !== 3) process.exit(1);"
-        % worker_url
-    )
-    r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True)
-    check("发音代理可返回音频", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
+    if os.path.exists(worker):
+        worker_url = "file:///" + worker.replace("\\", "/")
+        js = (
+            "globalThis.fetch = async () => new Response(new Uint8Array([73,68,51]), "
+            "{status:200, headers:{'content-type':'audio/mpeg','content-length':'3'}});"
+            "globalThis.caches = {default:{match:async()=>null, put:async()=>{}}};"
+            "const {default:worker} = await import(%r);"
+            "const req = new Request('https://example.com/api/audio?word=hello');"
+            "const res = await worker.fetch(req, {ASSETS:{fetch:async()=>new Response('')}});"
+            "const n = (await res.arrayBuffer()).byteLength;"
+            "if (res.status !== 200 || res.headers.get('content-type') !== 'audio/mpeg' || n !== 3) process.exit(1);"
+            % worker_url
+        )
+        r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True)
+        check("发音代理可返回音频", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
+        body_checks(worker_url)
 
-    worker_text = io.open(worker, encoding="utf-8").read()
+    worker_text = io.open(worker, encoding="utf-8").read() if os.path.exists(worker) else ""
     check("同步写入合并为单次 D1", "RETURNING updated_at" in worker_text and "ON CONFLICT(user_id) DO UPDATE" in worker_text)
     check("同步支持增量拉取", "unchanged: true" in worker_text and "searchParams.get('since')" in worker_text)
-    check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(body.payload, remote)" in worker_text)
+    check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(body.payload, base)" in worker_text)
     check("服务端合并每日节奏", "function mergeDaily(" in worker_text and "daily: mergeDaily(" in worker_text)
-    check("服务端 force 双向生效", "cloudForce > localForce" in worker_text and "localForce > cloudForce" in worker_text)
+    check("删除用墓碑表达", "function isTombstone(" in worker_text and "del: 1" in worker_text)
+    check("服务端补全清空墓碑", "body.reset === true" in worker_text and "tombstoneAll(remote, tombTime)" in worker_text)
+    check("reset 以客户端快照为准", "preferPayload(merged, body.payload)" in worker_text)
+    check("合并键序规范化后比较", "const mergedText = stableJson(merged);" in worker_text
+          and "mergedText === row.payload" in worker_text)
+    check("版本号严格单调", "MAX(?, updated_at + 1)" in worker_text)
+    check("用户名不区分大小写判重", "COLLATE NOCASE" in worker_text)
     check("服务端章节与 deckChapter 自洽", "deckChapter[deck] = chapter;" in worker_text)
     check("同步支持压缩上传", "DecompressionStream" in worker_text and "x-ky-encoding" in worker_text)
+    check("流式读取有体积上限", "if (total > limit)" in worker_text and "reader.cancel()" in worker_text)
+
+
+def body_checks(worker_url):
+    """过大的请求体必须回 413，而不是把 isolate 读到 OOM。"""
+    js = (
+        "import zlib from 'node:zlib';"
+        "globalThis.caches = {default:{match:async()=>null, put:async()=>{}}};"
+        "const stmt = () => ({bind: () => ({first: async () => null, run: async () => ({}), all: async () => ({results: []})})});"
+        "const {default:worker} = await import(%r);"
+        "const env = {DB:{prepare: stmt, batch: async () => []}, ASSETS:{fetch:async()=>new Response('')}};"
+        "const results = [];"
+        # 64MB 全空格压缩后很小：解压前看不出问题，必须靠解压后的累计体积拦住
+        "const bomb = zlib.gzipSync(Buffer.alloc(64 * 1024 * 1024, 32), {level: 9});"
+        "results.push((await worker.fetch(new Request('https://example.com/api/state/sync', {"
+        "method:'POST', headers:{'content-type':'application/octet-stream','x-ky-encoding':'gzip',"
+        "'cookie':'ky_sid=deadbeef'}, body: bomb}), env, {})).status);"
+        "const fat = JSON.stringify({payload:{state:{}}, pad:'x'.repeat(2 * 1024 * 1024)});"
+        "results.push((await worker.fetch(new Request('https://example.com/api/state', {"
+        "method:'PUT', headers:{'content-type':'application/json','cookie':'ky_sid=deadbeef'},"
+        "body: fat}), env, {})).status);"
+        "const fatLogin = JSON.stringify({username:'a', password:'b', pad:'x'.repeat(1024 * 1024)});"
+        "results.push((await worker.fetch(new Request('https://example.com/api/login', {"
+        "method:'POST', headers:{'content-type':'application/json','cf-connecting-ip':'9.9.9.9'},"
+        "body: fatLogin}), env, {})).status);"
+        "if (results.some(x => x !== 413)) { console.error('statuses=' + results.join(',')); process.exit(1); }"
+        % worker_url
+    )
+    r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, timeout=180)
+    check("超大请求体一律 413", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:300])
 
 
 def browser_checks():
@@ -779,11 +922,16 @@ def browser_checks():
             "weight_down": True, "weight_badge_val": True,
             "mastered_has_words": True, "mastered_restored": True,
             "restore_len_minus_one": True, "restore_on_next_word": True,
-            "merge_cloud_force_wins": True, "merge_position_latest": True,
+            "merge_tombstone_wins": True, "merge_delete_beats_older": True,
+            "merge_relearn_beats_delete": True, "merge_tombstone_pruned": True,
+            "tombstone_all_covers_cloud": True, "reset_prefers_client": True,
+            "merge_no_proto_pollution": True, "snapshot_slim": True, "live_entry_revives": True,
+            "merge_position_latest": True,
             "daily_bump": True, "daily_master_bump": True,
             "streak_three": True, "streak_broken": True, "streak_yesterday": True,
-            "merge_daily_max": True, "snapshot_has_daily": True, "daily_scoped": True,
-            "merge_local_force_wins": True, "undo_rolls_daily": True,
+            "merge_daily_max": True, "merge_daily_newer_t": True,
+            "snapshot_has_daily": True, "daily_scoped": True,
+            "undo_rolls_daily": True,
             "rhythm_rendered": True,
             "desktop_click_flips": True, "touch_synth_click_ignored": True,
             "cross_next": True, "cross_prev": True,
@@ -796,12 +944,18 @@ def browser_checks():
             "lazy_after_has_insurance": True,
             "deck_meta_insurance": "1545 词", "deck_meta_core": "1342 词",
             "deck_meta_restored": True,
-            "all_words_lazy_at_boot": True, "all_words_ready": True, "all_words_count": 3364,
+            "all_words_lazy_at_boot": True, "all_words_ready": True, "all_words_count": 3356,
             "lazy_words_count": 1342, "lazy_insurance_count": 1545,
             "first_card_marked": True, "word_location": "core",
         }
         for k, v in expect.items():
             check("行为·" + k, data.get(k) == v, "实际=%s" % data.get(k))
+        check("卡片等级只显示单字母", data.get("priority_letter") is True,
+              "实际=%s" % data.get("priority_letter"))
+        check("长按详情词典默认展开", data.get("dict_open_default") is True,
+              "实际=%s" % data.get("dict_open_default"))
+        check("详情面板能开能关", data.get("detail_shown") is True and data.get("detail_hidden") is True,
+              "开=%s 关=%s" % (data.get("detail_shown"), data.get("detail_hidden")))
         for key, label in (("flip_node_delta", "翻卡不重建 DOM"), ("navigate_node_delta", "切词不重建 DOM")):
             value = data.get(key)
             check("行为·" + label, isinstance(value, int) and abs(value) <= 2, "节点变化=%s" % value)

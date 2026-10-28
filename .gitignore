@@ -13,6 +13,9 @@ ref/ky1/*.pdf
 output/
 dist/
 deploy/
+# 构建时先写这里再整体替换，正常结束后自动删除
+deploy.tmp/
+deploy.old/
 __pycache__/
 *.pyc
 .wrangler/

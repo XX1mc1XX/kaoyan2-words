@@ -173,6 +173,18 @@ def main():
     checks.append({"name": "词形注释覆盖 ≥ 99%", "ok": forms_ratio >= 0.99, "weight": 1.0,
                    "detail": "%d/%d = %.1f%%" % (forms_noted, forms_total, forms_ratio * 100)})
 
+    # 8.5 详情按首字母分片：一次长按不该下整表
+    detail_dir = os.path.join(ROOT, "deploy", "data")
+    shard_sizes = []
+    if os.path.isdir(detail_dir):
+        for name in os.listdir(detail_dir):
+            if name.startswith("detail-") and name.endswith(".json"):
+                shard_sizes.append(os.path.getsize(os.path.join(detail_dir, name)))
+    checks.append({"name": "详情单片 < 80KB", "ok": bool(shard_sizes) and max(shard_sizes) < 80 * 1024,
+                   "weight": 1.0,
+                   "detail": "%d 片，最大 %.0fKB" % (
+                       len(shard_sizes), (max(shard_sizes) if shard_sizes else 0) / 1024)})
+
     # 9. 回归测试（含数量门槛）
     passed, tested = run_tests()
     checks.append({"name": "回归测试全过", "ok": tested > 0 and passed == tested, "weight": 3.0,

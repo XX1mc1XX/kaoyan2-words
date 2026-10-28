@@ -129,6 +129,11 @@ def static_checks():
         headers = io.open(os.path.join(deploy, "_headers"), encoding="utf-8").read() if os.path.exists(os.path.join(deploy, "_headers")) else ""
         check("拆分词库长期缓存", "/data/*" in headers and "immutable" in headers)
         check("主程序长期缓存", "/app.*.js" in headers and "immutable" in headers)
+        detail_files = [x for x in data_files if x.startswith("detail-")]
+        detail_sizes = [os.path.getsize(os.path.join(data_dir, x)) for x in detail_files]
+        check("详情按首字母分片", len(detail_files) >= 24, "%d 片" % len(detail_files))
+        check("详情单片 < 80KB", bool(detail_sizes) and max(detail_sizes) < 80 * 1024,
+              "最大 %.0fKB" % (max(detail_sizes) / 1024 if detail_sizes else 0))
     else:
         check("部署目录无多余文件", False, "先跑 make_html.py")
         check("部署含 _worker.js", False)

@@ -313,12 +313,20 @@ for deck_id, deck_rows in deck_payloads.items():
     target.write_text(payload, encoding="utf-8", newline="\n")
     asset_map[deck_id] = "./" + rel_path.as_posix()
 
-# 长按详情单独一片：只有第一次长按时才下载，不占首屏
-detail_payload = json_block(detail)
-detail_digest = hashlib.sha256(detail_payload.encode("utf-8")).hexdigest()[:12]
-detail_rel = Path("data") / f"detail.{detail_digest}.json"
-(DEPLOY / detail_rel).write_text(detail_payload, encoding="utf-8", newline="\n")
-asset_map["detail"] = "./" + detail_rel.as_posix()
+# 长按详情按首字母拆片：一次长按只下载那个字母的详情（十几 KB），
+# 而不是把 400KB 全表拉下来
+detail_shards = {}
+for word_key, word_info in detail.items():
+    letter = word_key[0].lower() if word_key[:1].isalpha() else "_"
+    detail_shards.setdefault(letter, {})[word_key] = word_info
+detail_assets = {}
+for letter, items in sorted(detail_shards.items()):
+    payload = json_block(items)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+    rel_path = Path("data") / f"detail-{letter}.{digest}.json"
+    (DEPLOY / rel_path).write_text(payload, encoding="utf-8", newline="\n")
+    detail_assets[letter] = "./" + rel_path.as_posix()
+asset_map["details"] = detail_assets
 
 web_meta = dict(meta)
 web_meta.update(

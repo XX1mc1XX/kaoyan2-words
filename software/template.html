@@ -1678,25 +1678,38 @@ card.addEventListener('click', event => {
 // ---------- 长按看详情 ----------
 // 内容顺序按考研优先级排：先给「值不值得花时间」（等级 + 真题次数），
 // 再给释义和词形；词典全义项默认折叠，避免把「州 / 大写字母」这类非重点义摆到最前面。
-let detailMap = null;
-let detailLoading = null;
-function loadDetail() {
-  if (detailMap) return Promise.resolve(detailMap);
-  if (detailLoading) return detailLoading;
-  const url = WEB_MODE && DATA_META && DATA_META.assets && DATA_META.assets.detail;
-  if (!url) {
-    // 单文件版内联；detail 是「词 → 详情」的对象，不能走 deckJson（那边只收数组）
-    const el = document.getElementById('ky-deck-detail');
-    try { detailMap = el ? JSON.parse(el.textContent) : {}; }
-    catch { detailMap = {}; }
-    return Promise.resolve(detailMap);
+// 详情按首字母分片：一次长按只拉那个首字母的那一片（十几 KB），不下载整表
+const detailShards = {};
+const detailPending = {};
+function detailShardKey(word) {
+  const first = String(word || '').charAt(0).toLowerCase();
+  return /^[a-z]$/.test(first) ? first : '_';
+}
+function loadDetail(word) {
+  const key = detailShardKey(word);
+  if (detailShards[key]) return Promise.resolve(detailShards[key]);
+  if (detailPending[key]) return detailPending[key];
+  const assets = WEB_MODE && DATA_META && DATA_META.assets && DATA_META.assets.details;
+  if (!assets) {
+    // 单文件版：整表内联；detail 是「词 → 详情」的对象，不能走 deckJson（那边只收数组）
+    if (!detailShards.all) {
+      const el = document.getElementById('ky-deck-detail');
+      try { detailShards.all = el ? JSON.parse(el.textContent) : {}; }
+      catch { detailShards.all = {}; }
+    }
+    return Promise.resolve(detailShards.all);
   }
-  detailLoading = fetch(url, { cache: 'force-cache' })
+  const url = assets[key];
+  if (!url) {
+    detailShards[key] = {};
+    return Promise.resolve(detailShards[key]);
+  }
+  detailPending[key] = fetch(url, { cache: 'force-cache' })
     .then(r => { if (!r.ok) throw new Error('detail ' + r.status); return r.json(); })
-    .then(d => { detailMap = d || {}; return detailMap; })
-    .catch(() => { detailMap = {}; return detailMap; })
-    .finally(() => { detailLoading = null; });
-  return detailLoading;
+    .then(d => { detailShards[key] = d || {}; return detailShards[key]; })
+    .catch(() => { detailShards[key] = {}; return detailShards[key]; })
+    .finally(() => { delete detailPending[key]; });
+  return detailPending[key];
 }
 
 function escapeHtml(text) {
@@ -1717,8 +1730,8 @@ function formNote(value) {
   if (codes.every(code => FORM_LABELS[code])) return codes.map(code => FORM_LABELS[code]).join('·');
   return value;   // 派生词，值本身就是中文释义
 }
-function renderDetail(word, extra) {
-  const info = (extra && extra[word.word]) || {};
+function renderDetail(word, info) {
+  info = info || {};
   $('detailWord').textContent = word.word;
   $('detailPhonetic').textContent = info.p ? '/' + info.p + '/' : '';
 
@@ -1755,11 +1768,11 @@ function renderDetail(word, extra) {
 
 async function openDetail(word) {
   if (!word) return;
-  renderDetail(word, detailMap);        // 先把已有内容显示出来，别让用户干等
-  const extra = await loadDetail();
+  renderDetail(word, null);             // 先把已有内容显示出来，别让用户干等
+  const shard = await loadDetail(word.word);
   const mask = $('detailMask');
   if (mask.classList.contains('hidden')) return;
-  if (queue[idx] && queue[idx].word === word.word) renderDetail(word, extra);
+  if (queue[idx] && queue[idx].word === word.word) renderDetail(word, shard[word.word]);
 }
 function closeDetail() { $('detailMask').classList.add('hidden'); }
 $('detailClose').onclick = closeDetail;

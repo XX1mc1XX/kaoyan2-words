@@ -8,10 +8,13 @@
 """
 from __future__ import annotations
 
+import gzip
 import io
 import json
 import os
 import re
+import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -50,7 +53,8 @@ def static_checks():
     check("含登录面板", "authModal" in t and "accountBtn" in t)
     check("含云同步接口", "/state" in t and "snapshot" in t)
     check("含恢复原序按钮", "restoreOrder" in t)
-    check("含综合权重", "scoreOf" in t and "综合权重 ' + scoreOf(word)" in t)
+    check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
+    check("含鼠标滚轮翻词", "wheelLockedUntil" in t and "addEventListener('wheel'" in t)
     check("含发音代理", "/api/audio?word=" in t)
     check("发音预加载可秒播", all(x in t for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
     check("发音 Blob 内存缓存", "audioBlobUrls" in t and "URL.createObjectURL(blob)" in t)
@@ -90,17 +94,51 @@ def static_checks():
     # --- 构建产物 ---
     deploy = os.path.join(ROOT, "deploy")
     allowed = {"index.html", "sw.js", "_worker.js", "_headers", "manifest.webmanifest",
-               "icon-192.png", "icon-512.png"}
+               "icon-192.png", "icon-512.png", "data"}
     if os.path.isdir(deploy):
-        extra = sorted(set(os.listdir(deploy)) - allowed)
+        extra = sorted(x for x in set(os.listdir(deploy)) - allowed if not re.fullmatch(r"app\.[0-9a-f]{12}\.js", x))
         check("部署目录无多余文件", not extra, str(extra[:5]))
         check("部署含 _worker.js", os.path.exists(os.path.join(deploy, "_worker.js")))
+        web_path = os.path.join(deploy, "index.html")
+        web_html = io.open(web_path, encoding="utf-8").read() if os.path.exists(web_path) else ""
+        web_gzip = len(gzip.compress(web_html.encode("utf-8"), 9)) if web_html else 0
+        check("网页首包 gzip < 50KB", 0 < web_gzip < 50 * 1024, "%.1fKB" % (web_gzip / 1024))
+        web_words = json_block_value(web_html, "words")
+        check("网页首屏只内嵌首章", len(web_words) == 200, "%d 词" % len(web_words))
+        app_files = [x for x in os.listdir(deploy) if re.fullmatch(r"app\.[0-9a-f]{12}\.js", x)]
+        check("网页主程序独立缓存", len(app_files) == 1 and ("src=\"./" + app_files[0] + "\"") in web_html, str(app_files))
+        data_dir = os.path.join(deploy, "data")
+        data_files = sorted(os.listdir(data_dir)) if os.path.isdir(data_dir) else []
+        check("网页词库拆分资源齐备",
+              len(data_files) == 4 and all(x.endswith(".json") for x in data_files), str(data_files))
+        deploy_sw = io.open(os.path.join(deploy, "sw.js"), encoding="utf-8").read() if os.path.exists(os.path.join(deploy, "sw.js")) else ""
+        check("SW 预缓存拆分词库", "./data/" in deploy_sw and "__DATA_ASSETS__" not in deploy_sw)
+        check("SW 预缓存主程序", any(("./" + x) in deploy_sw for x in app_files))
+        headers = io.open(os.path.join(deploy, "_headers"), encoding="utf-8").read() if os.path.exists(os.path.join(deploy, "_headers")) else ""
+        check("拆分词库长期缓存", "/data/*" in headers and "immutable" in headers)
+        check("主程序长期缓存", "/app.*.js" in headers and "immutable" in headers)
     else:
         check("部署目录无多余文件", False, "先跑 make_html.py")
         check("部署含 _worker.js", False)
 
     check("顶栏合并词库与词数", "deck-inline" in t and "deck-bar" not in t and "deck-label" not in t)
     check("顶栏无品牌文字与当前词库标签", "英语二词汇" not in t and "当前词库" not in t)
+
+
+def json_block_value(html, deck_id):
+    """读取某个内嵌 JSON 数据块。"""
+    head = '<script type="application/json" id="ky-deck-%s">' % deck_id
+    start = html.find(head)
+    if start < 0:
+        return []
+    start += len(head)
+    end = html.find("</script>", start)
+    if end < 0:
+        return []
+    try:
+        return json.loads(html[start:end])
+    except Exception:
+        return []
 
 
 def json_block_bytes(html, deck_id):
@@ -214,7 +252,10 @@ setTimeout(function () {
           out.right_same = document.getElementById('word').textContent === w2.word;
           out.right_weight = ((state[w2.word] || {}).w || 0) >= 1;
           out.weight_badge = !document.getElementById('weightBadge').classList.contains('hidden');
-          out.composite_weight = document.getElementById('wordId').textContent === '综合权重 ' + scoreOf(w2);
+          const shownWeight = Number(document.getElementById('wordId').textContent);
+          out.composite_weight = Number.isFinite(shownWeight)
+            && Math.abs(shownWeight - displayWeightOf(w2)) < 0.001;
+          out.unique_weights = new Set(DECKS.core.words.map(w => w.weight)).size === DECKS.core.words.length;
 
           // E. 词库章节记忆
           gotoChapter(1);
@@ -373,6 +414,20 @@ setTimeout(function () {
             && document.getElementById('deckMeta').textContent === DECKS.derivative.words.length + ' 词';
           switchDeck(deckBackup);
 
+          // O. 鼠标滚轮上下翻词
+          switchDeck('core');
+          loadChapter(0, 'natural');
+          idx = 0;
+          renderStudy();
+          const wheelStart = queue[idx].word;
+          const wheelDownEvent = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true });
+          card.dispatchEvent(wheelDownEvent);
+          out.wheel_next = wheelDownEvent.defaultPrevented && queue[idx].word !== wheelStart;
+          wheelLockedUntil = 0;
+          const wheelUpEvent = new WheelEvent('wheel', { deltaY: -120, bubbles: true, cancelable: true });
+          card.dispatchEvent(wheelUpEvent);
+          out.wheel_prev = wheelUpEvent.defaultPrevented && queue[idx].word === wheelStart;
+
           document.title = 'RESULT:' + JSON.stringify(out);
         }, 200);
       }, 150);
@@ -383,6 +438,91 @@ setTimeout(function () {
 }, 1400);
 </script>
 """
+
+
+def web_browser_checks():
+    """Serve deploy/ like production and verify the split first-load path."""
+    deploy = os.path.join(ROOT, "deploy")
+    index_path = os.path.join(deploy, "index.html")
+    if not os.path.exists(index_path):
+        check("网页版首次加载测试", False, "deploy/index.html 不存在")
+        return
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    server = subprocess.Popen(
+        [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+        cwd=deploy, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    probe_path = os.path.join(deploy, "_webcheck.html")
+    profile = tempfile.mkdtemp(prefix="ky-webcheck-")
+    try:
+        html = io.open(index_path, encoding="utf-8").read()
+        probe = r'''
+<script>
+setTimeout(async function(){
+  const out = {};
+  try {
+    out.web_mode = WEB_MODE;
+    out.first_card = Math.round(window.__firstCardAt || 0);
+    out.boot_word = document.getElementById('word').textContent;
+    out.boot_meta = document.getElementById('deckMeta').textContent;
+    out.boot_options = document.getElementById('chapterSelect').options.length;
+    out.partial_len = deckJson('words').length;
+    gotoChapter(1);
+    await new Promise(function(r){ setTimeout(r, 1800); });
+    out.chapter = curChapter;
+    out.chapter_queue = queue.length;
+    out.chapter_word = queue[0] && queue[0].word;
+    switchView('List');
+    await new Promise(function(r){ setTimeout(r, 1000); });
+    out.list_count = document.querySelectorAll('#wordList li').length;
+    await switchDeck('derivative');
+    out.deriv_meta = document.getElementById('deckMeta').textContent;
+    out.deriv_count = deckJson('derivatives').length;
+  } catch (e) {
+    out.error = e.stack || e.message;
+  }
+  document.title = 'RESULT:' + JSON.stringify(out);
+}, 600);
+</script>
+'''
+        io.open(probe_path, "w", encoding="utf-8").write(html.replace("</body>", probe + "</body>"))
+        url = "http://127.0.0.1:%d/_webcheck.html" % port
+        r = subprocess.run(
+            [EDGE, "--headless=new", "--disable-gpu", "--no-first-run",
+             "--user-data-dir=" + profile, "--virtual-time-budget=12000", "--dump-dom", url],
+            capture_output=True, timeout=120,
+        )
+        dom = r.stdout.decode("utf-8", "replace")
+        i = dom.find("RESULT:")
+        if i < 0:
+            check("网页版首次加载测试", False, "未拿到浏览器结果")
+            return
+        raw = dom[i + 7:dom.find("</title>", i)]
+        data = json.loads(raw)
+        if "error" in data:
+            check("网页版首次加载测试", False, data["error"][:160])
+            return
+        check("网页版进入按需加载模式", data.get("web_mode") is True)
+        check("网页首屏只解析首章", data.get("partial_len") == 200, "实际=%s" % data.get("partial_len"))
+        check("网页首卡快速出现", 0 < data.get("first_card", 0) < 800, "%sms" % data.get("first_card"))
+        check("网页首屏显示完整词数", data.get("boot_meta") == "1342 词", "实际=%s" % data.get("boot_meta"))
+        check("网页章节总数完整", data.get("boot_options") == 7, "实际=%s" % data.get("boot_options"))
+        check("网页切章加载成功", data.get("chapter") == 1 and data.get("chapter_queue", 0) > 0,
+              "实际=%s/%s" % (data.get("chapter"), data.get("chapter_queue")))
+        check("网页词表加载完整", data.get("list_count") == 100, "实际=%s" % data.get("list_count"))
+        check("网页切库加载成功", data.get("deriv_meta") == "128 词" and data.get("deriv_count") == 128,
+              "实际=%s/%s" % (data.get("deriv_meta"), data.get("deriv_count")))
+    finally:
+        server.terminate()
+        try:
+            server.wait(timeout=5)
+        except Exception:
+            server.kill()
+        if os.path.exists(probe_path):
+            os.remove(probe_path)
+        shutil.rmtree(profile, ignore_errors=True)
 
 
 def runtime_checks():
@@ -439,7 +579,7 @@ def browser_checks():
             "left_mastered": True, "left_due": True, "undo_visible": True,
             "undo_cleared": True, "undo_back": True,
             "right_same": True, "right_weight": True, "weight_badge": True,
-            "composite_weight": True,
+            "composite_weight": True, "unique_weights": True,
             "deck_chapter": True, "resume_ok": True,
             "order_stable": True, "order_shuffled": True, "order_restored": True,
             "shuffle_confirm_cancel": True, "restore_confirm_cancel": True,
@@ -451,6 +591,7 @@ def browser_checks():
             "list_first_page": True, "list_has_more": True, "list_load_more": True,
             "icon_login_logo": True, "icon_preset": True, "icon_custom": True, "icon_restore": True,
             "header_compact": True, "header_deck_count": True,
+            "wheel_next": True, "wheel_prev": True,
             "lazy_same_ref": True, "lazy_cached_before": "words",
             "lazy_after_has_insurance": True,
             "deck_meta_insurance": "1545 词", "deck_meta_core": "1342 词",
@@ -504,6 +645,10 @@ def main():
     print("浏览器行为")
     print("=" * 56)
     browser_checks()
+    print("=" * 56)
+    print("网页按需加载")
+    print("=" * 56)
+    web_browser_checks()
     print("=" * 56)
     print("首屏性能")
     print("=" * 56)

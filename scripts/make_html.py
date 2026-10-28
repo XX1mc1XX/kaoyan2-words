@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Embed the generated word list into the single-file mobile web app."""
 from __future__ import annotations
 
@@ -60,7 +60,8 @@ meta.update({
     "source_files": source_files,
 })
 def slim_rows(source):
-    """只打包前端真正读取的字段（见 template.html 实际引用）。"""
+    """只打包前端真正读取的字段，并生成每个词唯一的展示权重。"""
+    total = len(source)
     return [
         {
             "id": r["id"],
@@ -69,8 +70,11 @@ def slim_rows(source):
             "meaning": r["meaning"],
             "forms": r.get("forms", []),
             "priority": r.get("priority", ""),
+            # 词表已按综合优先级排序；用名次映射到 0.01–100.00，
+            # 保证同一词库内每个词的展示权重都不同。
+            "weight": round((total - index + 1) * 100 / total, 2),
         }
-        for r in source
+        for index, r in enumerate(source, 1)
     ]
 
 slim = slim_rows(rows)
@@ -92,24 +96,28 @@ def json_block(value):
     return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
 
 
-html = (
-    template.replace("__DATA__", json_block(slim))
-    .replace("__DERIVATIVES__", json_block(derivative_slim))
-    .replace("__BASIC__", json_block(basic_slim))
-    .replace("__INSURANCE__", json_block(insurance_slim))
-    .replace("__META__", json_block(meta))
+def render_html(deck_values, meta_value):
+    return (
+        template.replace("__DATA__", json_block(deck_values["words"]))
+        .replace("__DERIVATIVES__", json_block(deck_values["derivatives"]))
+        .replace("__BASIC__", json_block(deck_values["basic"]))
+        .replace("__INSURANCE__", json_block(deck_values["insurance"]))
+        .replace("__META__", json_block(meta_value))
+    )
+
+
+# 本地单文件版继续内嵌全部词库，双击即可完整离线使用。
+standalone_html = render_html(
+    {
+        "words": slim,
+        "derivatives": derivative_slim,
+        "basic": basic_slim,
+        "insurance": insurance_slim,
+    },
+    meta,
 )
-OUT.write_text(html, encoding="utf-8", newline="\n")
+OUT.write_text(standalone_html, encoding="utf-8", newline="\n")
 
-# 每次构建都换一个缓存名，保证 Service Worker 能拿到新页面但保留已缓存发音。
-# 构建日期不参与哈希，否则每天都会全量重下页面。
-build_version = hashlib.sha256(
-    re.sub(r'"generated_at":"[^"]*"', "", html).encode("utf-8")
-).hexdigest()[:12]
-sw_js = (SOFT / "sw.template.js").read_text(encoding="utf-8").replace("__BUILD_VERSION__", build_version)
-(SOFT / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
-
-# 网页版与离线版同步生成，避免手工复制造成版本不一致。
 # deploy/ 是纯生成目录，先清空，防止旧版页面和 .git 残留被一起上传。
 DEPLOY.mkdir(parents=True, exist_ok=True)
 for stale in DEPLOY.iterdir():
@@ -118,7 +126,81 @@ for stale in DEPLOY.iterdir():
     else:
         os.chmod(stale, stat.S_IWRITE)
         stale.unlink(missing_ok=True)
-(DEPLOY / "index.html").write_text(html, encoding="utf-8", newline="\n")
+
+# 网页版只内嵌首章，其他词库拆成带内容哈希的独立资源：
+# 首屏不再下载 3364 个词，同时这些资源仍可长期缓存并供 Service Worker 离线预取。
+asset_map = {}
+deck_payloads = {
+    "words": slim,
+    "derivatives": derivative_slim,
+    "basic": basic_slim,
+    "insurance": insurance_slim,
+}
+for deck_id, deck_rows in deck_payloads.items():
+    payload = json_block(deck_rows)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+    rel_path = Path("data") / f"{deck_id}.{digest}.json"
+    target = DEPLOY / rel_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(payload, encoding="utf-8", newline="\n")
+    asset_map[deck_id] = "./" + rel_path.as_posix()
+
+web_meta = dict(meta)
+web_meta.update(
+    {
+        "web": True,
+        "deck_sizes": {
+            "words": len(slim),
+            "derivatives": len(derivative_slim),
+            "basic": len(basic_slim),
+            "insurance": len(insurance_slim),
+        },
+        "assets": asset_map,
+    }
+)
+web_html = render_html(
+    {
+        "words": slim[:200],
+        "derivatives": [],
+        "basic": [],
+        "insurance": [],
+    },
+    web_meta,
+)
+
+# 主程序拆成带哈希的独立脚本，放入 head 并用 defer 提前并行下载。
+# HTML 可以先绘制骨架，脚本和词库分片还能长期缓存。
+app_match = re.search(r'<script id="ky-app">(.*?)</script>', web_html, re.S)
+if not app_match:
+    raise RuntimeError("ky-app script block not found")
+app_js = app_match.group(1)
+app_digest = hashlib.sha256(app_js.encode("utf-8")).hexdigest()[:12]
+app_asset = f"./app.{app_digest}.js"
+(DEPLOY / app_asset[2:]).write_text(app_js, encoding="utf-8", newline="\n")
+web_html = web_html[:app_match.start()] + web_html[app_match.end():]
+head_end = web_html.find("</head>")
+if head_end < 0:
+    raise RuntimeError("head tag not found")
+web_html = (
+    web_html[:head_end]
+    + f'<script defer src="{app_asset}"></script>\n'
+    + web_html[head_end:]
+)
+
+# 每次构建都换一个缓存名，保证 Service Worker 能拿到新页面但保留已缓存发音。
+# 构建日期不参与哈希，否则每天都会全量重下页面。
+build_version = hashlib.sha256(
+    re.sub(r'"generated_at":"[^"]*"', "", web_html).encode("utf-8")
+).hexdigest()[:12]
+runtime_assets = list(asset_map.values()) + [app_asset]
+sw_js = (
+    (SOFT / "sw.template.js").read_text(encoding="utf-8")
+    .replace("__BUILD_VERSION__", build_version)
+    .replace("__DATA_ASSETS__", json.dumps(runtime_assets, ensure_ascii=False))
+)
+(SOFT / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
+
+(DEPLOY / "index.html").write_text(web_html, encoding="utf-8", newline="\n")
 (DEPLOY / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
 for name in ("manifest.webmanifest", "icon-192.png", "icon-512.png"):
     shutil.copy2(SOFT / name, DEPLOY / name)
@@ -126,11 +208,14 @@ shutil.copy2(ROOT / "backend" / "worker.js", DEPLOY / "_worker.js")
 (DEPLOY / "_headers").write_text(
     "/index.html\n  Cache-Control: public, max-age=0, must-revalidate\n"
     "/sw.js\n  Cache-Control: no-cache\n"
-    "/manifest.webmanifest\n  Cache-Control: public, max-age=3600\n",
+    "/manifest.webmanifest\n  Cache-Control: public, max-age=3600\n"
+    "/data/*\n  Cache-Control: public, max-age=31536000, immutable\n"
+    "/app.*.js\n  Cache-Control: public, max-age=31536000, immutable\n",
     encoding="utf-8",
     newline="\n",
 )
 
 print(f"output={OUT}")
 print(f"deploy={DEPLOY / 'index.html'}")
-print(f"words={len(slim)} derivatives={len(derivative_slim)} basic={len(basic_slim)} insurance={len(insurance_slim)} size={OUT.stat().st_size / 1024:.0f}KB")
+print(f"words={len(slim)} derivatives={len(derivative_slim)} basic={len(basic_slim)} insurance={len(insurance_slim)}")
+print(f"standalone={OUT.stat().st_size / 1024:.0f}KB web={len(web_html.encode('utf-8')) / 1024:.0f}KB")

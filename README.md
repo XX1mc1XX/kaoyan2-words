@@ -114,9 +114,10 @@ git checkout <commit>    # 回退到某个版本
 ## 发音、离线与性能
 
 - 已预加载的真人发音直接秒播；新词首次先用系统语音立即发声，同时后台缓存真人音频，之后可秒播并离线重播。
+- 网页首屏只内嵌当前词库首章（200 词），其余词库拆成带哈希的独立 JSON 并由 Service Worker 后台预缓存；首次打开不再等待 3364 个词全部下载。单文件版仍内嵌全部词库，双击即可完整离线使用。
 - 听过的词以及后续 3 个词会由 Service Worker 缓存发音，之后离线也能重播。
 - 首次通过 HTTPS 打开后，页面、词库与图标会进入离线缓存；之后断网仍可学习和记录进度。
 - `file://` 直接打开的单文件版本原本就支持离线学习；局域网 HTTP 无法启用 Service Worker，需要 HTTPS 才有完整离线能力。
 - 登录账号会缓存在本机，离线打开时仍使用该账号自己的进度；联网后再校验会话并同步。
 - 词表首屏只渲染 100 条，滚动/点击“显示更多”继续加载，避免移动端一次创建上千个 DOM 节点。
-- `python scripts/make_html.py` 会同时生成 `software/考研核心词.html` 与 `deploy/index.html`，并复制 `sw.js`、PWA 图标和最新 Worker，部署时不需要再手工复制。
+- `python scripts/make_html.py` 会同时生成完整的 `software/考研核心词.html` 和按需加载的 `deploy/index.html`，并在 `deploy/data/` 生成带内容哈希的词库分片，同时复制 `sw.js`、PWA 图标和最新 Worker，部署时不需要再手工复制。

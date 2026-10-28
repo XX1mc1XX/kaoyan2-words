@@ -1,9 +1,10 @@
-const BUILD_VERSION = '7cde427a1072';
+const BUILD_VERSION = '2a87190adf5a';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v1';
 const AUDIO_CACHE_MAX = 1500;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const SHELL = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const DATA_ASSETS = ["./data/words.7bfc52f3580f.json", "./data/derivatives.ad9cf4cb20ea.json", "./data/basic.52232073fbd3.json", "./data/insurance.f8b4a70be97a.json", "./app.7c288246b42f.js"];
+const SHELL = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png', ...DATA_ASSETS];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -39,6 +40,14 @@ async function cacheFirstAudio(request) {
   return response;
 }
 
+async function cacheFirstShellAsset(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) await cache.put(request, response.clone());
+  return response;
+}
 async function navigationResponse(event) {
   const request = event.request;
   const cache = await caches.open(SHELL_CACHE);
@@ -77,6 +86,10 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes('/api/audio')) {
     event.respondWith(cacheFirstAudio(request).catch(() => new Response('', { status: 503 })));
+    return;
+  }
+  if (url.pathname.startsWith('/data/')) {
+    event.respondWith(cacheFirstShellAsset(request).catch(() => new Response('', { status: 503 })));
     return;
   }
   if (url.pathname.includes('/api/')) return;

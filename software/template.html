@@ -119,7 +119,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .nav-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;flex-shrink:0}
 .nav-btn{border:1px solid var(--line);background:var(--card);color:var(--muted);font:inherit;font-size:13px;border-radius:12px;padding:9px 10px;cursor:pointer}
 .nav-btn:disabled{opacity:.35;cursor:default}
-.word-id{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.word-id{font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex-shrink:0}
 .btn{border:0;border-radius:14px;padding:13px 8px;font:inherit;font-size:15px;font-weight:750;color:#fff;background:var(--brand);cursor:pointer}
 .btn:active{transform:scale(.98)}
@@ -304,7 +304,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     </div>
     <div class="nav-row">
       <button class="nav-btn" id="prevWord">← 上一个</button>
-      <span class="word-id" id="wordId">综合权重 --</span>
+      <span class="word-id" id="wordId">--</span>
       <button class="nav-btn" id="nextWord">下一个 →</button>
     </div>
     <div class="order-btns">
@@ -421,7 +421,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 <script type="application/json" id="ky-deck-basic">__BASIC__</script>
 <script type="application/json" id="ky-deck-insurance">__INSURANCE__</script>
 <script type="application/json" id="ky-deck-meta">__META__</script>
-<script>
+<script id="ky-app">
 // 词库放进 JSON 数据块：浏览器不把它当脚本编译，切到哪个库才 JSON.parse 哪个。
 const _deckCache = {};
 function deckJson(id) {
@@ -435,6 +435,74 @@ function deckJson(id) {
     _deckCache[id] = Array.isArray(rows) ? rows : [];
   }
   return _deckCache[id];
+}
+const DATA_META = (() => {
+  const el = document.getElementById('ky-deck-meta');
+  try { return el ? JSON.parse(el.textContent) : {}; }
+  catch { return {}; }
+})();
+const WEB_MODE = !!(DATA_META && DATA_META.web);
+const DECK_IDS = { core: 'words', derivative: 'derivatives', foundation: 'basic', insurance: 'insurance' };
+const DECK_KEYS = ['core', 'derivative', 'foundation', 'insurance'];
+const _deckReady = new Set(WEB_MODE ? [] : DECK_KEYS);
+const _deckLoading = {};
+
+function deckDataReady(deckKey) {
+  if (!WEB_MODE) return true;
+  if (deckKey === 'mastered') return DECK_KEYS.every(deckDataReady);
+  const id = DECK_IDS[deckKey];
+  return !!id && _deckReady.has(id);
+}
+function allDecksReady() {
+  return !WEB_MODE || DECK_KEYS.every(deckDataReady);
+}
+function deckDataLength(deckKey) {
+  const id = DECK_IDS[deckKey];
+  if (!id) return 0;
+  const size = DATA_META && DATA_META.deck_sizes && DATA_META.deck_sizes[id];
+  return Math.max(deckJson(id).length, Number(size) || 0);
+}
+function deckCanShowChapter(deckKey, ch) {
+  if (deckDataReady(deckKey)) return true;
+  return WEB_MODE && deckKey === 'core' && ch === 0 && deckJson('words').length > 0;
+}
+function resetDeckCaches() {
+  allWordsCache = null;
+  wordLocationCache = null;
+  masteredWordsCache = null;
+}
+function loadWebDeck(deckKey) {
+  const id = DECK_IDS[deckKey];
+  if (!id) return Promise.reject(new Error('unknown deck'));
+  if (!WEB_MODE || _deckReady.has(id)) return Promise.resolve(deckJson(id));
+  if (_deckLoading[deckKey]) return _deckLoading[deckKey];
+  const url = DATA_META && DATA_META.assets && DATA_META.assets[id];
+  if (!url) return Promise.reject(new Error('deck asset missing'));
+  _deckLoading[deckKey] = fetch(url, { cache: 'force-cache' })
+    .then(response => {
+      if (!response.ok) throw new Error('deck load failed: ' + response.status);
+      return response.json();
+    })
+    .then(rows => {
+      if (!Array.isArray(rows) || !rows.length) throw new Error('deck data invalid');
+      _deckCache[id] = rows;
+      _deckReady.add(id);
+      resetDeckCaches();
+      return rows;
+    })
+    .finally(() => { delete _deckLoading[deckKey]; });
+  return _deckLoading[deckKey];
+}
+async function ensureDeckData(deckKey) {
+  if (deckKey === 'mastered') {
+    await Promise.all(DECK_KEYS.map(loadWebDeck));
+  } else {
+    await loadWebDeck(deckKey);
+  }
+  updateDeckMeta();
+  renderChapters();
+  if (!$('viewStat').classList.contains('hidden')) updateStats();
+  return deckWords();
 }
 const LS_STATE = 'ky_words_v1';
 const LS_CONF = 'ky_conf_v1';
@@ -543,6 +611,7 @@ let activeDeck = Object.prototype.hasOwnProperty.call(DECKS, conf.deck) ? conf.d
 // 全量词表只在「已认识库」和跨库搜索时才会被真正解析。
 let allWordsCache = null;
 const allWords = () => {
+  if (WEB_MODE && !allDecksReady()) return [];
   if (!allWordsCache) {
     const seen = new Set(), list = [];
     for (const w of [...deckJson('words'), ...deckJson('derivatives'), ...deckJson('basic'), ...deckJson('insurance')]) {
@@ -597,9 +666,14 @@ function tierOf(word) {
   const p = String(word.priority || 'C').trim().charAt(0).toUpperCase();
   return TIER_SCORE[p] || 0;
 }
-// 合成权重 = 词表默认权重 + 我右滑累计的次数
+// 词表内唯一的 0–100 基础权重 + 用户错题修正
 function scoreOf(word) {
   return tierOf(word) + weightOf(word);
+}
+function displayWeightOf(word) {
+  const base = Number(word && word.weight);
+  const fallback = tierOf(word);
+  return Math.round(((Number.isFinite(base) ? base : fallback) + weightOf(word) * 0.1) * 100) / 100;
 }
 // 原序：完全按词表顺序，每次打开都一样
 function naturalOrder(list) {
@@ -627,7 +701,38 @@ function savePos() {
   chapterData[key].t = Date.now();
   save('ky_chapter_v1', chapterData);
 }
+let studyLoading = false;
+function showStudyLoading(message) {
+  studyLoading = true;
+  $('position').textContent = '正在加载词库…';
+  $('swipeStage').classList.remove('hidden');
+  $('card').classList.remove('hidden');
+  $('done').classList.add('hidden');
+  document.querySelector('.nav-row').classList.add('hidden');
+  $('word').textContent = '加载中…';
+  $('familyNote').classList.add('hidden');
+  $('forms').textContent = '';
+  $('formsBox').classList.add('hidden');
+  $('meaning').className = 'meaning';
+  $('meaning').textContent = message || '正在加载当前章节…';
+  $('wordId').textContent = '';
+  $('prevWord').disabled = true;
+  $('nextWord').disabled = true;
+}
+function showStudyLoadError() {
+  showStudyLoading('词库加载失败，请检查网络后刷新页面重试。');
+  $('word').textContent = '加载失败';
+}
 function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
+  const targetDeck = activeDeck;
+  if (!deckCanShowChapter(targetDeck, ch)) {
+    showStudyLoading('正在加载这一部分词库，首次加载后会长期缓存。');
+    ensureDeckData(targetDeck).then(() => {
+      if (activeDeck === targetDeck) loadChapter(ch, mode, idxAt);
+    }).catch(() => showStudyLoadError());
+    return;
+  }
+  studyLoading = false;
   curChapter = ch;
   clearUndoBar();
   const key = chapterKey(ch);
@@ -669,6 +774,7 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
   renderStudy();
 }
 function renderStudy() {
+  studyLoading = false;
   const total = queue.length;
   const current = total ? Math.min(idx + 1, total) : 0;
   $('position').innerHTML = `第 <b>${current}</b> / ${total} 个`;
@@ -714,7 +820,7 @@ function renderStudy() {
   const wb = $('weightBadge');
   wb.textContent = wt > 0 ? String(wt) : '';
   wb.classList.toggle('hidden', wt === 0);
-  $('wordId').textContent = '综合权重 ' + scoreOf(word);
+  $('wordId').textContent = displayWeightOf(word).toFixed(2);
   const show = revealed === null ? !!conf.showByDefault : revealed;
   const meaning = $('meaning');
   if (show) {
@@ -750,6 +856,7 @@ function renderStudy() {
   $('nextWord').disabled = idx >= total - 1 && curChapter >= chapterCount() - 1;
 }
 function navigate(delta) {
+  if (studyLoading) return;
   const next = idx + delta;
   // 到章节边界就翻到相邻章节：上一章停最后一词，下一章停第一词
   if (next < 0) { crossChapter(-1); return; }
@@ -1023,6 +1130,7 @@ function speak(word, options) {
   return true;
 }
 function toggleMeaning() {
+  if (studyLoading) return;
   const cur = revealed === null ? !!conf.showByDefault : revealed;
   revealed = !cur;
   renderStudy();
@@ -1095,30 +1203,67 @@ function mark(word, known) {
       wb.classList.remove('pulse');
       void wb.offsetWidth;
       wb.classList.add('pulse');
-      $('wordId').textContent = '综合权重 ' + scoreOf(word);
+      $('wordId').textContent = displayWeightOf(word).toFixed(2);
     }
   }
   updateStats();
 }
 function updateStats() {
+  if (WEB_MODE && !deckDataReady(activeDeck)) {
+    const target = activeDeck;
+    $('sTotal').textContent = target === 'mastered' ? '…' : deckDataLength(target);
+    $('sLearned').textContent = '…';
+    $('sMastered').textContent = '…';
+    $('sDue').textContent = '…';
+    if (!$('viewStat').classList.contains('hidden')) {
+      ensureDeckData(target).then(() => {
+        if (activeDeck === target && !$('viewStat').classList.contains('hidden')) updateStats();
+      }).catch(() => {
+        if (activeDeck === target) {
+          $('sTotal').textContent = '加载失败';
+          $('sLearned').textContent = '—';
+          $('sMastered').textContent = '—';
+          $('sDue').textContent = '—';
+        }
+      });
+    }
+    return;
+  }
   let learned = 0, mastered = 0;
   const words = deckWords();
+  const total = activeDeck === 'mastered' ? words.length : deckDataLength(activeDeck);
   for (const word of words) {
     const st = state[word.word];
     if (!st) continue;
     learned += 1;
     if (st.mastered) mastered += 1;
   }
-  $('sTotal').textContent = words.length;
+  $('sTotal').textContent = total;
   $('sLearned').textContent = learned;
   $('sMastered').textContent = mastered;
-  $('sDue').textContent = words.length - mastered;
+  $('sDue').textContent = Math.max(total - mastered, 0);
 }
 const LIST_PAGE_SIZE = 100;
 let listLimit = LIST_PAGE_SIZE;
 function renderList(reset) {
   if (reset) listLimit = LIST_PAGE_SIZE;
   const list = $('wordList');
+  if (WEB_MODE && !deckDataReady(activeDeck)) {
+    const target = activeDeck;
+    const loading = document.createElement('li');
+    loading.className = 'list-meaning';
+    loading.textContent = '正在加载完整词库，加载一次后会长期缓存…';
+    list.replaceChildren(loading);
+    ensureDeckData(target).then(() => {
+      if (activeDeck === target && !$('viewList').classList.contains('hidden')) renderList(reset);
+    }).catch(() => {
+      if (activeDeck === target) {
+        loading.textContent = '词库加载失败，请检查网络后重新进入词表。';
+        list.replaceChildren(loading);
+      }
+    });
+    return;
+  }
   const q = searchText.trim().toLowerCase();
   const fragment = document.createDocumentFragment();
   const inMasteredDeck = activeDeck === 'mastered';
@@ -1200,13 +1345,17 @@ function ownerIndex(deckKey, name) {
   return found && found.deck === deckKey ? found.index : -1;
 }
 
-function updateDeckMeta() {
-  const words = deckWords();
-  $('deckSelect').value = activeDeck;
-  $('deckMeta').textContent = words.length + ' 词';
+function deckKnownLength(deckKey) {
+  return deckKey === 'mastered' ? deckWords().length : deckDataLength(deckKey);
 }
-function switchDeck(value) {
+function updateDeckMeta() {
+  const total = deckKnownLength(activeDeck);
+  $('deckSelect').value = activeDeck;
+  $('deckMeta').textContent = total + ' 词';
+}
+async function switchDeck(value) {
   if (!Object.prototype.hasOwnProperty.call(DECKS, value)) return;
+  const previous = activeDeck;
   savePos();
   activeDeck = value;
   conf.deck = value;
@@ -1214,6 +1363,20 @@ function switchDeck(value) {
   const resume = (conf.deckChapter && conf.deckChapter[value]) || 0;
   conf.chapter = resume;
   save(LS_CONF, conf);
+  if (WEB_MODE && !deckCanShowChapter(value, resume)) {
+    showStudyLoading('正在加载所选词库，首次只需下载这一套词。');
+    try {
+      await ensureDeckData(value);
+    } catch (err) {
+      activeDeck = previous;
+      conf.deck = previous;
+      save(LS_CONF, conf);
+      updateDeckMeta();
+      showStudyLoadError();
+      return;
+    }
+    if (activeDeck !== value) return;
+  }
   loadChapter(resume);
   bus.emit('deck:change');
   if (!$('viewList').classList.contains('hidden')) renderList(true);
@@ -1225,14 +1388,15 @@ function switchView(name) {
   if (name === 'Stat') updateStats();
 }
 const CHAPTER_SIZE = 200;
-function chapterCount() { return Math.ceil(deckWords().length / CHAPTER_SIZE); }
+function chapterCount() { return Math.ceil(deckKnownLength(activeDeck) / CHAPTER_SIZE); }
 function currentChapter() { return curChapter; }
 function renderChapters() {
   const sel = $('chapterSelect');
+  const total = deckKnownLength(activeDeck);
   sel.replaceChildren();
   for (let i = 0; i < chapterCount(); i++) {
     const start = i * CHAPTER_SIZE + 1;
-    const end = Math.min((i + 1) * CHAPTER_SIZE, deckWords().length);
+    const end = Math.min((i + 1) * CHAPTER_SIZE, total);
     const opt = document.createElement('option');
     opt.value = String(i);
     opt.textContent = '第' + (i + 1) + '章';
@@ -1346,7 +1510,7 @@ card.addEventListener('touchend', event => {
     // 点词朗读，点别处翻面；起点落在单词上也只是「点」，不影响手势
     if (event.target.closest && event.target.closest('#word')) {
       const w = queue[idx];
-      if (w) { wordTouchedAt = Date.now(); speak(w.word); }
+      if (w && !studyLoading) { wordTouchedAt = Date.now(); speak(w.word); }
       return;
     }
     toggleMeaning();
@@ -1415,6 +1579,17 @@ card.addEventListener('touchcancel', () => {
   card.style.borderColor = '';
   setTimeout(() => { swipeTrack.style.transition = ''; card.style.transition = ''; }, 220);
 }, { passive: true });
+
+// 鼠标滚轮翻词：向下滚下一个，向上滚上一个；节流避免触控板一次跳过多个词。
+let wheelLockedUntil = 0;
+card.addEventListener('wheel', event => {
+  if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 3) return;
+  event.preventDefault();
+  const now = Date.now();
+  if (now < wheelLockedUntil) return;
+  wheelLockedUntil = now + 320;
+  navigate(event.deltaY > 0 ? 1 : -1);
+}, { passive: false });
 $('progressBar').oninput = event => {
   if (!queue.length) return;
   idx = Math.min(Math.max(Number(event.target.value), 0), queue.length - 1);
@@ -1664,6 +1839,7 @@ $('weightBadge').onclick = event => {
 // 点单词朗读；阻止冒泡避免触发卡片的翻面
 $('word').addEventListener('click', event => {
   event.stopPropagation();
+  if (studyLoading) return;
   if (Date.now() - wordTouchedAt < 500) return;   // touchend 已读过，避免读两遍
   const w = queue[idx];
   if (w) speak(w.word);

@@ -114,9 +114,26 @@ def render_html(deck_values, meta_value, detail_value):
 
 EXAM_TAGS = ("zk", "gk", "cet4", "cet6", "ky", "toefl", "ielts", "gre")
 
+# ECDICT exchange 字段的形态码 → 中文标注
+FORM_MARKS = {
+    "p": "过去式", "d": "过去分词", "i": "现在分词",
+    "s": "复数", "3": "第三人称单数", "r": "比较级", "t": "最高级",
+}
+
+
+def short_meaning(translation):
+    """取第一个义项里最靠前的一小段，给词形做简短注释用。"""
+    for line in (translation or "").split("\n"):
+        line = line.strip()
+        if not line or line.startswith("["):
+            continue
+        line = re.sub(r"^[a-z]+\.\s*", "", line)
+        return line.split(",")[0].strip()[:14]
+    return ""
+
 
 def build_detail(rows):
-    """长按查看用的详情：音标 + 前两个词性组。
+    """长按查看用的详情：音标 + 前两个词性组 + 词形释义。
 
     只取前两组是因为词典里靠后的义项大多是生僻用法，考研不考；
     把整段塞进去反而会把「州 / 大写字母」这类非重点义摆到用户眼前。
@@ -124,30 +141,69 @@ def build_detail(rows):
     path = DATA / "ecdict.csv"
     if not path.exists():
         return {}
-    wanted = {r["word"] for r in rows}
-    detail = {}
+
+    word_forms = {}
+    lookup = set()
+    for r in rows:
+        word = r["word"]
+        forms = [f.lower() for f in (r.get("forms") or []) if f and f.lower() != word]
+        word_forms[word] = forms
+        lookup.add(word)
+        lookup.update(forms)
+
+    ecdict = {}
     with io.open(path, encoding="utf-8", errors="replace", newline="") as f:
         for row in csv.DictReader(f):
             word = (row.get("word") or "").lower()
-            if word not in wanted or word in detail:
+            if word in lookup and word not in ecdict:
+                ecdict[word] = row
+
+    detail = {}
+    for word, forms in word_forms.items():
+        row = ecdict.get(word)
+        if not row:
+            continue
+        groups = []
+        for line in (row.get("translation") or "").split("\n"):
+            line = line.strip()
+            if not line or line.startswith("["):   # 跳过 [计] [医] 这类领域行
                 continue
-            groups = []
-            for line in (row.get("translation") or "").split("\n"):
-                line = line.strip()
-                if not line or line.startswith("["):   # 跳过 [计] [医] 这类领域行
-                    continue
-                groups.append(line[:46] + "…" if len(line) > 46 else line)
-            if not groups:
+            groups.append(line[:46] + "…" if len(line) > 46 else line)
+        if not groups:
+            continue
+        item = {"t": "\n".join(groups[:2])}
+        phonetic = (row.get("phonetic") or "").strip()
+        if phonetic:
+            item["p"] = phonetic
+        # 考纲标签：ky = 考研大纲词，其余用来判断这个词的通用程度
+        tags = [t for t in (row.get("tag") or "").split() if t in EXAM_TAGS]
+        if tags:
+            item["g"] = tags
+
+        # 词形释义：形态变化只存码（前端映射成中文），真派生词才查自己的释义
+        marks = {}
+        for part in (row.get("exchange") or "").split("/"):
+            if ":" not in part:
                 continue
-            item = {"t": "\n".join(groups[:2])}
-            phonetic = (row.get("phonetic") or "").strip()
-            if phonetic:
-                item["p"] = phonetic
-            # 考纲标签：ky = 考研大纲词，其余用来判断这个词的通用程度
-            tags = [t for t in (row.get("tag") or "").split() if t in EXAM_TAGS]
-            if tags:
-                item["g"] = tags
-            detail[word] = item
+            code, value = part.split(":", 1)
+            if code not in FORM_MARKS:
+                continue
+            for name in value.split("/"):
+                key = name.strip().lower()
+                if key and key != word:
+                    marks.setdefault(key, []).append(code)
+        form_info = {}
+        for form in forms:
+            if form in form_info:
+                continue
+            if form in marks:
+                form_info[form] = "|".join(marks[form])
+            else:
+                form_info[form] = short_meaning((ecdict.get(form) or {}).get("translation"))
+        if form_info:
+            item["f"] = form_info
+
+        detail[word] = item
     return detail
 
 

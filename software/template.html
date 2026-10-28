@@ -255,6 +255,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .detail-row .v{flex:1;min-width:0;word-break:break-word}
 .detail-chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;
   background:var(--brand-soft);color:var(--brand);margin-right:6px}
+.form-note{color:var(--muted);font-size:12px;font-weight:400}
 .detail-dict{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .detail-dict summary{font-size:13px;color:var(--muted);cursor:pointer;list-style:none;padding:4px 0}
 .detail-dict summary::-webkit-details-marker{display:none}
@@ -1430,7 +1431,7 @@ function updateDeckMeta() {
 async function switchDeck(value) {
   if (!Object.prototype.hasOwnProperty.call(DECKS, value)) return;
   const previous = activeDeck;
-  savePos();
+  // 先切当前词书，再保存旧章节位置：savePos() 内也不能把 activeDeck 写回旧值。
   activeDeck = value;
   conf.deck = value;
   const resume = (conf.deckChapter && conf.deckChapter[value]) || 0;
@@ -1705,6 +1706,17 @@ function escapeHtml(text) {
 function detailRow(key, value) {
   return value ? '<div class="detail-row"><span class="k">' + key + '</span><span class="v">' + value + '</span></div>' : '';
 }
+// 词形注释：纯码（p|d）是形态变化，其余是派生词自己的释义
+const FORM_LABELS = {
+  p: '过去式', d: '过去分词', i: '现在分词',
+  s: '复数', 3: '第三人称单数', r: '比较级', t: '最高级',
+};
+function formNote(value) {
+  if (!value) return '';
+  const codes = value.split('|');
+  if (codes.every(code => FORM_LABELS[code])) return codes.map(code => FORM_LABELS[code]).join('·');
+  return value;   // 派生词，值本身就是中文释义
+}
 function renderDetail(word, extra) {
   const info = (extra && extra[word.word]) || {};
   $('detailWord').textContent = word.word;
@@ -1723,10 +1735,18 @@ function renderDetail(word, extra) {
   $('detailExam').innerHTML = detailRow('真题', exam.length ? exam.join(' · ') : '未在已收录真题中出现');
 
   const forms = (word.forms || []).filter(Boolean);
+  // 词形后面带释义：形态变化标「过去式 / 现在分词」，真派生词给它自己的意思
+  const formNotes = info.f || {};
+  const formsHtml = forms.map(f => {
+    const note = formNote(formNotes[f.toLowerCase()]);
+    return note
+      ? escapeHtml(f) + '<span class="form-note">（' + escapeHtml(note) + '）</span>'
+      : escapeHtml(f);
+  }).join(' / ');
   $('detailForms').innerHTML =
     detailRow('释义', escapeHtml(word.meaning)) +
     (word.family ? detailRow('词族', escapeHtml(word.family)) : '') +
-    (forms.length ? detailRow('词形', escapeHtml(forms.join(' / '))) : '');
+    (forms.length ? detailRow('词形', formsHtml) : '');
 
   $('detailDict').textContent = info.t || '（这个词没有额外的词典义项）';
   $('detailDictBox').open = false;
@@ -2055,7 +2075,8 @@ async function api(path, options) {
   if (navigator.onLine === false) throw new Error('当前处于离线状态');
   const opt = options || {};
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
+  // 同步请求可能经过慢速国际链路；短超时会把已经成功的写入误报成失败，造成反复重传。
+  const timer = controller ? setTimeout(() => controller.abort(), opt.timeout || 30000) : null;
   let body;
   let headers = {};
   if (opt.body !== undefined) {
@@ -2377,17 +2398,28 @@ function latestChapterTime(chapterData) {
 function mergeConf(local, cloud, localChapters, cloudChapters) {
   const a = local || {};
   const b = cloud || {};
-  const localAt = Math.max(Number(a.progressAt) || 0, latestChapterTime(localChapters));
-  const cloudAt = Math.max(Number(b.progressAt) || 0, latestChapterTime(cloudChapters));
+  // conf.progressAt 是用户“切库/切章/翻词”动作的权威时间；
+  // 章节记录里的 t 会包含程序化恢复，不能拿来反推当前该用哪本词书。
+  let localAt = Number(a.progressAt) || 0;
+  let cloudAt = Number(b.progressAt) || 0;
+  if (!localAt && !cloudAt) {
+    // 兼容旧数据：只有完全没有位置时间时，才退回章节活动时间。
+    localAt = latestChapterTime(localChapters);
+    cloudAt = latestChapterTime(cloudChapters);
+  }
   const localForce = Number(a.forceAt) || 0;
   const cloudForce = Number(b.forceAt) || 0;
   const chooseCloud = cloudForce > localForce || (cloudForce === localForce && cloudAt >= localAt);
   const winner = chooseCloud ? b : a;
   const other = chooseCloud ? a : b;
+  const deck = winner.deck || other.deck || 'core';
   return {
     ...other,
     ...winner,
+    deck,
+    chapter: Number(winner.chapter ?? (winner.deckChapter || {})[deck] ?? 0) || 0,
     deckChapter: { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) },
+    progressAt: Math.max(localAt, cloudAt),
   };
 }
 function mergeSnapshots(local, cloud) {
@@ -2418,7 +2450,7 @@ async function putState(payload, baseUpdatedAt, force) {
     baseUpdatedAt: Math.max(0, Number(baseUpdatedAt) || 0),
   };
   if (force) body.force = true;
-  const r = await api('/state', { method: 'PUT', body, compress: true });
+  const r = await api('/state', { method: 'PUT', body, compress: true, timeout: 45000 });
   lastSyncAt = r.updatedAt || Date.now();
   return r;
 }
@@ -2434,10 +2466,13 @@ function applyMergedSnapshot(merged, local) {
 }
 
 async function syncWithServer(local) {
+  // 位置/顺序参与合并，主程序更新后必须重新走服务端合并，不能沿用旧的增量版本。
+  lastSyncAt = 0;
   const result = await api('/state/sync', {
     method: 'POST',
     body: { payload: local },
     compress: true,
+    timeout: 45000,
   });
   lastSyncAt = result.updatedAt || Date.now();
   const changedLocally = applyMergedSnapshot(result.payload, local);

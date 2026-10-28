@@ -24,6 +24,11 @@ scripts/check_*.py
 scripts/review_*.py
 scripts/analysis_*.py
 
+# 依赖与联调临时文件
+node_modules/
+tmp-*.json
+tmp-*.txt
+
 # 系统
 Thumbs.db
 desktop.ini

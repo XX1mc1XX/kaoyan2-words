@@ -403,6 +403,17 @@ setTimeout(function () {
             chapterData: {}, conf: { forceAt: 0 },
           };
           out.merge_cloud_force_wins = !('beta' in mergeSnapshots(snapPlain, snapForce).state);
+          const posOld = {
+            state: {}, chapterData: { 'core:0': { order: ['state'], t: 10, pos: 0 } },
+            conf: { deck: 'core', chapter: 0, deckChapter: { core: 0 }, progressAt: 10 },
+          };
+          const posNew = {
+            state: {}, chapterData: { 'derivative:0': { order: ['investigation', 'analysis'], t: 20, pos: 1 } },
+            conf: { deck: 'derivative', chapter: 0, deckChapter: { derivative: 0 }, progressAt: 20 },
+          };
+          const posMerged = mergeSnapshots(posOld, posNew);
+          out.merge_position_latest = posMerged.conf.deck === 'derivative'
+            && posMerged.chapterData['derivative:0'].order[0] === 'investigation';
 
           // R. 桌面鼠标点卡片翻面；触摸结束后补发的合成 click 不能多翻一次
           const cardEl = document.getElementById('card');
@@ -647,7 +658,7 @@ def browser_checks():
             "weight_down": True, "weight_badge_val": True,
             "mastered_has_words": True, "mastered_restored": True,
             "restore_len_minus_one": True, "restore_on_next_word": True,
-            "merge_cloud_force_wins": True,
+            "merge_cloud_force_wins": True, "merge_position_latest": True,
             "desktop_click_flips": True, "touch_synth_click_ignored": True,
             "cross_next": True, "cross_prev": True,
             "badge_no_flip": True, "word_touchend_reaches_card": True,

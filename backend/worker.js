@@ -171,25 +171,33 @@ function latestChapterTime(chapterData) {
   }
   return latest;
 }
-
 function mergeConf(local, cloud, localChapters, cloudChapters) {
   const a = local || {};
   const b = cloud || {};
-  const localAt = Math.max(Number(a.progressAt) || 0, latestChapterTime(localChapters));
-  const cloudAt = Math.max(Number(b.progressAt) || 0, latestChapterTime(cloudChapters));
+  // conf.progressAt 是用户“切库/切章/翻词”动作的权威时间；
+  // 章节记录里的 t 会包含程序化恢复，不能拿来反推当前该用哪本词书。
+  let localAt = Number(a.progressAt) || 0;
+  let cloudAt = Number(b.progressAt) || 0;
+  if (!localAt && !cloudAt) {
+    // 兼容旧数据：只有完全没有位置时间时，才退回章节活动时间。
+    localAt = latestChapterTime(localChapters);
+    cloudAt = latestChapterTime(cloudChapters);
+  }
   const localForce = Number(a.forceAt) || 0;
   const cloudForce = Number(b.forceAt) || 0;
-  // forceAt 表示清空/导入覆盖；否则页面位置按最近一次学习活动决定。
   const chooseCloud = cloudForce > localForce || (cloudForce === localForce && cloudAt >= localAt);
   const winner = chooseCloud ? b : a;
   const other = chooseCloud ? a : b;
+  const deck = winner.deck || other.deck || 'core';
   return {
     ...other,
     ...winner,
+    deck,
+    chapter: Number(winner.chapter ?? (winner.deckChapter || {})[deck] ?? 0) || 0,
     deckChapter: { ...(other.deckChapter || {}), ...(winner.deckChapter || {}) },
+    progressAt: Math.max(localAt, cloudAt),
   };
 }
-
 function mergeSnapshots(local, cloud) {
   const localForce = (local.conf && local.conf.forceAt) || 0;
   const cloudForce = (cloud.conf && cloud.conf.forceAt) || 0;

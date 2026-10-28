@@ -50,7 +50,7 @@ def static_checks():
     check("含登录面板", "authModal" in t and "accountBtn" in t)
     check("含云同步接口", "/state" in t and "snapshot" in t)
     check("含恢复原序按钮", "restoreOrder" in t)
-    check("含合成权重", "scoreOf" in t)
+    check("含综合权重", "scoreOf" in t and "综合权重 ' + scoreOf(word)" in t)
     check("含发音代理", "/api/audio?word=" in t)
     check("发音预加载可秒播", all(x in t for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
     check("发音 Blob 内存缓存", "audioBlobUrls" in t and "URL.createObjectURL(blob)" in t)
@@ -214,6 +214,7 @@ setTimeout(function () {
           out.right_same = document.getElementById('word').textContent === w2.word;
           out.right_weight = ((state[w2.word] || {}).w || 0) >= 1;
           out.weight_badge = !document.getElementById('weightBadge').classList.contains('hidden');
+          out.composite_weight = document.getElementById('wordId').textContent === '综合权重 ' + scoreOf(w2);
 
           // E. 词库章节记忆
           gotoChapter(1);
@@ -315,6 +316,15 @@ setTimeout(function () {
           out.first_card_marked = typeof window.__firstCardAt === 'number';
           const firstWord = words1[0].word;
           out.word_location = (wordLocation().get(firstWord) || {}).deck;
+
+          // O. 翻卡/切词只改文本和属性，不重建 DOM（重建会让长列表卡顿）
+          const nodesBeforeFlip = document.querySelectorAll('*').length;
+          toggleMeaning();
+          out.flip_node_delta = document.querySelectorAll('*').length - nodesBeforeFlip;
+          toggleMeaning();
+          const nodesBeforeNext = document.querySelectorAll('*').length;
+          navigate(1);
+          out.navigate_node_delta = document.querySelectorAll('*').length - nodesBeforeNext;
 
           // M. 词表首屏只渲染一页，避免移动端一次创建上千个节点
           switchView('List');
@@ -429,6 +439,7 @@ def browser_checks():
             "left_mastered": True, "left_due": True, "undo_visible": True,
             "undo_cleared": True, "undo_back": True,
             "right_same": True, "right_weight": True, "weight_badge": True,
+            "composite_weight": True,
             "deck_chapter": True, "resume_ok": True,
             "order_stable": True, "order_shuffled": True, "order_restored": True,
             "shuffle_confirm_cancel": True, "restore_confirm_cancel": True,
@@ -450,6 +461,9 @@ def browser_checks():
         }
         for k, v in expect.items():
             check("行为·" + k, data.get(k) == v, "实际=%s" % data.get(k))
+        for key, label in (("flip_node_delta", "翻卡不重建 DOM"), ("navigate_node_delta", "切词不重建 DOM")):
+            value = data.get(key)
+            check("行为·" + label, isinstance(value, int) and abs(value) <= 2, "节点变化=%s" % value)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)

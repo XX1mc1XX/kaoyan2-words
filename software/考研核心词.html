@@ -304,7 +304,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     </div>
     <div class="nav-row">
       <button class="nav-btn" id="prevWord">← 上一个</button>
-      <span class="word-id" id="wordId">优先级 #1</span>
+      <span class="word-id" id="wordId">综合权重 --</span>
       <button class="nav-btn" id="nextWord">下一个 →</button>
     </div>
     <div class="order-btns">
@@ -714,9 +714,7 @@ function renderStudy() {
   const wb = $('weightBadge');
   wb.textContent = wt > 0 ? String(wt) : '';
   wb.classList.toggle('hidden', wt === 0);
-  const slice = chapterSlice(curChapter);
-  const done = slice.filter(w => isMastered(w)).length;
-  $('wordId').textContent = '本章 ' + done + '/' + slice.length;
+  $('wordId').textContent = '综合权重 ' + scoreOf(word);
   const show = revealed === null ? !!conf.showByDefault : revealed;
   const meaning = $('meaning');
   if (show) {
@@ -1097,6 +1095,7 @@ function mark(word, known) {
       wb.classList.remove('pulse');
       void wb.offsetWidth;
       wb.classList.add('pulse');
+      $('wordId').textContent = '综合权重 ' + scoreOf(word);
     }
   }
   updateStats();

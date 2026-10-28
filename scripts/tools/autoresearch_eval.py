@@ -136,7 +136,17 @@ def main():
     checks.append({"name": "离线资源齐备", "ok": offline_ok, "weight": 1.0,
                    "detail": "%d bytes sw" % len(sw)})
 
-    # 6. 回归测试（含数量门槛）
+    # 6. 离线实测：装好 SW 后关掉服务，重开页面还能不能背
+    try:
+        sys.path.insert(0, os.path.join(ROOT, "scripts", "tools"))
+        import offline_check
+        offline = offline_check.check()
+    except Exception as exc:
+        offline = {"ok": False, "reason": "实测脚本出错：%s" % exc}
+    checks.append({"name": "断网后仍可背单词", "ok": bool(offline.get("ok")), "weight": 2.0,
+                   "detail": offline.get("reason") or offline.get("offline_word", "")})
+
+    # 7. 回归测试（含数量门槛）
     passed, tested = run_tests()
     checks.append({"name": "回归测试全过", "ok": tested > 0 and passed == tested, "weight": 3.0,
                    "detail": "%d/%d" % (passed, tested)})

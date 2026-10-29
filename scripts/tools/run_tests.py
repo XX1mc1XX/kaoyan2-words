@@ -72,6 +72,10 @@ def static_checks():
     check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
     check("含鼠标滚轮翻词", "wheelLockedUntil" in t and "addEventListener('wheel'" in t)
     check("含发音代理", "/api/audio?word=" in t)
+    check("朗读可切中英文", all(x in t for x in ("speakLang", "zhVoice", "toggleSpeakLang", "meaningForSpeech")))
+    check("朗读键长按切换语言", "speakLongFired" in t and "pointerdown" in t and "pointercancel" in t)
+    check("中文语音状态如实展示", "zhVoiceStat" in t and "zhVoiceStatus" in t and "localService" in t)
+    check("卡片顶部锚定不随释义跳动", "justify-content:flex-start" in t and "clamp(34px,10vh,88px)" in t)
     check("发音预加载可秒播", all(x in t for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
     check("发音 Blob 内存缓存", "audioBlobUrls" in t and "URL.createObjectURL(blob)" in t)
     check("新词发音不等待网络", "新词不等待网络" in t and "1800" not in t)
@@ -449,8 +453,14 @@ setTimeout(function () {
           out.word_location = (wordLocation().get(firstWord) || {}).deck;
 
           // O. 翻卡/切词只改文本和属性，不重建 DOM（重建会让长列表卡顿）
+          // 点开释义时单词和释义的纵坐标都不能动：卡片是 flex-start 锚定的，
+          // 换成居中会把整块内容重新居中，单词就会往上跳。
+          const wordBox = document.getElementById('word').getBoundingClientRect();
+          const meaningBox = document.getElementById('meaning').getBoundingClientRect();
           const nodesBeforeFlip = document.querySelectorAll('*').length;
           toggleMeaning();
+          out.word_shift = Math.round(document.getElementById('word').getBoundingClientRect().top - wordBox.top);
+          out.meaning_shift = Math.round(document.getElementById('meaning').getBoundingClientRect().top - meaningBox.top);
           out.flip_node_delta = document.querySelectorAll('*').length - nodesBeforeFlip;
           toggleMeaning();
           const nodesBeforeNext = document.querySelectorAll('*').length;
@@ -692,7 +702,32 @@ setTimeout(async function(){
     out.boot_word = document.getElementById('word').textContent;
     out.boot_meta = document.getElementById('deckMeta').textContent;
     out.boot_options = document.getElementById('chapterSelect').options.length;
+    out.boot_queue = queue.length;
     out.partial_len = deckJson('words').length;
+    // 内嵌词库只有几十个时，分母必须按整章显示，不能露出「只有 40 个」
+    const fullWords = _deckCache.words;
+    _deckReady.delete('words');
+    _deckCache.words = fullWords.slice(0, 40);
+    queue = chapterSlice(0).slice();
+    idx = 0;
+    renderStudy();
+    out.partial_denominator = document.getElementById('position').textContent;
+    out.partial_bar_max = document.getElementById('progressBar').max;
+    _deckReady.add('words');
+    _deckCache.words = fullWords;
+    loadChapter(curChapter, undefined, 0);
+
+    // 拖动进度条：拖动中不朗读，松手必须立刻读出新目标词，不能等用户再去点喇叭
+    document.dispatchEvent(new Event('touchstart'));
+    const bar = document.getElementById('progressBar');
+    const dragTarget = 2;
+    bar.value = String(dragTarget);
+    bar.dispatchEvent(new Event('input', { bubbles: true }));
+    const dragWord = queue[dragTarget] && queue[dragTarget].word;
+    out.drag_holding = dragging === true && lastSpoken !== dragWord;
+    bar.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    out.drag_released = dragging === false;
+    out.drag_spoken = !!dragWord && lastSpoken === dragWord;
     gotoChapter(1);
     await new Promise(function(r){ setTimeout(r, 1800); });
     out.chapter = curChapter;
@@ -793,7 +828,17 @@ setTimeout(async function(){
             check("网页版首次加载测试", False, data["error"][:160])
             return
         check("网页版进入按需加载模式", data.get("web_mode") is True)
-        check("网页首屏只解析少量词", 0 < (data.get("partial_len") or 0) <= 50, "实际=%s" % data.get("partial_len"))
+        # 首屏内联的只有 40 词（静态检查已卡 <=50），但第一章必须补齐到整章 200，
+        # 否则「第 1 / 40 个」这种缺词状态会一直挂着。补全靠后台拉全词库。
+        check("网页首屏补齐整库", data.get("partial_len") == 1342, "实际=%s" % data.get("partial_len"))
+        check("网页第一章整章 200 词", data.get("boot_queue") == 200, "实际=%s" % data.get("boot_queue"))
+        check("内嵌词库时分母仍显示整章",
+              data.get("partial_denominator") == "第 1 / 200 个" and data.get("partial_bar_max") == "200",
+              "位置=%s 进度条=%s" % (data.get("partial_denominator"), data.get("partial_bar_max")))
+        check("拖动进度条拖动中不朗读", data.get("drag_holding") is True, "实际=%s" % data.get("drag_holding"))
+        check("拖动进度条松手后朗读新词",
+              data.get("drag_released") is True and data.get("drag_spoken") is True,
+              "松手=%s 朗读=%s" % (data.get("drag_released"), data.get("drag_spoken")))
         check("网页首卡快速出现", 0 < data.get("first_card", 0) < 800, "%sms" % data.get("first_card"))
         app_name = next((x for x in os.listdir(deploy) if re.fullmatch(r"app\.[0-9a-f]{12}\.js", x)), "")
         app_text = io.open(os.path.join(deploy, app_name), encoding="utf-8").read() if app_name else ""
@@ -988,6 +1033,8 @@ def browser_checks():
         for key, label in (("flip_node_delta", "翻卡不重建 DOM"), ("navigate_node_delta", "切词不重建 DOM")):
             value = data.get(key)
             check("行为·" + label, isinstance(value, int) and abs(value) <= 2, "节点变化=%s" % value)
+        check("行为·点开释义单词不下移", data.get("word_shift") == 0, "位移=%s" % data.get("word_shift"))
+        check("行为·点开释义释义不位移", data.get("meaning_shift") == 0, "位移=%s" % data.get("meaning_shift"))
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)

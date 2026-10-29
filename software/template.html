@@ -58,7 +58,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .head-btns{justify-self:end;display:flex;gap:5px;min-width:0}
 .meaning-toggle{border:1px solid var(--line);border-color:color-mix(in srgb,var(--brand) 45%,var(--line));background:var(--card);
   color:var(--brand);font:inherit;font-size:12.5px;font-weight:750;border-radius:999px;padding:7px 9px;cursor:pointer;
-  white-space:nowrap}
+  white-space:nowrap;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 .meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
 @media (prefers-color-scheme:dark){.meaning-toggle[aria-pressed="true"]{color:#0b1714}}
 .meaning-toggle[aria-pressed="true"]{background:var(--brand);color:#fff}
@@ -88,7 +88,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .swipe-action strong{font-size:14px;line-height:1.2;white-space:nowrap}
 .swipe-action .swipe-detail{font-size:9px;font-weight:650;opacity:.82;line-height:1.25}
 .card{position:absolute;inset:0;z-index:2;width:100%;height:100%;min-width:0;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:22px;
-  box-shadow:var(--shadow);padding:6px 18px 74px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);padding:clamp(34px,10vh,88px) 18px 74px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
   text-align:center;gap:12px;overflow:hidden;touch-action:none;user-select:none}
 .card::after{content:"";position:absolute;inset:auto -25% -45% -25%;height:60%;background:radial-gradient(circle,var(--brand-soft),transparent 68%);opacity:.65;pointer-events:none}
 .card>*{position:relative;z-index:1}
@@ -238,11 +238,11 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   .deck-meta{font-size:10.5px}
   .tabs{gap:2px;padding:2px}
   .tab{padding:5px 7px;font-size:11.5px}
-  .card{padding:4px 13px 58px}.meaning-toggle{font-size:12px}
+  .card{padding:clamp(28px,9vh,64px) 13px 58px}.meaning-toggle{font-size:12px}
 }
 @media (max-height:620px){
   header{padding:6px 10px}main{padding:6px 10px 7px}.view{gap:6px}
-  .card{padding:2px 12px 48px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
+  .card{padding:clamp(16px,6vh,40px) 12px 48px;gap:5px}.word{font-size:clamp(28px,7.5vh,42px)}
   .forms{font-size:11.5px}
   .family-note{font-size:11px}
   .meaning{font-size:clamp(18px,5vh,24px)}.rule{margin:0}.swipe-action{width:88px}.swipe-hint{display:none}
@@ -471,12 +471,14 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     <div class="offline-box hidden" id="offlineBox">
       <div class="offline-title">离线缓存</div>
       <div class="offline-line" id="offlineStat">正在统计…</div>
+      <div class="offline-line" id="zhVoiceStat">中文语音：检测中…</div>
       <div class="offline-bar"><i id="offlineFill"></i></div>
       <div class="daily">
         <button class="btn" id="offlineStart" type="button">下载全部</button>
         <button class="btn hidden" id="offlineStop" type="button">停止</button>
       </div>
-      <div class="offline-line">把四本词库、词典释义和全部真人发音存进本机，没网也能背。约 40MB，随时可停。</div>
+      <div class="offline-line">把四本词库、词典释义和全部英文真人发音存进本机，没网也能背。约 40MB，随时可停。</div>
+      <div class="offline-line">中文释义用系统语音朗读，没有音频文件可下载；上面那行会显示你手机上的中文语音是否已装好。</div>
     </div>
   </div>
 </div>
@@ -754,7 +756,7 @@ function streakDays(d) {
 // 以前本地这份用 Math.max，撤销减掉的计数一同步就被云端「取大」复活了。
 const $ = id => document.getElementById(id);
 let state = load(LS_STATE, {});
-let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, icon: null, iconAt: 0 }, load(LS_CONF, {}));
+let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, speakLang: 'en', icon: null, iconAt: 0 }, load(LS_CONF, {}));
 const DECKS = {
   core: { label: '阶段一 · 核心词', note: '阶段一 · 核心词：先背完这一套，再进入核心派生。', get words() { return deckJson('words'); } },
   derivative: { label: '阶段二 · 核心派生', note: '阶段二 · 核心派生：只收词族中高频、词性或语义有明显变化的成员。', get words() { return deckJson('derivatives'); } },
@@ -890,6 +892,23 @@ function resumePosition() {
   const ch = byDeck[activeDeck];
   return Number.isInteger(ch) ? ch : (Number(conf.chapter) || 0);
 }
+let pendingSeek = null;   // 词库还没补齐时拖到的位次，补齐后再跳过去
+let fillDeckPending = null;
+// 内嵌词库只够铺首屏，整本要在后台补齐。补完按「当前停留的那个词」重建队列，
+// 不能按位次：补齐后整章的排序来源从几十个词变成上千个，位次已经完全对不上。
+function fillDeckInBackground(deckKey) {
+  if (deckKey === 'mastered' || deckDataReady(deckKey) || fillDeckPending) return;
+  const targetDeck = activeDeck;
+  fillDeckPending = deckKey;
+  ensureDeckData(deckKey).then(() => {
+    fillDeckPending = null;
+    if (activeDeck !== targetDeck) { pendingSeek = null; return; }
+    const seek = pendingSeek;
+    pendingSeek = null;
+    if (typeof seek === 'number') loadChapter(curChapter, undefined, seek);
+    else loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null);
+  }).catch(() => { fillDeckPending = null; pendingSeek = null; });
+}
 let studyLoading = false;
 function showStudyLoading(message) {
   studyLoading = true;
@@ -912,15 +931,18 @@ function showStudyLoadError() {
   showStudyLoading('词库加载失败，请检查网络后刷新页面重试。');
   $('word').textContent = '加载失败';
 }
-function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
+function loadChapter(ch, mode, idxAt, atWord) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
   const targetDeck = activeDeck;
   if (!deckCanShowChapter(targetDeck, ch)) {
     showStudyLoading('正在加载这一部分词库，首次加载后会长期缓存。');
     ensureDeckData(targetDeck).then(() => {
-      if (activeDeck === targetDeck) loadChapter(ch, mode, idxAt);
+      if (activeDeck === targetDeck) loadChapter(ch, mode, idxAt, atWord);
     }).catch(() => showStudyLoadError());
     return;
   }
+  // 网页版首屏只内嵌了几十个词，够立刻背起来；整本词库必须在这之后补齐，
+  // 否则这一章永远只有内嵌的那几十个词（进度条总数卡住、后面的词轮不到）。
+  if (WEB_MODE && !deckDataReady(targetDeck)) fillDeckInBackground(targetDeck);
   studyLoading = false;
   // 章节数会随「已认识」库的恢复/新增变化，记住的章号可能已经越界，先夹到有效范围
   ch = Math.min(Math.max(ch, 0), Math.max(chapterCount() - 1, 0));
@@ -969,7 +991,10 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
   }
   for (const w of pending) if (!seen.has(w.word)) ordered.push(w);
   queue = ordered;
-  if (typeof idxAt === 'number' && queue.length) {
+  if (atWord) {
+    const j = queue.findIndex(w => w.word === atWord);
+    idx = j >= 0 ? j : 0;
+  } else if (typeof idxAt === 'number' && queue.length) {
     idx = idxAt < 0 ? queue.length - 1 : Math.min(idxAt, queue.length - 1);
   } else if (rec.posWord) {
     const j = queue.findIndex(w => w.word === rec.posWord);
@@ -980,12 +1005,23 @@ function loadChapter(ch, mode, idxAt) {   // mode: 'shuffle' 打乱 / 'natural' 
   revealed = null;
   renderStudy();
 }
+// 整章应有的词数（按整本词库算，不看当前是否已经解析完）。
+// 网页版首屏只内嵌几十个词，直接拿队列长度当分母会露出「只有 40 个」。
+function chapterExpectedLength(ch) {
+  const all = deckKnownLength(activeDeck);
+  return Math.max(0, Math.min(CHAPTER_SIZE, all - ch * CHAPTER_SIZE));
+}
+function deckIncomplete() {
+  return WEB_MODE && !deckDataReady(activeDeck);
+}
 function renderStudy() {
   studyLoading = false;
   const total = queue.length;
   const current = total ? Math.min(idx + 1, total) : 0;
-  $('position').innerHTML = `第 <b>${current}</b> / ${total} 个`;
-  $('progressBar').max = String(Math.max(total, 1));
+  // 词库还没补齐时，分母用整章应有的词数：队列只是内嵌的子集，补全后会长回整章
+  const shownTotal = deckIncomplete() ? Math.max(chapterExpectedLength(curChapter), total) : total;
+  $('position').innerHTML = `第 <b>${current}</b> / ${shownTotal} 个`;
+  $('progressBar').max = String(Math.max(shownTotal, 1));
   if (!dragging) $('progressBar').value = String(Math.min(idx, total));
   if (!total || idx >= total) {
     $('swipeStage').classList.add('hidden');
@@ -1039,9 +1075,11 @@ function renderStudy() {
   }
   $('meaningToggle').textContent = conf.showByDefault ? '释义开' : '释义关';
   $('meaningToggle').setAttribute('aria-pressed', String(!!conf.showByDefault));
-  $('speakToggle').textContent = conf.speak ? '朗读开' : '朗读关';
+  const langTag = conf.speakLang === 'zh' ? '中' : '英';
+  $('speakToggle').textContent = conf.speak ? '朗读·' + langTag : '朗读关';
   $('speakToggle').setAttribute('aria-pressed', String(!!conf.speak));
-  if (conf.speak && !dragging && lastSpoken !== word.word && speak(word.word)) lastSpoken = word.word;
+  $('speakToggle').title = '轻点开/关朗读，长按切换中英文';
+  if (conf.speak && !dragging && lastSpoken !== word.word && speak(word)) lastSpoken = word.word;
   const masteredDeck = activeDeck === 'mastered';
   const leftSwipeCard = $('swipeLeftCard');
   const rightSwipeCard = $('swipeRightCard');
@@ -1088,6 +1126,7 @@ function crossChapter(dir) {
 }
 let lastSpoken = '';
 let speakVoice = null;
+let zhVoice = null;
 let voiceReady = false;
 let speakBroken = false;
 let speechToken = 0;
@@ -1130,6 +1169,12 @@ function refreshVoice() {
     const pick = (list) => list.find(v => !/online|natural|network/i.test(v.name + ' ' + v.voiceURI))
                     || list[0];
     speakVoice = pick(us) || pick(anyEn) || null;
+    // 中文优先普通话、优先本地引擎（离线也能读），在线合成放最后
+    const zh = voices.filter(v => /^zh|^cmn/i.test(v.lang));
+    zhVoice = zh.find(v => /zh[-_]CN|^cmn/i.test(v.lang) && v.localService)
+           || zh.find(v => v.localService)
+           || zh.find(v => /zh[-_]CN|^cmn/i.test(v.lang))
+           || zh[0] || null;
     voiceReady = true;
   } catch (e) {}
 }
@@ -1155,24 +1200,33 @@ const markGesture = () => {
 document.addEventListener('touchstart', markGesture, { once: true, passive: true });
 document.addEventListener('mousedown', markGesture, { once: true });
 document.addEventListener('keydown', markGesture, { once: true });
-function systemSpeak(word, token, notify, reason) {
+function systemSpeak(text, token, notify, reason, lang) {
   if (token !== speechToken) return false;
   const synth = window.speechSynthesis;
   if (!synth || typeof SpeechSynthesisUtterance === 'undefined') {
     if (notify) speechFail(reason || '浏览器不支持语音合成');
     return false;
   }
-  if (!voiceReady) refreshVoice();
+  const isZh = lang === 'zh-CN';
+  if (!voiceReady || (isZh && !zhVoice)) refreshVoice();
+  // 没有中文音色时硬提交只会让引擎拿英文声线乱念，或者干脆不出声，不如直接报错
+  if (isZh && !zhVoice) {
+    if (notify) speechFail(reason || '系统没有可用的中文语音');
+    return false;
+  }
   const hadSpeech = !!(synth.speaking || synth.pending);
   if (hadSpeech) {
     try { synth.cancel(); } catch {}
   }
-  const u = new SpeechSynthesisUtterance(word);
-  u.lang = 'en-US';
-  u.rate = 0.95;
+  // 安卓上语音引擎被系统挂起后会静默排队，只 cancel 不 resume 就一直不出声
+  if (synth.paused) { try { synth.resume(); } catch {} }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang || 'en-US';
+  u.rate = isZh ? 0.92 : 0.95;
   u.pitch = 1;
   u.volume = 1;
-  if (speakVoice) u.voice = speakVoice;
+  if (isZh) { if (zhVoice) u.voice = zhVoice; }
+  else if (speakVoice) u.voice = speakVoice;
   u.onstart = () => {
     if (token !== speechToken) return;
     speakBroken = false;
@@ -1304,10 +1358,38 @@ function playAudioElement(player, word, token, notify, options, source) {
     return true;
   }
 }
-function speak(word, options) {
+// 释义里常有括号注释和分号，念出来会很啰嗦，先清一遍
+function meaningForSpeech(item) {
+  const meaning = (item && typeof item === 'object') ? String(item.meaning || '') : '';
+  return meaning
+    .replace(/[（(][^）)]*[）)]/g, ' ')
+    .replace(/[；;]/g, '，')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function speak(item, options) {
   const notify = !!(options && options.notify);
+  const word = typeof item === 'string' ? item : (item && item.word);
   if (!word) return false;
   if (!userGestured) return false;
+  // 中文模式：真人音频只念英文单词，中文释义只能交给系统语音
+  if (conf.speakLang === 'zh') {
+    const zhToken = ++speechToken;
+    clearTimeout(audioFallbackTimer);
+    if (activePronunciationAudio) {
+      try { activePronunciationAudio.pause(); } catch {}
+      activePronunciationAudio = null;
+    }
+    const meaning = meaningForSpeech(item);
+    if (!meaning) {
+      if (notify) speechFail('这个词还没有中文释义');
+      return false;
+    }
+    const spoken = systemSpeak(meaning, zhToken, notify, '系统没有可用的中文语音', 'zh-CN');
+    if (options && options.onStatus) options.onStatus(spoken ? 'system' : 'failed');
+    if (!spoken && notify) speechFail('系统语音不可用');
+    return spoken;
+  }
   const token = ++speechToken;
   clearTimeout(audioFallbackTimer);
   if (activePronunciationAudio) {
@@ -1827,7 +1909,7 @@ card.addEventListener('touchend', event => {
     // 点词朗读，点别处翻面；起点落在单词上也只是「点」，不影响手势
     if (event.target.closest && event.target.closest('#word')) {
       const w = queue[idx];
-      if (w && !studyLoading) { wordTouchedAt = Date.now(); speak(w.word); }
+      if (w && !studyLoading) { wordTouchedAt = Date.now(); speak(w); }
       return;
     }
     toggleMeaning();
@@ -2037,7 +2119,7 @@ function closeDetail() {
 }
 $('detailClose').onclick = closeDetail;
 $('detailMask').onclick = event => { if (event.target === $('detailMask')) closeDetail(); };
-$('detailAgain').onclick = () => { const w = queue[idx]; if (w) speak(w.word); };
+$('detailAgain').onclick = () => { const w = queue[idx]; if (w) speak(w); };
 // 焦点锁在面板内：Tab 到最后一个就回到第一个
 $('detailSheet').addEventListener('keydown', event => {
   if (event.key !== 'Tab') return;
@@ -2091,24 +2173,30 @@ card.addEventListener('wheel', event => {
 }, { passive: false });
 $('progressBar').oninput = event => {
   if (!queue.length) return;
-  idx = Math.min(Math.max(Number(event.target.value), 0), queue.length - 1);
+  const want = Math.max(Number(event.target.value), 0);
+  // 分母是整章词数、队列却只有内嵌的几十个：拖到队列之外先记下目标，补全后再落位
+  pendingSeek = want > queue.length - 1 && deckIncomplete() ? want : null;
+  idx = Math.min(want, queue.length - 1);
   revealed = null;
   dragging = true;
   renderStudy();
 };
-$('progressBar').onchange = event => {
-  dragging = false;
-  savePos();
-};
+$('progressBar').onchange = finishProgressDrag;
 // 拖回原位置不会触发 change，必须另有出口，否则 dragging 永远为 true（进度条冻结、自动朗读失效）
-const endProgressDrag = () => {
+// 松手必须补一次发音：拖动过程中 renderStudy() 会跳过朗读，不发就只剩手势没声音，
+// 用户得自己再点喇叭。
+function finishProgressDrag() {
   if (!dragging) return;
   dragging = false;
   savePos();
-};
-$('progressBar').onpointerup = endProgressDrag;
-$('progressBar').ontouchend = endProgressDrag;
-$('progressBar').onblur = endProgressDrag;
+  prefetchAudioNearby();
+  if (pendingSeek !== null) return;   // 目标位次还没到货，等补齐后落位时再朗读
+  const w = queue[idx];
+  if (w && conf.speak && speak(w)) lastSpoken = w.word;
+}
+$('progressBar').onpointerup = finishProgressDrag;
+$('progressBar').ontouchend = finishProgressDrag;
+$('progressBar').onblur = finishProgressDrag;
 $('shuffleChapter').onclick = () => {
   const slice = chapterSlice(curChapter);
   if (slice.every(w => isMastered(w))) {
@@ -2161,7 +2249,7 @@ document.querySelectorAll('.filter').forEach(button => {
 $('testSpeak').onclick = () => {
   const diag = $('speakDiag');
   diag.textContent = '正在播放 hello…';
-  const ok = speak('hello', { notify: true, onStatus: source => {
+  const ok = speak({ word: 'hello', meaning: '你好' }, { notify: true, onStatus: source => {
     if (source === 'online') diag.textContent = '真人发音已立即播放；这个词也会缓存，之后离线可重播。';
     else if (source === 'system') diag.textContent = '已立即用系统语音播放；真人发音会在后台缓存，之后秒播。';
     else diag.textContent = '在线发音和系统语音都不可用，请检查网络、媒体音量或换用系统浏览器。';
@@ -2236,7 +2324,7 @@ $('exportProgress').onclick = () => {
     state,
     chapterData,
     daily,
-    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, progressAt: Number(conf.progressAt) || 0, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, icon: conf.icon || null, iconAt: Number(conf.iconAt) || 0 }
+    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, progressAt: Number(conf.progressAt) || 0, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, speakLang: conf.speakLang === 'zh' ? 'zh' : 'en', icon: conf.icon || null, iconAt: Number(conf.iconAt) || 0 }
   };
   const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -2320,6 +2408,7 @@ $('importFile').onchange = event => {
         }
         conf.showByDefault = !!d.conf.showByDefault;
         if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
+        if (d.conf.speakLang === 'zh' || d.conf.speakLang === 'en') conf.speakLang = d.conf.speakLang;
         if (Object.prototype.hasOwnProperty.call(d.conf, 'icon')) {
           // 备份是外部文件：图标不收超大或非图片的 dataURL，否则会写满 localStorage
           const incoming = d.conf.icon;
@@ -2414,12 +2503,64 @@ $('meaningToggle').onclick = () => {
   revealed = null;
   renderStudy();
 };
-$('speakToggle').onclick = () => {
+function toggleSpeakLang() {
+  conf.speakLang = conf.speakLang === 'zh' ? 'en' : 'zh';
+  refreshVoice();
+  save(LS_CONF, conf);
+  lastSpoken = '';          // 清掉去重标记，让 renderStudy 立刻用新语言念一次
+  renderStudy();
+  if (conf.speakLang === 'zh' && !zhVoice) {
+    const el = $('speakWarn');
+    if (el) {
+      el.textContent = '没检测到中文语音。中文释义靠系统语音朗读，请在系统设置里安装中文语音包。';
+      el.classList.remove('hidden');
+    }
+  }
+}
+// 朗读键：轻点开关，长按切换中英文。统一走 Pointer Events，移动超阈值就取消，
+// 免得滑动页面时误切语言。
+let speakPressAt = null;
+let speakPressTimer = null;
+let speakLongFired = false;
+const speakBtn = $('speakToggle');
+const cancelSpeakPress = () => {
+  if (speakPressTimer) { clearTimeout(speakPressTimer); speakPressTimer = null; }
+  speakPressAt = null;
+};
+speakBtn.addEventListener('contextmenu', event => event.preventDefault());
+speakBtn.addEventListener('pointerdown', event => {
+  if (typeof event.button === 'number' && event.button !== 0) return;
+  speakLongFired = false;
+  speakPressAt = { x: event.clientX, y: event.clientY };
+  clearTimeout(speakPressTimer);
+  speakPressTimer = setTimeout(() => {
+    speakPressTimer = null;
+    speakPressAt = null;
+    speakLongFired = true;
+    toggleSpeakLang();
+    if (navigator.vibrate) navigator.vibrate(18);
+  }, 550);
+});
+speakBtn.addEventListener('pointermove', event => {
+  if (!speakPressAt) return;
+  if (Math.abs(event.clientX - speakPressAt.x) > 8 || Math.abs(event.clientY - speakPressAt.y) > 8) cancelSpeakPress();
+});
+// 触摸长按后浏览器不一定补发 click，隔一拍再清标志，免得误吞下一次轻点
+const releaseSpeakPress = () => {
+  cancelSpeakPress();
+  if (speakLongFired) setTimeout(() => { speakLongFired = false; }, 350);
+};
+speakBtn.addEventListener('pointerup', releaseSpeakPress);
+speakBtn.addEventListener('pointercancel', releaseSpeakPress);
+speakBtn.addEventListener('pointerleave', cancelSpeakPress);
+speakBtn.addEventListener('click', event => {
+  if (speakLongFired) { speakLongFired = false; event.preventDefault(); return; }
+  cancelSpeakPress();
   conf.speak = !conf.speak;
   save(LS_CONF, conf);
-  if (conf.speak) { const w = queue[idx]; if (w) speak(w.word); }
+  if (conf.speak) { const w = queue[idx]; if (w) speak(w); }
   renderStudy();
-};
+});
 // 点红点：权重 -1，用于误判右滑后回退
 $('weightBadge').onclick = event => {
   event.stopPropagation();
@@ -2438,7 +2579,7 @@ $('word').addEventListener('click', event => {
   if (studyLoading) return;
   if (Date.now() - wordTouchedAt < 500) return;   // touchend 已读过，避免读两遍
   const w = queue[idx];
-  if (w) speak(w.word);
+  if (w) speak(w);
 });
 let wordTouchedAt = 0;
 $('deckSelect').onchange = event => switchDeck(event.target.value);
@@ -3315,11 +3456,34 @@ function renderOfflineJob() {
   else $('offlineStat').textContent = job.phase + ' ' + job.done + ' / ' + job.total + '（' + pct + '%）' + tail;
 }
 
+// 中文释义只能靠系统语音合成，没有音频文件可下载；这里只做检测和预热，不谎称下载
+function zhVoiceStatus() {
+  refreshVoice();
+  if (!zhVoice) return '中文语音：系统未安装，需要先去系统设置里添加中文语音包';
+  return zhVoice.localService
+    ? '中文语音：系统内置（' + zhVoice.name + '），断网也能读'
+    : '中文语音：系统在线合成（' + zhVoice.name + '），朗读时需要联网';
+}
+function warmChineseVoice() {
+  const synth = window.speechSynthesis;
+  if (!synth || !zhVoice) return false;
+  try {
+    const u = new SpeechSynthesisUtterance('一');
+    u.voice = zhVoice;
+    u.lang = zhVoice.lang || 'zh-CN';
+    u.rate = 1.2;
+    u.volume = 0;
+    synth.speak(u);
+    return true;
+  } catch { return false; }
+}
 async function refreshOfflineStat() {
   const box = $('offlineBox');
   if (!box) return;
   const supported = 'serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:';
   box.classList.toggle('hidden', !supported);
+  const zhEl = $('zhVoiceStat');
+  if (zhEl) zhEl.textContent = zhVoiceStatus();
   if (!supported || offlineJob) return;
   $('offlineStat').textContent = '正在统计…';
   const words = await offlineWordList();
@@ -3345,6 +3509,10 @@ async function runOfflineDownload() {
   const startBtn = $('offlineStart');
   const stopBtn = $('offlineStop');
   startBtn.disabled = true;
+  // 中文语音包由系统管理，下载不了，只能借这次点击把引擎唤醒，让第一次朗读不卡
+  warmChineseVoice();
+  const zhEl = $('zhVoiceStat');
+  if (zhEl) zhEl.textContent = zhVoiceStatus();
   $('offlineStat').textContent = '正在准备词库…';
   const words = await offlineWordList();
   if (!words.length) {

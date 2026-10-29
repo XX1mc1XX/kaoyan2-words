@@ -3916,15 +3916,16 @@ async function fetchOfflineAudio(text, lang) {
       await new Promise(resolve => setTimeout(resolve, waits[attempt]));
       continue;
     }
-    if (response.status !== 429) {
+    // 4xx 是词条本身有问题，重试没意义；429 和 5xx 是临时状态，值得再试。
+    // 429 说明被限流，退避要长；5xx 只是这一跳抖动，等一下马上就能好。
+    if (response.status !== 429 && response.status < 500) {
       // 跨域直连拿到的是 opaque，ok 恒为 false、status 恒为 0，不能当失败处理
       if (!response.ok && response.type !== 'opaque') throw new Error('audio ' + response.status);
       return response;
     }
-    if (attempt === waits.length) break;
-    await new Promise(resolve => setTimeout(resolve, waits[attempt]));
+    if (attempt === waits.length) throw new Error('audio ' + response.status);
+    await new Promise(resolve => setTimeout(resolve, response.status === 429 ? waits[attempt] : 500));
   }
-  throw new Error('audio rate limited');
 }
 
 async function runOfflineDownload(opts) {
@@ -4003,8 +4004,9 @@ async function runOfflineDownload(opts) {
         } catch {
           job.failed += 1;
           consecutiveFailures += 1;
-          // 连续失败说明断网或被限流，整批先停，已缓存的留着，下次启动接着补
-          if (consecutiveFailures >= 20) {
+          // 连续失败说明断网或被限流，整批先停，已缓存的留着，下次启动接着补。
+          // 16 个并发一起倒下时二十次只是两轮，太容易误判成断网，放到四十。
+          if (consecutiveFailures >= 40) {
             job.cancelled = true;
             $('offlineStat').textContent = '网络不稳定，已暂停；下次打开会接着补。';
           }

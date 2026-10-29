@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'f25e2dd7e675';
+const BUILD_VERSION = '5ed592d28e66';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v2';
 // 四本词库合计三千多词，中英文各一条音频，「下载全部」要能一次装下。
@@ -10,7 +10,7 @@ const NAV_TIMEOUT_MS = 3000;
 const AUDIO_BUDGET_RATIO = 0.8;
 const AUDIO_BUDGET_MIN_FREE = 8 * 1024 * 1024;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.7bbc27a2254e.js"];
+const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.8cb34d07b30b.js"];
 // 首装只等页面壳这几个小文件。四本词库和主程序五百多 KB 放到激活后再补，
 // 否则第一次打开会一直卡在 SW 安装，浏览器标签上的进度条也停不下来。
 const SHELL_CORE = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png'];

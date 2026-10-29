@@ -477,8 +477,15 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
         <button class="btn" id="offlineStart" type="button">下载全部</button>
         <button class="btn hidden" id="offlineStop" type="button">停止</button>
       </div>
-      <div class="offline-line">把四本词库、词典释义和全部英文真人发音存进本机，没网也能背。约 40MB，随时可停。</div>
-      <div class="offline-line">中文释义用系统语音朗读，没有音频文件可下载；上面那行会显示你手机上的中文语音是否已装好。</div>
+      <div class="offline-line">把四本词库、词典释义和中文英文发音都存进本机，没网也能背。约 60MB，随时可停。</div>
+    </div>
+    <div class="offline-box" id="appBox">
+      <div class="offline-title">安装与更新</div>
+      <div class="daily">
+        <button class="btn" id="installApp" type="button">安装到桌面</button>
+        <button class="btn" id="checkUpdate" type="button">检查更新</button>
+      </div>
+      <div class="offline-line" id="appStat">装到桌面后会全屏运行、启动更快，也不会被浏览器清掉缓存。</div>
     </div>
   </div>
 </div>
@@ -896,18 +903,31 @@ let pendingSeek = null;   // 词库还没补齐时拖到的位次，补齐后再
 let fillDeckPending = null;
 // 内嵌词库只够铺首屏，整本要在后台补齐。补完按「当前停留的那个词」重建队列，
 // 不能按位次：补齐后整章的排序来源从几十个词变成上千个，位次已经完全对不上。
-function fillDeckInBackground(deckKey) {
+function fillDeckInBackground(deckKey, attempt) {
   if (deckKey === 'mastered' || deckDataReady(deckKey) || fillDeckPending) return;
-  const targetDeck = activeDeck;
   fillDeckPending = deckKey;
-  ensureDeckData(deckKey).then(() => {
-    fillDeckPending = null;
-    if (activeDeck !== targetDeck) { pendingSeek = null; return; }
-    const seek = pendingSeek;
-    pendingSeek = null;
-    if (typeof seek === 'number') loadChapter(curChapter, undefined, seek);
-    else loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null);
-  }).catch(() => { fillDeckPending = null; pendingSeek = null; });
+  // 整本词库两百多 KB，等页面 load 完再拉：否则它会计入浏览器标签上的加载进度，
+  // 首屏明明已经能用了，进度条却一直转。
+  const begin = () => setTimeout(() => {
+    const targetDeck = activeDeck;
+    ensureDeckData(deckKey).then(() => {
+      fillDeckPending = null;
+      if (activeDeck !== targetDeck) { pendingSeek = null; return; }
+      const seek = pendingSeek;
+      pendingSeek = null;
+      // 目标位次要连章带书一起核对：补全期间用户可能已经跳了章，
+      // 拿旧章的目标位次套到新章会直接落到错词上
+      if (seek && seek.deck === activeDeck && seek.ch === curChapter) loadChapter(curChapter, undefined, seek.idx);
+      else loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null);
+    }).catch(() => {
+      fillDeckPending = null;
+      // 一次失败就永久停在 40 张最糟：重试一次，再失败才放弃，等下次进章节重新拉
+      if (!attempt) fillDeckInBackground(deckKey, 1);
+      else pendingSeek = null;
+    });
+  }, 300);
+  if (document.readyState === 'complete') begin();
+  else window.addEventListener('load', begin, { once: true });
 }
 let studyLoading = false;
 function showStudyLoading(message) {
@@ -1099,6 +1119,7 @@ function renderStudy() {
   $('chapterSelect').value = String(currentChapter());
   $('prevWord').disabled = idx <= 0 && curChapter <= 0;
   $('nextWord').disabled = idx >= total - 1 && curChapter >= chapterCount() - 1;
+  prefetchChapterAudio();
 }
 function navigate(delta) {
   if (studyLoading) return;
@@ -1136,7 +1157,8 @@ let pronunciationAudio = null;
 let activePronunciationAudio = null;
 const AUDIO_WORDS_KEY = 'ky_audio_words_v1';
 const AUDIO_PRELOAD_AHEAD = 6;
-const AUDIO_PLAYER_LIMIT = 20;
+// 整章 200 个词的音频都要留在内存里，否则预热完立刻被回收，等于白做
+const AUDIO_PLAYER_LIMIT = 260;
 const AUDIO_BLOB_LIMIT = 80;
 const audioPlayers = new Map();
 const audioBlobUrls = new Map();
@@ -1145,11 +1167,20 @@ let audioCachedWords = (() => {
   try { return new Set(JSON.parse(localStorage.getItem(AUDIO_WORDS_KEY)) || []); }
   catch { return new Set(); }
 })();
-function audioUrl(word) {
-  return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2';
+// 英文走有道词典发音（浏览器直连也行）；中文释义走百度 TTS，必须经自家 worker 转一手，
+// 否则跨域和 referer 校验都过不去。file:// 单文件版没有 worker，中文只能退回系统语音。
+const AUDIO_PROXY_READY = location.protocol !== 'file:';
+function audioUrl(text, lang) {
+  if (lang === 'zh') return '/api/audio?lang=zh&word=' + encodeURIComponent(text);
+  return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2';
 }
-function cachedAudioUrl(word) {
-  return '/api/audio?word=' + encodeURIComponent(word);
+function cachedAudioUrl(text, lang) {
+  return '/api/audio?' + (lang === 'zh' ? 'lang=zh&' : '') + 'word=' + encodeURIComponent(text);
+}
+// 有 Service Worker 代理就一律走 /api/audio：命中本地缓存几毫秒就返回，
+// 全量下载过之后，拖进度条跳到任何词都能立刻出声；file:// 没有代理才直连。
+function playSrcFor(text, lang) {
+  return AUDIO_PROXY_READY ? cachedAudioUrl(text, lang) : audioUrl(text, lang);
 }
 function rememberAudio(word) {
   audioCachedWords.add(word);
@@ -1196,6 +1227,9 @@ let userGestured = false;
 const markGesture = () => {
   userGestured = true;
   if (window.speechSynthesis && !voiceReady) refreshVoice();
+  // 首次手势之前不允许预加载音频，手势到了立刻把整章补上
+  chapterPrefetchKey = '';
+  prefetchChapterAudio();
 };
 document.addEventListener('touchstart', markGesture, { once: true, passive: true });
 document.addEventListener('mousedown', markGesture, { once: true });
@@ -1256,14 +1290,15 @@ function trimAudioPlayers() {
     } catch {}
   }
 }
-function preloadAudioWord(word) {
+function preloadAudioWord(word, lang) {
   if (!word || navigator.onLine === false) return null;
+  if (lang === 'zh' && !AUDIO_PROXY_READY) return null;
   let player = audioPlayers.get(word);
   if (!player) {
     player = new Audio();
     player.preload = 'auto';
     player.setAttribute('playsinline', '');
-    player.src = audioUrl(word);
+    player.src = playSrcFor(word, lang);
     audioPlayers.set(word, player);
     trimAudioPlayers();
     try { player.load(); } catch {}
@@ -1277,34 +1312,61 @@ function trimAudioBlobs() {
     try { URL.revokeObjectURL(url); } catch {}
   }
 }
-function cachePronunciationForOffline(word) {
-  if (!word || navigator.onLine === false || location.protocol === 'file:') return;
-  if (audioCachedWords.has(word) || audioFetching.has(word)) return;
-  audioFetching.add(word);
-  fetch(cachedAudioUrl(word)).then(response => {
+function cachePronunciationForOffline(text, lang) {
+  if (!text || navigator.onLine === false || location.protocol === 'file:') return;
+  if (audioCachedWords.has(text) || audioFetching.has(text)) return;
+  audioFetching.add(text);
+  fetch(cachedAudioUrl(text, lang)).then(response => {
     if (!response.ok) throw new Error('audio cache failed');
     return response.blob();
   }).then(blob => {
     if (!blob.size || !/^audio\//i.test(blob.type || '')) throw new Error('invalid audio');
-    const old = audioBlobUrls.get(word);
+    const old = audioBlobUrls.get(text);
     if (old) { try { URL.revokeObjectURL(old); } catch {} }
-    audioBlobUrls.set(word, URL.createObjectURL(blob));
+    audioBlobUrls.set(text, URL.createObjectURL(blob));
     trimAudioBlobs();
-    rememberAudio(word);
-  }).catch(() => {}).finally(() => audioFetching.delete(word));
+    rememberAudio(text);
+  }).catch(() => {}).finally(() => audioFetching.delete(text));
+}
+// 当前朗读模式对应的音频 key：英文用单词，中文用清洗后的释义
+function audioKeyOf(item) {
+  return conf.speakLang === 'zh' ? meaningForSpeech(item) : (item && item.word);
 }
 // 真人音频提前加载到内存；离线副本单独延后缓存，避免抢占首次发声的带宽。
 function prefetchAudioNearby() {
   if (!userGestured || navigator.onLine === false || !queue.length) return;
-  const words = queue.slice(idx, idx + AUDIO_PRELOAD_AHEAD + 1).map(item => item.word);
-  for (const word of words) preloadAudioWord(word);
+  const lang = conf.speakLang === 'zh' ? 'zh' : 'en';
+  const keys = queue.slice(idx, idx + AUDIO_PRELOAD_AHEAD + 1).map(audioKeyOf).filter(Boolean);
+  for (const key of keys) preloadAudioWord(key, lang);
   if (location.protocol === 'file:' || offlineCacheTimer) return;
   offlineCacheTimer = setTimeout(() => {
     offlineCacheTimer = null;
     if (navigator.onLine === false) return;
-    const cacheWords = queue.slice(idx, idx + 3).map(item => item.word);
-    for (const word of cacheWords) cachePronunciationForOffline(word);
+    const cacheKeys = queue.slice(idx, idx + 3).map(audioKeyOf).filter(Boolean);
+    for (const key of cacheKeys) cachePronunciationForOffline(key, lang);
   }, 900);
+}
+// 整章预热：用户在一章里随便拖、随便翻，音频都已经在内存里，出声零等待。
+// 分批加载，别一次甩几百个请求出去把主线程和网络都堵住。
+let chapterPrefetchKey = '';
+function prefetchChapterAudio() {
+  if (!userGestured || navigator.onLine === false) return;
+  const lang = conf.speakLang === 'zh' ? 'zh' : 'en';
+  const key = activeDeck + ':' + curChapter + ':' + lang;
+  if (chapterPrefetchKey === key) return;
+  chapterPrefetchKey = key;
+  const slice = chapterSlice(curChapter);
+  let i = 0;
+  const step = () => {
+    if (chapterPrefetchKey !== key) return;
+    const end = Math.min(i + 8, slice.length);
+    for (; i < end; i += 1) {
+      const k = audioKeyOf(slice[i]);
+      if (k) preloadAudioWord(k, lang);
+    }
+    if (i < slice.length) setTimeout(step, 120);
+  };
+  step();
 }
 function getPronunciationAudio() {
   if (!pronunciationAudio) {
@@ -1314,7 +1376,7 @@ function getPronunciationAudio() {
   }
   return pronunciationAudio;
 }
-function playAudioElement(player, word, token, notify, options, source) {
+function playAudioElement(player, word, token, notify, options, source, lang) {
   if (!player || token !== speechToken) return false;
   let settled = false;
   const useSystem = reason => {
@@ -1323,7 +1385,7 @@ function playAudioElement(player, word, token, notify, options, source) {
     clearTimeout(audioFallbackTimer);
     try { player.pause(); } catch {}
     if (activePronunciationAudio === player) activePronunciationAudio = null;
-    const ok = systemSpeak(word, token, notify, reason);
+    const ok = systemSpeak(word, token, notify, reason, lang);
     if (options && options.onStatus) options.onStatus(ok ? 'system' : 'failed');
     if (!ok && notify) speechFail(reason || '在线发音和系统语音都不可用');
   };
@@ -1333,7 +1395,7 @@ function playAudioElement(player, word, token, notify, options, source) {
     clearTimeout(audioFallbackTimer);
     speakBroken = false;
     if (source === 'cached') rememberAudio(word);
-    cachePronunciationForOffline(word);
+    cachePronunciationForOffline(word, lang === 'zh-CN' ? 'zh' : 'en');
     prefetchAudioNearby();
     if (options && options.onStatus) options.onStatus('online');
   };
@@ -1372,23 +1434,16 @@ function speak(item, options) {
   const word = typeof item === 'string' ? item : (item && item.word);
   if (!word) return false;
   if (!userGestured) return false;
-  // 中文模式：真人音频只念英文单词，中文释义只能交给系统语音
-  if (conf.speakLang === 'zh') {
-    const zhToken = ++speechToken;
-    clearTimeout(audioFallbackTimer);
-    if (activePronunciationAudio) {
-      try { activePronunciationAudio.pause(); } catch {}
-      activePronunciationAudio = null;
-    }
-    const meaning = meaningForSpeech(item);
-    if (!meaning) {
-      if (notify) speechFail('这个词还没有中文释义');
-      return false;
-    }
-    const spoken = systemSpeak(meaning, zhToken, notify, '系统没有可用的中文语音', 'zh-CN');
-    if (options && options.onStatus) options.onStatus(spoken ? 'system' : 'failed');
-    if (!spoken && notify) speechFail('系统语音不可用');
-    return spoken;
+  // 中英两条链路只差音源：中文用释义文本走百度 TTS，英文用单词走有道
+  const isZh = conf.speakLang === 'zh';
+  const key = isZh ? meaningForSpeech(item) : word;
+  const lang = isZh ? 'zh-CN' : 'en-US';
+  const tag = isZh ? 'zh' : 'en';
+  // 中文音频必须经 worker 代理；单文件版没有代理，只能靠系统语音
+  const canAudio = !isZh || AUDIO_PROXY_READY;
+  if (!key) {
+    if (notify) speechFail('这个词还没有中文释义');
+    return false;
   }
   const token = ++speechToken;
   clearTimeout(audioFallbackTimer);
@@ -1396,28 +1451,31 @@ function speak(item, options) {
     try { activePronunciationAudio.pause(); } catch {}
     activePronunciationAudio = null;
   }
-  const direct = audioPlayers.get(word);
-  if (direct && direct.readyState >= 2 && !direct.error) {
-    return playAudioElement(direct, word, token, notify, options, 'direct');
+  if (canAudio) {
+    const direct = audioPlayers.get(key);
+    if (direct && direct.readyState >= 2 && !direct.error) {
+      return playAudioElement(direct, key, token, notify, options, 'direct', lang);
+    }
+    const blobUrl = audioBlobUrls.get(key);
+    if (blobUrl) {
+      const player = getPronunciationAudio();
+      player.src = blobUrl;
+      return playAudioElement(player, key, token, notify, options, 'blob', lang);
+    }
+    // 缓存过的词（含全量下载的）在线也直接用本地，别绕网络去等系统语音
+    if (audioCachedWords.has(key)) {
+      const player = getPronunciationAudio();
+      player.src = playSrcFor(key, tag);
+      return playAudioElement(player, key, token, notify, options, 'cached', lang);
+    }
   }
-  const blobUrl = audioBlobUrls.get(word);
-  if (blobUrl) {
-    const player = getPronunciationAudio();
-    player.src = blobUrl;
-    return playAudioElement(player, word, token, notify, options, 'blob');
-  }
-  if (navigator.onLine === false && location.protocol !== 'file:' && audioCachedWords.has(word)) {
-    const player = getPronunciationAudio();
-    player.src = cachedAudioUrl(word);
-    return playAudioElement(player, word, token, notify, options, 'cached');
-  }
-  // 新词不等待网络：先用系统语音立即出声，真人音频在后台准备，之后就会秒播。
+  // 新词不等待网络：音频还没到手就先让系统语音出声，真人音频在后台准备，下一轮秒播
   prefetchAudioNearby();
-  cachePronunciationForOffline(word);
-  const ok = systemSpeak(word, token, notify, '在线真人音频尚未就绪');
+  if (canAudio) cachePronunciationForOffline(key, tag);
+  const ok = systemSpeak(key, token, notify, isZh ? '系统没有可用的中文语音' : '在线真人音频尚未就绪', lang);
   if (options && options.onStatus) options.onStatus(ok ? 'system' : 'failed');
-  if (!ok && notify) speechFail('系统语音也不可用');
-  return true;
+  if (!ok && notify) speechFail(isZh ? '系统语音不可用' : '系统语音也不可用');
+  return ok;
 }
 function toggleMeaning() {
   if (studyLoading) return;
@@ -2171,15 +2229,25 @@ card.addEventListener('wheel', event => {
   wheelLockedUntil = now + 320;
   navigate(event.deltaY > 0 ? 1 : -1);
 }, { passive: false });
+let dragWarmTimer = null;
 $('progressBar').oninput = event => {
   if (!queue.length) return;
   const want = Math.max(Number(event.target.value), 0);
   // 分母是整章词数、队列却只有内嵌的几十个：拖到队列之外先记下目标，补全后再落位
-  pendingSeek = want > queue.length - 1 && deckIncomplete() ? want : null;
+  pendingSeek = want > queue.length - 1 && deckIncomplete()
+    ? { deck: activeDeck, ch: curChapter, idx: want }
+    : null;
   idx = Math.min(want, queue.length - 1);
   revealed = null;
   dragging = true;
   renderStudy();
+  // 拖动停顿 120ms 就把目标词的音频准备好，松手那一刻直接出声
+  clearTimeout(dragWarmTimer);
+  dragWarmTimer = setTimeout(() => {
+    const w = queue[idx];
+    const key = w && audioKeyOf(w);
+    if (key) preloadAudioWord(key, conf.speakLang === 'zh' ? 'zh' : 'en');
+  }, 120);
 };
 $('progressBar').onchange = finishProgressDrag;
 // 拖回原位置不会触发 change，必须另有出口，否则 dragging 永远为 true（进度条冻结、自动朗读失效）
@@ -2188,6 +2256,7 @@ $('progressBar').onchange = finishProgressDrag;
 function finishProgressDrag() {
   if (!dragging) return;
   dragging = false;
+  clearTimeout(dragWarmTimer);
   savePos();
   prefetchAudioNearby();
   if (pendingSeek !== null) return;   // 目标位次还没到货，等补齐后落位时再朗读
@@ -3426,7 +3495,9 @@ function updateOfflineStatus() {
 // ---------- 全量离线缓存 ----------
 // 缓存写入交给 Service Worker：页面只发请求，持久化和淘汰策略都在 sw.js 里。
 // 页面壳和四本词库在 SW 安装时就已存好，这里补的是全部真人发音 + 词典详情分片。
-const OFFLINE_CONCURRENCY = 3;
+// 音频都很小（10KB 上下），并发开满，只在单条卡住时超时跳过，不做任何限速。
+const OFFLINE_CONCURRENCY = 12;
+const OFFLINE_FETCH_TIMEOUT = 8000;
 const OFFLINE_AUDIO_CACHE = 'ky-audio-v1';
 let offlineJob = null;
 
@@ -3445,24 +3516,41 @@ async function offlineWordList() {
   return out;
 }
 
+// 中文释义也要能离线：百度 TTS 每个文本一个音频，按文本去重后数量比词数少
+async function offlineZhTexts() {
+  try { await Promise.all(DECK_KEYS.map(loadWebDeck)); } catch {}
+  const seen = new Set();
+  const out = [];
+  for (const key of DECK_KEYS) {
+    for (const item of DECKS[key].words || []) {
+      const text = meaningForSpeech(item);
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      out.push(text);
+    }
+  }
+  return out;
+}
+
 function renderOfflineJob() {
   const job = offlineJob;
   if (!job) return;
   const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
   $('offlineFill').style.width = pct + '%';
   const tail = job.failed ? '，失败 ' + job.failed : '';
-  if (job.cancelled) $('offlineStat').textContent = '已停止：缓存了 ' + job.done + ' / ' + job.total + ' 个词' + tail;
-  else if (job.done >= job.total) $('offlineStat').textContent = '完成：' + job.total + ' 个词的发音和词典都存好了' + tail;
-  else $('offlineStat').textContent = job.phase + ' ' + job.done + ' / ' + job.total + '（' + pct + '%）' + tail;
+  const elapsed = (Date.now() - (job.startedAt || Date.now())) / 1000;
+  const rate = elapsed > 3 && job.done ? ' · ' + (job.done / elapsed).toFixed(1) + '/秒' : '';
+  if (job.cancelled) $('offlineStat').textContent = '已停止：缓存了 ' + job.done + ' / ' + job.total + ' 个' + tail;
+  else if (job.done >= job.total) $('offlineStat').textContent = '完成：' + job.total + ' 条发音和词典都存好了' + tail;
+  else $('offlineStat').textContent = job.phase + ' ' + job.done + ' / ' + job.total + '（' + pct + '%）' + rate + tail;
 }
 
-// 中文释义只能靠系统语音合成，没有音频文件可下载；这里只做检测和预热，不谎称下载
+// 中文现在走百度 TTS，是可缓存的音频；单文件版没有 worker，才退回系统语音
 function zhVoiceStatus() {
   refreshVoice();
-  if (!zhVoice) return '中文语音：系统未安装，需要先去系统设置里添加中文语音包';
-  return zhVoice.localService
-    ? '中文语音：系统内置（' + zhVoice.name + '），断网也能读'
-    : '中文语音：系统在线合成（' + zhVoice.name + '），朗读时需要联网';
+  if (AUDIO_PROXY_READY) return '中文朗读：百度语音，点「下载全部」可一并离线';
+  if (!zhVoice) return '中文朗读：单文件版没有联网代理，系统也没装中文语音';
+  return '中文朗读：系统语音（' + zhVoice.name + '）';
 }
 function warmChineseVoice() {
   const synth = window.speechSynthesis;
@@ -3491,25 +3579,39 @@ async function refreshOfflineStat() {
   $('offlineStat').textContent = '共 ' + words.length + ' 个词，已缓存发音 ' + audioCachedWords.size + ' 个。';
 }
 
-// 一次全量下载等于几千个音频请求，撞到限流就等一下再试，别让整批失败
-async function fetchOfflineAudio(word) {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const response = await fetch(cachedAudioUrl(word));
+// 一次全量下载等于几千个音频请求，撞到限流就退避重试，别让整批失败
+async function fetchOfflineAudio(text, lang) {
+  const waits = [2000, 6000, 15000];
+  const makeTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
+    ? AbortSignal.timeout(OFFLINE_FETCH_TIMEOUT) : null;
+  for (let attempt = 0; attempt <= waits.length; attempt += 1) {
+    let response;
+    const timeout = makeTimeout();
+    try {
+      response = await fetch(cachedAudioUrl(text, lang), timeout ? { signal: timeout } : {});
+    } catch (err) {
+      // 超时或断连：按普通失败退避重试，别让整批卡在这一条上
+      if (attempt === waits.length) throw err;
+      await new Promise(resolve => setTimeout(resolve, waits[attempt]));
+      continue;
+    }
     if (response.status !== 429) {
       if (!response.ok) throw new Error('audio ' + response.status);
       return response;
     }
-    await new Promise(resolve => setTimeout(resolve, 4000 * (attempt + 1)));
+    if (attempt === waits.length) break;
+    await new Promise(resolve => setTimeout(resolve, waits[attempt]));
   }
   throw new Error('audio rate limited');
 }
 
-async function runOfflineDownload() {
+async function runOfflineDownload(opts) {
+  const auto = !!(opts && opts.auto);
   if (offlineJob) return;
   const startBtn = $('offlineStart');
   const stopBtn = $('offlineStop');
   startBtn.disabled = true;
-  // 中文语音包由系统管理，下载不了，只能借这次点击把引擎唤醒，让第一次朗读不卡
+  // file:// 单文件版没有 worker，中文只能靠系统语音，借这次点击把引擎唤醒
   warmChineseVoice();
   const zhEl = $('zhVoiceStat');
   if (zhEl) zhEl.textContent = zhVoiceStatus();
@@ -3520,7 +3622,26 @@ async function runOfflineDownload() {
     startBtn.disabled = false;
     return;
   }
-  offlineJob = { total: words.length, done: 0, failed: 0, cancelled: false, phase: '正在下载发音' };
+  // 英文单词音 + 中文释义音一起下，中文按文本去重
+  let targets = words.map(word => ({ key: word, lang: 'en' }));
+  if (AUDIO_PROXY_READY) {
+    for (const text of await offlineZhTexts()) targets.push({ key: text, lang: 'zh' });
+  }
+  // 当前章节先下：用户正在背的这几百个（英文+中文）马上可用，其余的慢慢补
+  const urgent = new Set();
+  for (const item of queue) {
+    urgent.add(item.word);
+    const zh = meaningForSpeech(item);
+    if (zh) urgent.add(zh);
+  }
+  if (urgent.size) {
+    targets = targets.filter(t => urgent.has(t.key)).concat(targets.filter(t => !urgent.has(t.key)));
+  }
+  offlineJob = {
+    total: targets.length, done: 0, failed: 0, cancelled: false,
+    startedAt: Date.now(),
+    phase: auto ? '后台自动缓存' : '正在下载发音',
+  };
   stopBtn.classList.remove('hidden');
   renderOfflineJob();
   try {
@@ -3532,35 +3653,121 @@ async function runOfflineDownload() {
       try { await fetch(url, { cache: 'force-cache' }); } catch { offlineJob.failed += 1; }
     }
     let cursor = 0;
+    let consecutiveFailures = 0;
     const worker = async () => {
       for (;;) {
         const job = offlineJob;
         if (!job || job.cancelled) return;
         const index = cursor;
         cursor += 1;
-        if (index >= words.length) return;
-        const word = words[index];
+        if (index >= targets.length) return;
+        const target = targets[index];
         try {
-          if (!(await audioCache.match(cachedAudioUrl(word)))) await fetchOfflineAudio(word);
-          audioCachedWords.add(word);
-        } catch { job.failed += 1; }
+          if (!(await audioCache.match(cachedAudioUrl(target.key, target.lang)))) {
+            await fetchOfflineAudio(target.key, target.lang);
+          }
+          audioCachedWords.add(target.key);
+          consecutiveFailures = 0;
+        } catch {
+          job.failed += 1;
+          consecutiveFailures += 1;
+          // 连续失败说明断网或被限流，整批先停，已缓存的留着，下次启动接着补
+          if (consecutiveFailures >= 20) {
+            job.cancelled = true;
+            $('offlineStat').textContent = '网络不稳定，已暂停；下次打开会接着补。';
+          }
+        }
         job.done += 1;
         if (job.done % 5 === 0 || job.done === job.total) renderOfflineJob();
       }
     };
     await Promise.all(Array.from({ length: OFFLINE_CONCURRENCY }, worker));
   } finally {
+    const finished = offlineJob;
     renderOfflineJob();
     offlineJob = null;
     try { localStorage.setItem(AUDIO_WORDS_KEY, JSON.stringify([...audioCachedWords])); } catch {}
     startBtn.disabled = false;
     stopBtn.classList.add('hidden');
     updateOfflineStatus();
+    // 自动模式只在整批都成功时才算完成；有失败就下次启动接着补，已缓存的不重复下
+    if (auto && finished && !finished.cancelled && !finished.failed && finished.done >= finished.total) {
+      try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {}
+    }
   }
 }
 
-$('offlineStart').onclick = () => { runOfflineDownload(); };
+// 后台自动缓存：首屏稳定后自己跑全量，用户不用点任何按钮
+const AUTO_OFFLINE_KEY = 'ky_auto_offline_v1';
+let autoOfflineStarted = false;
+function autoOfflineAllowed() {
+  try { if (localStorage.getItem(AUTO_OFFLINE_KEY) === 'done') return false; } catch { return false; }
+  const conn = navigator.connection;
+  if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return false;
+  return true;
+}
+function scheduleAutoOffline() {
+  if (autoOfflineStarted || !autoOfflineAllowed()) return;
+  if (!('serviceWorker' in navigator) || !window.isSecureContext || location.protocol === 'file:') return;
+  autoOfflineStarted = true;
+  // 等首屏、首词朗读都稳住之后再开始，别抢前台带宽
+  const start = () => runOfflineDownload({ auto: true });
+  const idle = () => {
+    if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 20000 });
+    else setTimeout(start, 20000);
+  };
+  if (document.readyState === 'complete') idle();
+  else window.addEventListener('load', idle, { once: true });
+}
+
+$('offlineStart').onclick = () => {
+  if (offlineJob) { $('offlineStat').textContent = '正在后台缓存中，进度见上方。'; return; }
+  runOfflineDownload();
+};
 $('offlineStop').onclick = () => { if (offlineJob) offlineJob.cancelled = true; };
+
+// ---- 安装到桌面 + 手动检查更新 ----
+let installPrompt = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  installPrompt = event;
+  const stat = $('appStat');
+  if (stat && !isStandalone()) stat.textContent = '可以安装到桌面了，点左边按钮。';
+});
+$('installApp').onclick = async () => {
+  const stat = $('appStat');
+  if (isStandalone()) { stat.textContent = '已经在桌面图标里运行了。'; return; }
+  if (!installPrompt) {
+    stat.textContent = '这个浏览器没给安装入口：安卓用 Edge/Chrome 菜单里的「添加到主屏幕」，iOS 用 Safari 分享→「添加到主屏幕」。';
+    return;
+  }
+  installPrompt.prompt();
+  const choice = await installPrompt.userChoice;
+  stat.textContent = choice && choice.outcome === 'accepted' ? '已安装，去桌面找图标。' : '已取消安装。';
+  installPrompt = null;
+};
+$('checkUpdate').onclick = async () => {
+  const stat = $('appStat');
+  stat.textContent = '正在检查…';
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { stat.textContent = '当前不是离线版本，直接刷新页面即可。'; return; }
+    await reg.update();
+    setTimeout(() => {
+      if (reg.waiting || reg.installing) {
+        stat.textContent = '发现新版本，正在应用…';
+        setTimeout(() => location.reload(), 900);
+      } else {
+        stat.textContent = '已是最新版本。';
+      }
+    }, 1500);
+  } catch {
+    stat.textContent = '检查失败，请确认网络后重试。';
+  }
+};
+
+scheduleAutoOffline();
 window.addEventListener('online', updateOfflineStatus);
 window.addEventListener('offline', updateOfflineStatus);
 updateOfflineStatus();

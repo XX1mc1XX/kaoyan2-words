@@ -1,4 +1,4 @@
-const BUILD_VERSION = '5ed592d28e66';
+const BUILD_VERSION = 'a16f96487565';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v2';
 // 四本词库合计三千多词，中英文各一条音频，「下载全部」要能一次装下。
@@ -10,7 +10,7 @@ const NAV_TIMEOUT_MS = 3000;
 const AUDIO_BUDGET_RATIO = 0.8;
 const AUDIO_BUDGET_MIN_FREE = 8 * 1024 * 1024;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.8cb34d07b30b.js"];
+const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.d75809d3cac9.js"];
 // 首装只等页面壳这几个小文件。四本词库和主程序五百多 KB 放到激活后再补，
 // 否则第一次打开会一直卡在 SW 安装，浏览器标签上的进度条也停不下来。
 const SHELL_CORE = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
@@ -80,13 +80,16 @@ async function cacheFirstAudio(request) {
   const response = await fetch(request);
   // 走到这里的只有自家的 /api/audio：同源响应，ok 能如实反映成败。
   // 失败的响应一旦进缓存，那个词就永久没声音，所以只存 200。
-  if (response.ok && await audioBudgetOk()) {
-    await safePut(cache, request, response.clone());
-    const keys = await cache.keys();
-    if (keys.length > AUDIO_CACHE_MAX) {
-      for (const key of keys.slice(0, keys.length - AUDIO_CACHE_MAX)) {
-        try { await cache.delete(key); } catch {}
-      }
+  if (!response.ok) return response;
+  // 页面把「下载成功」直接记成了本地已缓存，这里就不能因为配额紧张悄悄不存：
+  // 一旦跳过，标记和真实缓存就分叉，离线时那个词没声音、在线时也退回慢路径。
+  // 空间不够就多淘汰一些旧的，而不是拒绝新的。
+  await safePut(cache, request, response.clone());
+  const keys = await cache.keys();
+  const keep = (await audioBudgetOk()) ? AUDIO_CACHE_MAX : Math.floor(AUDIO_CACHE_MAX * 0.9);
+  if (keys.length > keep) {
+    for (const key of keys.slice(0, keys.length - keep)) {
+      try { await cache.delete(key); } catch {}
     }
   }
   return response;

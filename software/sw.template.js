@@ -80,13 +80,16 @@ async function cacheFirstAudio(request) {
   const response = await fetch(request);
   // 走到这里的只有自家的 /api/audio：同源响应，ok 能如实反映成败。
   // 失败的响应一旦进缓存，那个词就永久没声音，所以只存 200。
-  if (response.ok && await audioBudgetOk()) {
-    await safePut(cache, request, response.clone());
-    const keys = await cache.keys();
-    if (keys.length > AUDIO_CACHE_MAX) {
-      for (const key of keys.slice(0, keys.length - AUDIO_CACHE_MAX)) {
-        try { await cache.delete(key); } catch {}
-      }
+  if (!response.ok) return response;
+  // 页面把「下载成功」直接记成了本地已缓存，这里就不能因为配额紧张悄悄不存：
+  // 一旦跳过，标记和真实缓存就分叉，离线时那个词没声音、在线时也退回慢路径。
+  // 空间不够就多淘汰一些旧的，而不是拒绝新的。
+  await safePut(cache, request, response.clone());
+  const keys = await cache.keys();
+  const keep = (await audioBudgetOk()) ? AUDIO_CACHE_MAX : Math.floor(AUDIO_CACHE_MAX * 0.9);
+  if (keys.length > keep) {
+    for (const key of keys.slice(0, keys.length - keep)) {
+      try { await cache.delete(key); } catch {}
     }
   }
   return response;

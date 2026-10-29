@@ -3919,8 +3919,8 @@ async function fetchOfflineAudio(text, lang) {
     // 4xx 是词条本身有问题，重试没意义；429 和 5xx 是临时状态，值得再试。
     // 429 说明被限流，退避要长；5xx 只是这一跳抖动，等一下马上就能好。
     if (response.status !== 429 && response.status < 500) {
-      // 跨域直连拿到的是 opaque，ok 恒为 false、status 恒为 0，不能当失败处理
-      if (!response.ok && response.type !== 'opaque') throw new Error('audio ' + response.status);
+      // 下载一律走自家的 /api/audio，同源响应，ok 能如实反映成败
+      if (!response.ok) throw new Error('audio ' + response.status);
       return response;
     }
     if (attempt === waits.length) throw new Error('audio ' + response.status);
@@ -3982,8 +3982,10 @@ async function runOfflineDownload(opts) {
     await navigator.serviceWorker.ready;
     // 词典详情的分片按首字母拆过，26 个小文件，先拿完离线也能长按看详情
     const details = (DATA_META && DATA_META.assets && DATA_META.assets.details) || {};
+    // 词典详情分片是附加内容，拉不到不该算进发音失败：它会让 finished.failed 永远
+    // 为真，后台自动缓存就再也标不成「已完成」，每次打开都要重来一遍。
     for (const url of Object.values(details)) {
-      try { await fetch(url, { cache: 'force-cache' }); } catch { offlineJob.failed += 1; }
+      try { await fetch(url, { cache: 'force-cache' }); } catch {}
     }
     let cursor = 0;
     let consecutiveFailures = 0;

@@ -124,8 +124,9 @@ def static_checks():
     check("前端音频标记与 SW 缓存版本对齐",
           "AUDIO_CACHE_VERSION = 'v2'" in t and "AUDIO_CACHE = 'ky-audio-v2'" in sw
           and "'ky_audio_words_v1'" not in t and "'ky_auto_offline_v1'" not in t)
-    check("SW 音频缓存只存成功响应",
-          "response.ok && await audioBudgetOk()" in sw and "response.type === 'opaque'" not in sw)
+    check("SW 音频缓存只存成功响应", "if (!response.ok) return response;" in sw)
+    # 页面把下载成功记成「已缓存」，SW 要是因配额紧张就跳过存储，两边状态会分叉
+    check("SW 配额紧张时淘汰而不是拒存", "Math.floor(AUDIO_CACHE_MAX * 0.9)" in sw)
     check("SW 新版本自动刷新", "hadOldShell" in sw and "client.navigate(client.url)" in sw)
     mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
     mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""

@@ -270,7 +270,9 @@ function tombstoneAll(snapshot, now) {
     const out = {};
     for (const [key, rec] of Object.entries(records || {})) {
       if (key === '__proto__') continue;
-      out[key] = isTombstone(rec) ? rec : tombstone(t);
+      const stamp = Number(rec && rec.t) || 0;
+      // 清空只删除 resetAt 之前的历史记录；清空之后另一台设备的新进度必须保留。
+      out[key] = isTombstone(rec) || stamp > t ? rec : tombstone(t);
     }
     return out;
   };

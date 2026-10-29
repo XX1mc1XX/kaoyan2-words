@@ -283,6 +283,12 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .offline-bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:8px 0}
 .offline-bar i{display:block;height:100%;width:0;background:var(--brand);transition:width .2s ease}
 .offline-line{font-size:12px;color:var(--muted);line-height:1.6}
+
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+@media (pointer:coarse){.tab,.meaning-toggle,.chapter-select,.shuffle-btn,.filter,.daily button,.nav-btn,.restore-btn,.list-more,.modal-close,.auth-switch,.danger,.detail-close,.detail-dict summary,.detail-again{min-height:44px}.weight-badge{min-width:44px;min-height:44px;padding:7px 10px}.progress{height:44px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+@media (prefers-color-scheme:dark){.btn,.btn.bad,.btn.mid,.btn.good,.filter.active,.tab.active,.meaning-toggle[aria-pressed="true"],.undo-bar button,.icon-choice.active::after,.storage-warn{color:#0b1714}}
 </style>
 </head>
 <body>
@@ -300,17 +306,17 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     </select>
     <span class="deck-meta" id="deckMeta"></span>
   </div>
-  <div class="tabs">
-    <button class="tab active" id="tabStudy">学习</button>
-    <button class="tab" id="tabList">词表</button>
-    <button class="tab" id="tabStat">统计</button>
+  <div class="tabs" role="tablist" aria-label="主要视图">
+    <button class="tab active" id="tabStudy" role="tab" aria-selected="true" aria-controls="viewStudy">学习</button>
+    <button class="tab" id="tabList" role="tab" aria-selected="false" aria-controls="viewList">词表</button>
+    <button class="tab" id="tabStat" role="tab" aria-selected="false" aria-controls="viewStat">统计</button>
   </div>
 </header>
 <div class="storage-warn hidden" id="speakWarn" role="status" aria-live="polite"></div>
 <div class="storage-warn hidden" id="storageWarn" role="status" aria-live="polite">进度保存失败：浏览器存储已满或处于隐私模式，刷新后可能丢失。</div>
 <div class="storage-warn hidden" id="sessionWarn" role="status" aria-live="polite"></div>
 <main>
-  <section class="view" id="viewStudy">
+  <section class="view" id="viewStudy" role="tabpanel" aria-labelledby="tabStudy" tabindex="0">
     <div class="study-head">
       <div class="position" id="position">第 <b>1</b> / 1 个</div>
       <select class="chapter-select" id="chapterSelect" aria-label="跳转章节"></select>
@@ -333,7 +339,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
         <span class="priority b" id="priorityBadge">B 次重点</span>
         <button type="button" class="weight-badge hidden" id="weightBadge" title="点一下减 1 次权重"></button>
       </div>
-      <div class="word" id="word">加载中</div>
+      <div class="word" id="word" role="button" tabindex="0">加载中</div>
       <div class="family-note hidden" id="familyNote"></div>
       <div class="forms-box hidden" id="formsBox">
         <div class="forms" id="forms"></div>
@@ -367,9 +373,8 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
   </section>
 
   <section class="view hidden" id="viewList">
-    <div class="list-head">
-      <input class="search" id="searchInput" type="search" placeholder="搜索单词或中文释义">
-      <div class="filters" id="filters">
+      <label class="sr-only" for="searchInput">搜索单词或中文释义</label>
+      <input class="search" id="searchInput" type="search" placeholder="搜索单词或中文释义" aria-label="搜索单词或中文释义">
         <button class="filter active" data-priority="all">全部</button>
         <button class="filter" data-priority="S">S</button>
         <button class="filter" data-priority="A">A</button>
@@ -386,7 +391,8 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
       <div class="stat"><b id="sTotal">0</b><span>总词数</span></div>
       <div class="stat"><b id="sLearned">0</b><span>学过</span></div>
       <div class="stat"><b id="sMastered">0</b><span>掌握</span></div>
-      <div class="stat"><b id="sDue">0</b><span>待学</span></div>
+      <div class="stat"><b id="sDue">0</b><span>未学</span></div>
+      <div class="stat"><b id="sReview">0</b><span>待复习</span></div>
     </div>
     <div class="panel">
       <div class="panel-title">学习节奏</div>
@@ -446,16 +452,19 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     <div class="modal-title" id="authTitle">登录</div>
     <p class="modal-note">登录后进度在手机和电脑之间同步。</p>
     <form class="auth-form" id="authForm">
+      <label class="sr-only" for="authUser">用户名</label>
       <input class="auth-input" id="authUser" placeholder="用户名" autocomplete="username" required>
+      <label class="sr-only" for="authPass">密码，至少 6 位</label>
       <input class="auth-input" id="authPass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" required>
       <button class="btn primary" id="authSubmit" type="submit">登录</button>
     </form>
     <button class="auth-switch" id="authMode">没有账号？注册一个</button>
     <div class="auth-sep"><span>或</span></div>
     <button class="wx-btn" id="wxLogin" disabled title="需微信开放平台网站应用资质">微信扫码登录（暂不可用）</button>
-    <button class="auth-switch" id="pairClaimToggle">用配对码登录（在电脑上生成）</button>
+    <button class="auth-switch" id="pairClaimToggle" aria-expanded="false" aria-controls="pairClaimBox">用配对码登录（在电脑上生成）</button>
     <div class="auth-pair hidden" id="pairClaimBox">
-      <input class="auth-input" id="pairCode" inputmode="numeric" maxlength="6" placeholder="6 位配对码">
+      <label class="sr-only" for="pairCode">6 位配对码</label>
+      <input class="auth-input" id="pairCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位配对码">
       <button class="btn" id="pairClaimBtn">登录</button>
     </div>
     <div class="auth-pair hidden" id="pairNewBox">
@@ -680,7 +689,8 @@ const bus = (() => {
 })();
 // 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的
 const SCOPED_KEYS = new Set(['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1', 'ky_stamp_v1', 'ky_daily_v1']);
-const scopedKey = key => (authUser && SCOPED_KEYS.has(key) ? key + '@' + authUser : key);
+const accountScope = name => String(name || '').trim().toLowerCase();
+const scopedKey = key => (authUser && SCOPED_KEYS.has(key) ? key + '@' + accountScope(authUser) : key);
 const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(scopedKey(key))) ?? fallback; } catch { return fallback; } };
 let storageWarned = false;
 let masteredWordsCache = null;
@@ -688,14 +698,17 @@ const save = (key, value) => {
   if (key === LS_STATE) masteredWordsCache = null;
   try {
     localStorage.setItem(scopedKey(key), JSON.stringify(value));
-    try { localStorage.setItem(scopedKey(LS_STAMP), String(Date.now())); } catch {}
     bus.emit('data:change', key);
+    return true;
   } catch (e) {
     if (!storageWarned) {
       storageWarned = true;
       const el = document.getElementById('storageWarn');
       if (el) el.classList.remove('hidden');
     }
+// 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的
+    try { bus.emit('data:change', key); } catch {}
+    return false;
   }
 };
 const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
@@ -740,7 +753,7 @@ function bumpDaily(known, isNewMaster) {
 // 撤销时把刚才加的数量减回去，否则误滑一次会永久多算一天的学习量
 function revertDaily(delta) {
   if (!delta) return;
-  const key = dayKey(Date.now());
+  const key = delta.day || dayKey(Date.now());
   const cur = daily[key];
   if (!cur || cur.del) return;
   daily[key] = {
@@ -762,6 +775,25 @@ function streakDays(d) {
 // 合并每日节奏由 shared/merge.js 统一提供（带 t 时按时间取新；只有老数据才退回取大）。
 // 以前本地这份用 Math.max，撤销减掉的计数一同步就被云端「取大」复活了。
 const $ = id => document.getElementById(id);
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+const isShown = el => !!el && !el.hidden && getComputedStyle(el).visibility !== 'hidden' && el.getClientRects().length > 0;
+const focusablesIn = root => [...root.querySelectorAll(FOCUSABLE)].filter(isShown);
+function trapModalFocus(event, root, close) {
+  if (event.key === 'Escape') { event.preventDefault(); close(); return; }
+  if (event.key !== 'Tab') return;
+  const items = focusablesIn(root);
+  if (!items.length) { event.preventDefault(); root.focus({ preventScroll: true }); return; }
+  const first = items[0], last = items[items.length - 1], active = document.activeElement;
+  if (event.shiftKey && (active === first || !root.contains(active))) { event.preventDefault(); last.focus({ preventScroll: true }); }
+  else if (!event.shiftKey && (active === last || !root.contains(active))) { event.preventDefault(); first.focus({ preventScroll: true }); }
+}
+function setPageInert(on) {
+  for (const el of [document.querySelector('header'), document.querySelector('main')].filter(Boolean)) {
+    el.inert = on;
+    if (on) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
+  }
+}
+
 let state = load(LS_STATE, {});
 let conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, speakLang: 'en', icon: null, iconAt: 0 }, load(LS_CONF, {}));
 const DECKS = {
@@ -917,8 +949,11 @@ function fillDeckInBackground(deckKey, attempt) {
       pendingSeek = null;
       // 目标位次要连章带书一起核对：补全期间用户可能已经跳了章，
       // 拿旧章的目标位次套到新章会直接落到错词上
-      if (seek && seek.deck === activeDeck && seek.ch === curChapter) loadChapter(curChapter, undefined, seek.idx);
-      else loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null);
+      if (seek && seek.deck === activeDeck && seek.ch === curChapter) {
+        loadChapter(curChapter, undefined, seek.idx, seek.word);
+      } else {
+        loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null);
+      }
     }).catch(() => {
       fillDeckPending = null;
       // 一次失败就永久停在 40 张最糟：重试一次，再失败才放弃，等下次进章节重新拉
@@ -1011,14 +1046,24 @@ function loadChapter(ch, mode, idxAt, atWord) {   // mode: 'shuffle' 打乱 / 'n
   }
   for (const w of pending) if (!seen.has(w.word)) ordered.push(w);
   queue = ordered;
-  if (atWord) {
-    const j = queue.findIndex(w => w.word === atWord);
-    idx = j >= 0 ? j : 0;
+  // 恢复优先级：显式词 > 显式位次 > 章节保存的词 > 章节保存的位次。
+  const targetWord = atWord || (typeof idxAt !== 'number' && rec.posWord) || null;
+  if (targetWord) {
+    const j = queue.findIndex(w => w.word === targetWord);
+    if (j >= 0) idx = j;
+    else if (deckIncomplete()) {
+      pendingSeek = { deck: activeDeck, ch, idx: typeof idxAt === 'number' ? idxAt : (Number(rec.pos) || 0), word: targetWord };
+      showStudyLoading('正在恢复上次学习位置…');
+      return;
+    } else {
+      const savedIdx = Number(rec.pos) || 0;
+      idx = Math.min(Math.max(savedIdx, 0), Math.max(queue.length - 1, 0));
+    }
   } else if (typeof idxAt === 'number' && queue.length) {
     idx = idxAt < 0 ? queue.length - 1 : Math.min(idxAt, queue.length - 1);
   } else if (rec.posWord) {
     const j = queue.findIndex(w => w.word === rec.posWord);
-    idx = j >= 0 ? j : 0;                     // 按词定位，队列变短也不会错位
+    idx = j >= 0 ? j : 0;
   } else {
     idx = Math.min(Math.max(rec.pos || 0, 0), Math.max(queue.length - 1, 0));
   }
@@ -1159,6 +1204,8 @@ let activePronunciationAudio = null;
 // 前端这两个「已经下载过」的标记要是还留着，就会以为全都下过了、永远不再补。
 const AUDIO_CACHE_VERSION = 'v2';
 const AUDIO_WORDS_KEY = 'ky_audio_words_' + AUDIO_CACHE_VERSION;
+const AUDIO_CACHE_CONFIRMED_HEADER = 'x-ky-cache';
+const audioMarkerKey = (text, lang) => String(lang || 'en') + ':' + String(text || '');
 const AUDIO_PRELOAD_AHEAD = 6;
 // 整章 200 个词的音频都要留在内存里，否则预热完立刻被回收，等于白做
 const AUDIO_PLAYER_LIMIT = 260;
@@ -1167,7 +1214,7 @@ const audioPlayers = new Map();
 const audioBlobUrls = new Map();
 const audioFetching = new Set();
 let audioCachedWords = (() => {
-  try { return new Set(JSON.parse(localStorage.getItem(AUDIO_WORDS_KEY)) || []); }
+  try { return new Set((JSON.parse(localStorage.getItem(AUDIO_WORDS_KEY)) || []).map(x => String(x).includes(':') ? String(x) : 'en:' + String(x))); }
   catch { return new Set(); }
 })();
 // 英文走有道词典发音（浏览器直连也行）；中文释义走百度 TTS，必须经自家 worker 转一手，
@@ -1185,20 +1232,25 @@ function cachedAudioUrl(text, lang) {
 // 没下载过的英文直连有道（0.2s），中文必须走 worker（百度带错 referer 会返回空音频）。
 function playSrcFor(text, lang) {
   if (lang === 'zh') return cachedAudioUrl(text, 'zh');
-  if (AUDIO_PROXY_READY && audioCachedWords.has(text)) return cachedAudioUrl(text, 'en');
+  if (AUDIO_PROXY_READY && audioCachedWords.has(audioMarkerKey(text, 'en'))) return cachedAudioUrl(text, 'en');
   return audioUrl(text, 'en');
 }
 // 离线副本一律经 worker：只有那条路能确认真的拿到音频，跨域直连看不出成败
 function offlineAudioUrl(text, lang) {
   return cachedAudioUrl(text, lang);
 }
-function rememberAudio(word) {
-  audioCachedWords.add(word);
-  // 全量缓存后上千个词名，留着不截断也就几十 KB
+let audioMarkerFlushTimer = null;
+function flushAudioMarkers() {
+  if (audioMarkerFlushTimer) { clearTimeout(audioMarkerFlushTimer); audioMarkerFlushTimer = null; }
   try { localStorage.setItem(AUDIO_WORDS_KEY, JSON.stringify([...audioCachedWords])); } catch {}
-  updateOfflineStatus();
+  try { updateOfflineStatus(); } catch {}
 }
-// 音色缓存：优先本地音色，在线音色作为最后选择。
+function rememberAudio(word, lang) {
+  const marker = String(word || '').includes(':') ? String(word) : audioMarkerKey(word, lang || 'en');
+  if (audioCachedWords.has(marker)) return;
+  audioCachedWords.add(marker);
+  if (!audioMarkerFlushTimer) audioMarkerFlushTimer = setTimeout(flushAudioMarkers, 1200);
+}
 function refreshVoice() {
   try {
     const synth = window.speechSynthesis;
@@ -1303,13 +1355,14 @@ function trimAudioPlayers() {
 function preloadAudioWord(word, lang) {
   if (!word || navigator.onLine === false) return null;
   if (lang === 'zh' && !AUDIO_PROXY_READY) return null;
-  let player = audioPlayers.get(word);
+  const playerKey = audioMarkerKey(word, lang);
+  let player = audioPlayers.get(playerKey);
   if (!player) {
     player = new Audio();
     player.preload = 'auto';
     player.setAttribute('playsinline', '');
     player.src = playSrcFor(word, lang);
-    audioPlayers.set(word, player);
+    audioPlayers.set(playerKey, player);
     trimAudioPlayers();
     try { player.load(); } catch {}
   }
@@ -1324,21 +1377,22 @@ function trimAudioBlobs() {
 }
 function cachePronunciationForOffline(text, lang) {
   if (!text || navigator.onLine === false || location.protocol === 'file:') return;
-  if (audioCachedWords.has(text) || audioFetching.has(text)) return;
-  audioFetching.add(text);
-  fetch(offlineAudioUrl(text, lang)).then(response => {
+  const marker = audioMarkerKey(text, lang);
+  if (audioCachedWords.has(marker) || audioFetching.has(marker)) return;
+  audioFetching.add(marker);
+  fetch(offlineAudioUrl(text, lang) + '&offline=1').then(response => {
     if (!response.ok) throw new Error('audio cache failed');
+    if (response.headers.get(AUDIO_CACHE_CONFIRMED_HEADER) === 'store-failed') throw new Error('audio cache store failed');
     return response.blob();
   }).then(blob => {
     if (!blob.size || !/^audio\//i.test(blob.type || '')) throw new Error('invalid audio');
-    const old = audioBlobUrls.get(text);
+    const old = audioBlobUrls.get(marker);
     if (old) { try { URL.revokeObjectURL(old); } catch {} }
-    audioBlobUrls.set(text, URL.createObjectURL(blob));
+    audioBlobUrls.set(marker, URL.createObjectURL(blob));
     trimAudioBlobs();
-    rememberAudio(text);
-  }).catch(() => {}).finally(() => audioFetching.delete(text));
+    rememberAudio(marker);
+  }).catch(() => {}).finally(() => audioFetching.delete(marker));
 }
-// 当前朗读模式对应的音频 key：英文用单词，中文用清洗后的释义
 function audioKeyOf(item) {
   return conf.speakLang === 'zh' ? meaningForSpeech(item) : (item && item.word);
 }
@@ -1359,12 +1413,14 @@ function prefetchAudioNearby() {
 // 整章预热：用户在一章里随便拖、随便翻，音频都已经在内存里，出声零等待。
 // 分批加载，别一次甩几百个请求出去把主线程和网络都堵住。
 let chapterPrefetchKey = '';
+let chapterPrefetchTimer = null;
 function prefetchChapterAudio() {
   if (!userGestured || navigator.onLine === false) return;
   const lang = conf.speakLang === 'zh' ? 'zh' : 'en';
   const key = activeDeck + ':' + curChapter + ':' + lang;
   if (chapterPrefetchKey === key) return;
   chapterPrefetchKey = key;
+  if (chapterPrefetchTimer) { clearTimeout(chapterPrefetchTimer); chapterPrefetchTimer = null; }
   const slice = chapterSlice(curChapter);
   let i = 0;
   const step = () => {
@@ -1374,7 +1430,7 @@ function prefetchChapterAudio() {
       const k = audioKeyOf(slice[i]);
       if (k) preloadAudioWord(k, lang);
     }
-    if (i < slice.length) setTimeout(step, 120);
+    if (i < slice.length) chapterPrefetchTimer = setTimeout(step, 120);
   };
   step();
 }
@@ -1466,14 +1522,14 @@ function speak(item, options) {
     if (direct && direct.readyState >= 2 && !direct.error) {
       return playAudioElement(direct, key, token, notify, options, 'direct', lang);
     }
-    const blobUrl = audioBlobUrls.get(key);
+    const blobUrl = audioBlobUrls.get(audioMarkerKey(key, tag));
     if (blobUrl) {
       const player = getPronunciationAudio();
       player.src = blobUrl;
       return playAudioElement(player, key, token, notify, options, 'blob', lang);
     }
     // 缓存过的词（含全量下载的）在线也直接用本地，别绕网络去等系统语音
-    if (audioCachedWords.has(key)) {
+    if (audioCachedWords.has(audioMarkerKey(key, tag))) {
       const player = getPronunciationAudio();
       player.src = playSrcFor(key, tag);
       return playAudioElement(player, key, token, notify, options, 'cached', lang);
@@ -1510,7 +1566,8 @@ function lowerWeight(word) {
 // 已认识库：右滑恢复，放回原词库
 function restoreMastered(word) {
   if (!word) return;
-  const at = idx;   // 恢复后队列少一个，停在原位就是原来的下一个词
+  const at = idx;
+  const before = state[word.word] && !state[word.word].del ? { ...state[word.word] } : undefined;   // 恢复后队列少一个，停在原位就是原来的下一个词
   if (state[word.word]) {
     const st = liveEntry(word.word);
     st.mastered = false; st.due = 0; st.t = Date.now();
@@ -1523,7 +1580,7 @@ function restoreMastered(word) {
   loadChapter(curChapter, undefined, at);
   savePos();
   updateStats();
-  showUndo(word, 'restored', { s: 1, m: 0 });
+  showUndo(word, 'restored', { s: 1, m: 0 }, before, at);
 }
 // 左滑/左键、右滑/右键统一走这里，滑动和键盘不再各有一套语义
 function applyWordAction(word, dir) {
@@ -1537,6 +1594,8 @@ function applyWordAction(word, dir) {
 }
 function mark(word, known) {
   if (!word) return;
+  const before = state[word.word] && !state[word.word].del ? { ...state[word.word] } : undefined;
+  const actionPos = idx;
   const st = liveEntry(word.word);
   const wasMastered = !!st.mastered;
   st.t = Date.now();
@@ -1544,10 +1603,14 @@ function mark(word, known) {
   if (known) { st.mastered = true; st.due = todayTs() + 7 * DAY; }
   else { st.w = (st.w || 0) + 1; st.mastered = false; st.due = 0; }
   state[word.word] = st;
-  save(LS_STATE, state);
+  if (!save(LS_STATE, state)) {
+    if (before === undefined) delete state[word.word]; else state[word.word] = before;
+    showSessionNotice('保存失败：浏览器存储空间不足，请先导出备份。', 8000);
+    return;
+  }
   bumpDaily(known, known && !wasMastered);
   if (known) {
-    showUndo(word, undefined, { s: 1, m: wasMastered ? 0 : 1 });
+    showUndo(word, undefined, { s: 1, m: wasMastered ? 0 : 1 }, before, actionPos);
     // 移出当前队列：进度条总数同步减少，下一个词自动顶上原位
     queue = queue.filter(w => w.word !== word.word);
     if (idx >= queue.length) idx = Math.max(queue.length - 1, 0);
@@ -1606,43 +1669,55 @@ function renderRhythm() {
   });
   weekEl.replaceChildren(frag);
 }
+let statsDirty = false;
+let statsFrame = 0;
 function updateStats() {
+  if (!$('viewStat') || $('viewStat').classList.contains('hidden')) { statsDirty = true; return; }
+  // 统计页可见时同步计算，避免测试或调用方紧接着读取 DOM 拿到旧值。
+  updateStatsNow();
+}
+function updateStatsNow() {
+  statsFrame = 0;
+  if (!$('viewStat') || $('viewStat').classList.contains('hidden')) { statsDirty = true; return; }
+  statsDirty = false;
   renderRhythm();
   if (WEB_MODE && !deckDataReady(activeDeck)) {
     const target = activeDeck;
-    $('sTotal').textContent = target === 'mastered' ? '…' : deckDataLength(target);
-    $('sLearned').textContent = '…';
-    $('sMastered').textContent = '…';
-    $('sDue').textContent = '…';
+    $('sTotal').textContent = target === 'mastered' ? '?' : deckDataLength(target);
+    $('sLearned').textContent = '?';
+    $('sMastered').textContent = '?';
+    $('sDue').textContent = '?';
+    if ($('sReview')) $('sReview').textContent = '?';
     if (!$('viewStat').classList.contains('hidden')) {
       ensureDeckData(target).then(() => {
-        if (activeDeck === target && !$('viewStat').classList.contains('hidden')) updateStats();
+        if (activeDeck === target && !$('viewStat').classList.contains('hidden')) updateStatsNow();
       }).catch(() => {
         if (activeDeck === target) {
-          $('sTotal').textContent = '加载失败';
-          $('sLearned').textContent = '—';
-          $('sMastered').textContent = '—';
-          $('sDue').textContent = '—';
+  $('sTotal').textContent = '加载失败';
+          $('sLearned').textContent = '?';
+          $('sMastered').textContent = '?';
+          $('sDue').textContent = '?';
         }
       });
     }
     return;
   }
-  let learned = 0, mastered = 0;
+  let learned = 0, mastered = 0, dueReview = 0;
   const words = deckWords();
   const total = activeDeck === 'mastered' ? words.length : deckDataLength(activeDeck);
+  const now = Date.now();
   for (const word of words) {
     const st = state[word.word];
-    if (!st || st.del) continue;   // 墓碑不算「学过」
+    if (!st || st.del) continue;
     learned += 1;
-    if (st.mastered) mastered += 1;
+    if (st.mastered && (!st.due || st.due > now)) mastered += 1;
+    if (st.mastered && st.due && st.due <= now) dueReview += 1;
   }
   $('sTotal').textContent = total;
   $('sLearned').textContent = learned;
   $('sMastered').textContent = mastered;
-  // 「待学」是还没碰过的词，不是「还没掌握的词」。用 total - mastered 会让
-  // 学过但没掌握的词同时被算进「学过」和「待学」，学得越多这个数越不动。
   $('sDue').textContent = Math.max(total - learned, 0);
+  if ($('sReview')) $('sReview').textContent = dueReview;
 }
 const LIST_PAGE_SIZE = 100;
 let listLimit = LIST_PAGE_SIZE;
@@ -1692,9 +1767,13 @@ function renderList(reset) {
   const upto = Math.min(listLimit, matches.length);
   // 「显示更多」只追加新增的那一页：每次都重建全部已渲染条目是 O(n²)，
   // 连点十次就要重建上千个节点。签名和已渲染前缀都对得上才敢追加。
-  const canAppend = !reset && signature === listKey && listRendered > 0
-    && listRendered <= upto && listRendered <= listMatches.length
-    && listMatches.slice(0, listRendered).every((w, i) => w === matches[i]);
+  const previousKey = listKey;
+  const previousMatches = listMatches;
+  // 「显示更多」只追加已渲染前缀之后的新页。签名变化或状态变化导致前缀不同，
+  // 就整批重绘，绝不能把旧结果和新结果拼在一起。
+  let canAppend = !reset && signature === previousKey && listRendered > 0
+    && listRendered <= upto && listRendered <= previousMatches.length
+    && previousMatches.slice(0, listRendered).every((w, i) => w === matches[i]);
   if (!canAppend) {
     list.replaceChildren();
     listRendered = 0;
@@ -1815,9 +1894,14 @@ async function switchDeck(value) {
 }
 function switchView(name) {
   for (const v of ['Study','List','Stat']) $('view' + v).classList.toggle('hidden', v !== name);
-  document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.id === 'tab' + name));
+  document.querySelectorAll('.tab').forEach(tab => {
+    const selected = tab.id === 'tab' + name;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
   if (name === 'List') renderList();
-  if (name === 'Stat') updateStats();
+  if (name === 'Stat') updateStatsNow();
 }
 const CHAPTER_SIZE = 200;
 function chapterCount() { return Math.ceil(deckKnownLength(activeDeck) / CHAPTER_SIZE); }
@@ -1848,7 +1932,8 @@ function gotoChapter(i) {
   loadChapter(i);
 }
 let undoTimer = null, undoWord = null, undoKind = 'mastered', undoChapter = null, undoIdx = 0;
-let undoDelta = null;   // 这一步给 daily 加了多少，撤销时要原样减回去
+let undoDelta = null;
+let undoBefore = undefined;   // 这一步给 daily 加了多少，撤销时要原样减回去
 function clearUndoBar() {
   clearTimeout(undoTimer);
   undoWord = null;
@@ -1857,45 +1942,31 @@ function clearUndoBar() {
   const bar = document.getElementById('undoBar');
   if (bar) bar.classList.add('hidden');
 }
-function showUndo(word, kind, delta) {
+function showUndo(word, kind, delta, before, pos) {
   undoWord = word;
   undoKind = kind || 'mastered';
-  undoDelta = delta || null;
+  undoDelta = delta ? { day: dayKey(Date.now()), ...delta } : null;
+  undoBefore = before === undefined ? undefined : { ...before };
   undoChapter = chapterKey(curChapter);
-  // 记住它被移走时的位次，撤销时插回原位，而不是插到用户后来翻到的位置
-  undoIdx = Math.min(idx, queue.length);
+  undoIdx = Number.isInteger(pos) ? pos : Math.min(idx, queue.length);
   $('undoText').textContent = (undoKind === 'restored' ? '已恢复：' : '已认识：') + word.word;
   $('undoBar').classList.remove('hidden');
   clearTimeout(undoTimer);
-  undoTimer = setTimeout(() => { $('undoBar').classList.add('hidden'); undoWord = null; }, 5000);
+  undoTimer = setTimeout(() => { $('undoBar').classList.add('hidden'); undoWord = null; undoBefore = undefined; }, 5000);
 }
 function doUndo() {
   const word = undoWord;
-  if (!word) return;
-  // 已经切到别的章节/词库，撤销插回会把别章的词塞进当前队列
-  if (undoChapter !== chapterKey(curChapter)) {
-    $('undoBar').classList.add('hidden');
-    undoWord = null;
-    return;
-  }
-  if (state[word.word]) {
-    const st = liveEntry(word.word);
-    if (undoKind === 'restored') { st.mastered = true; st.due = todayTs() + 7 * DAY; }
-    else { st.mastered = false; st.due = 0; }
-    st.t = Date.now();
-    save(LS_STATE, state);
-  }
-  revertDaily(undoDelta);
-  undoDelta = null;
-  queue.splice(Math.min(undoIdx, queue.length), 0, word);
-  undoIdx = 0;
+  if (!word || undoChapter !== chapterKey(curChapter)) return;
+  const before = undoBefore, pos = undoIdx, delta = undoDelta, now = Date.now();
+  undoWord = null; undoBefore = undefined; undoDelta = null; undoChapter = null;
+  state[word.word] = before === undefined ? tombstone(now) : { ...before, t: now };
+  save(LS_STATE, state);
+  revertDaily(delta);
   $('undoBar').classList.add('hidden');
   clearTimeout(undoTimer);
-  undoWord = null;
   revealed = null;
+  loadChapter(curChapter, undefined, pos);
   savePos();
-  renderStudy();
-  updateStats();
 }
 $('undoBtn').onclick = doUndo;
 let touchStart = null;
@@ -2098,7 +2169,7 @@ function loadDetail(word) {
   detailPending[key] = fetch(url, { cache: 'force-cache' })
     .then(r => { if (!r.ok) throw new Error('detail ' + r.status); return r.json(); })
     .then(d => { detailShards[key] = d || {}; return detailShards[key]; })
-    .catch(() => { detailShards[key] = {}; return detailShards[key]; })
+    .catch(() => { delete detailShards[key]; throw new Error('detail load failed'); })
     .finally(() => { delete detailPending[key]; });
   return detailPending[key];
 }
@@ -2170,10 +2241,14 @@ function renderDetail(word, info) {
 
 async function openDetail(word) {
   if (!word) return;
-  renderDetail(word, null);             // 先把已有内容显示出来，别让用户干等
-  const shard = await loadDetail(word.word);
-  const mask = $('detailMask');
-  if (mask.classList.contains('hidden')) return;
+  renderDetail(word, null);
+  let shard;
+  try { shard = await loadDetail(word.word); }
+  catch {
+    if (!$('detailMask').classList.contains('hidden')) $('detailDict').textContent = '详情加载失败，请检查网络后再试。';
+    return;
+  }
+  if ($('detailMask').classList.contains('hidden')) return;
   if (queue[idx] && queue[idx].word === word.word) renderDetail(word, shard[word.word]);
 }
 let detailFocusBack = null;
@@ -2432,6 +2507,56 @@ $('exportProgress').onclick = () => {
 };
 $('importProgress').onclick = () => $('importFile').click();
 const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+function prepareImport(d) {
+  if (!objectRecord(d)) throw new Error('bad file');
+  const now = Date.now();
+  let nextState = state;
+  let nextChapters = chapterData;
+  let nextDaily = daily;
+  let nextConf = { ...conf };
+  // 导入是「用这份替换本机进度」。旧记录里没有的词必须写成墓碑，
+  // 否则下次同步会被云端按「云端有你没有」原样拼回来。
+  if (d.state !== undefined) {
+    if (!objectRecord(d.state)) throw new Error('bad state');
+    const incoming = validateStateStore(d.state, now);
+    for (const [name, rec] of Object.entries(incoming)) {
+      if (!rec.del && !rec.t) incoming[name] = { ...rec, t: now };
+    }
+    for (const name of Object.keys(state)) {
+      if (!Object.prototype.hasOwnProperty.call(incoming, name)) incoming[name] = tombstone(now);
+    }
+    nextState = incoming;
+  }
+  if (d.chapterData !== undefined) {
+    if (!objectRecord(d.chapterData)) throw new Error('bad chapters');
+    const incoming = validateChapterStore(d.chapterData, now);
+    for (const [key, rec] of Object.entries(incoming)) {
+      if (!rec.del && !rec.t) incoming[key] = { ...rec, t: now };
+    }
+    for (const key of Object.keys(chapterData)) {
+      if (!Object.prototype.hasOwnProperty.call(incoming, key)) incoming[key] = tombstone(now);
+    }
+    nextChapters = incoming;
+  }
+  if (d.daily !== undefined) {
+    if (!objectRecord(d.daily)) throw new Error('bad daily');
+    nextDaily = validateDailyStore(d.daily, now);
+  }
+  if (d.conf !== undefined) {
+    if (!objectRecord(d.conf)) throw new Error('bad conf');
+    nextConf = validateConfStore(d.conf);
+    if (Object.prototype.hasOwnProperty.call(d.conf, 'icon')) nextConf.iconAt = now;
+    nextConf.progressAt = now;
+  }
+  // 导入是覆盖：云端多出来的词要让服务端补墓碑，否则会被合并回来。
+  nextConf.overwritePending = true;
+  const deck = Object.prototype.hasOwnProperty.call(DECKS, nextConf.deck) ? nextConf.deck : 'core';
+  const chapter = Math.max(0, Number(nextConf.deckChapter[deck]) || 0);
+  nextConf.deck = deck;
+  nextConf.chapter = chapter;
+  nextConf.deckChapter = { ...(nextConf.deckChapter || {}), [deck]: chapter };
+  return { state: nextState, chapterData: nextChapters, daily: nextDaily, conf: nextConf };
+}
 $('importFile').onchange = event => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
@@ -2443,100 +2568,60 @@ $('importFile').onchange = event => {
   }
   const reader = new FileReader();
   reader.onload = () => {
+    const beforeImport = { state, chapterData, daily, conf, activeDeck, curChapter };
     try {
-      const d = JSON.parse(reader.result);
-      if (!d || typeof d !== 'object') throw new Error('bad file');
-      const NOW_T = Date.now();
-      // 导入是「用这份替换本机进度」。旧记录里没有的词必须写成墓碑，
-      // 否则下次同步会被云端按「云端有你没有」原样拼回来。
-      if (d.state && typeof d.state === 'object') {
-        const incoming = {};
-        for (const [name, rec] of Object.entries(d.state)) {
-          if (name === '__proto__' || !rec || typeof rec !== 'object') continue;
-          // 备份里也可能带墓碑（导出发生在一键清空之后）：必须原样保留，
-          // 否则这些词会被还原成「活着但没有任何记录」，清空白做。
-          if (rec.del) {
-            incoming[name] = { del: 1, t: Number(rec.t) || NOW_T };
-            continue;
-          }
-          const clean = {};
-          if (rec.mastered) clean.mastered = true;
-          if (Number(rec.w) > 0) clean.w = Math.max(0, Math.floor(Number(rec.w)));
-          if (Number(rec.seen) > 0) clean.seen = Math.max(0, Math.floor(Number(rec.seen)));
-          if (Number(rec.due) > 0) clean.due = Math.max(0, Number(rec.due));
-          clean.t = Number(rec.t) || NOW_T;   // 没有时间戳的老备份按导入时间算
-          incoming[name] = clean;
-        }
-        for (const name of Object.keys(state)) {
-          if (!Object.prototype.hasOwnProperty.call(incoming, name)) incoming[name] = tombstone(NOW_T);
-        }
-        state = incoming;
-        save(LS_STATE, state);
+      const next = prepareImport(JSON.parse(reader.result));
+      if (!commitStores(next)) {
+        alert('导入失败：浏览器存储空间不足，原进度已保留。');
+        return;
       }
-      if (d.chapterData && typeof d.chapterData === 'object') {
-        const next = {};
-        for (const [key, rec] of Object.entries(d.chapterData)) {
-          if (key === '__proto__' || !rec || typeof rec !== 'object') continue;
-          next[key] = {
-            ...rec,
-            order: Array.isArray(rec.order) ? rec.order.filter(x => typeof x === 'string') : [],
-            pos: Number(rec.pos) > 0 ? Math.floor(Number(rec.pos)) : 0,
-            t: Number(rec.t) || NOW_T,
-          };
-        }
-        for (const key of Object.keys(chapterData)) {
-          if (!Object.prototype.hasOwnProperty.call(next, key)) next[key] = tombstone(NOW_T);
-        }
-        chapterData = next;
-        save('ky_chapter_v1', chapterData);
-      }
-      if (d.daily && typeof d.daily === 'object') { daily = pruneDaily(d.daily); save(LS_DAILY, daily); }
-      if (d.conf) {
-        if (d.conf.deck && DECKS[d.conf.deck]) { activeDeck = d.conf.deck; conf.deck = d.conf.deck; }
-        conf.chapter = Number(d.conf.chapter) || 0;
-        if (d.conf.deckChapter && typeof d.conf.deckChapter === 'object') {
-          const byDeck = {};
-          for (const [deck, ch] of Object.entries(d.conf.deckChapter)) {
-            if (deck === '__proto__' || !Number.isInteger(Number(ch))) continue;
-            byDeck[deck] = Number(ch);
-          }
-          conf.deckChapter = byDeck;
-        }
-        conf.showByDefault = !!d.conf.showByDefault;
-        if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
-        if (d.conf.speakLang === 'zh' || d.conf.speakLang === 'en') conf.speakLang = d.conf.speakLang;
-        if (Object.prototype.hasOwnProperty.call(d.conf, 'icon')) {
-          // 备份是外部文件：图标不收超大或非图片的 dataURL，否则会写满 localStorage
-          const incoming = d.conf.icon;
-          const usable = !!incoming && typeof incoming === 'object'
-            && (incoming.kind !== 'image'
-              || (typeof incoming.data === 'string'
-                  && incoming.data.length <= ICON_DATA_MAX
-                  && /^data:image\//i.test(incoming.data)));
-          conf.icon = usable ? incoming : null;
-          conf.iconAt = NOW_T;
-        }
-        conf.progressAt = NOW_T;
-        save(LS_CONF, conf);
-        renderAuth();
-        renderIconSettings();
-        syncFavicon(currentIcon());
-      }
-      // 导入是覆盖：云端多出来的词要让服务端补墓碑，否则会被合并回来
-      conf.overwritePending = true;
-      save(LS_CONF, conf);
-      if (authUser) scheduleCloudSync(0);
+      state = next.state;
+      chapterData = next.chapterData;
+      daily = next.daily;
+      conf = next.conf;
+      activeDeck = conf.deck;
+      $('deckSelect').value = activeDeck;
       updateDeckMeta();
       renderChapters();
       loadChapter(resumePosition());
-      savePos();                 // 导入的位置也要落进 deckChapter，否则刷新就丢
+      conf.deckChapter[activeDeck] = curChapter;
+      conf.chapter = curChapter;
+      // 队列重建后的真实落点也要一起保存；这里若失败，四块数据会回滚到导入前。
+      if (!commitStores({ state, chapterData, daily, conf })) {
+        state = beforeImport.state;
+        chapterData = beforeImport.chapterData;
+        daily = beforeImport.daily;
+        conf = beforeImport.conf;
+        activeDeck = beforeImport.activeDeck;
+        curChapter = beforeImport.curChapter;
+        commitStores(beforeImport);
+        $('deckSelect').value = activeDeck;
+        updateDeckMeta();
+        renderChapters();
+        loadChapter(curChapter);
+        updateStats();
+        renderList();
+        renderIconSettings();
+        syncFavicon(currentIcon());
+        alert('导入失败：浏览器存储空间不足，原进度已保留。');
+        return;
+      }
+      if (authUser) scheduleCloudSync(0);
       updateStats();
+      renderList();
+      renderAuth();
+      renderIconSettings();
+      syncFavicon(currentIcon());
       alert('进度已导入');
     } catch (e) {
-      alert('文件格式不对，导入失败');
+      alert('文件格式不对，导入失败，原进度已保留。');
     } finally {
       event.target.value = '';
     }
+  };
+  reader.onerror = () => {
+    event.target.value = '';
+    alert('读取备份文件失败，原进度已保留。');
   };
   reader.readAsText(file);
 };
@@ -2570,6 +2655,8 @@ window.addEventListener('keydown', event => {
   if (event.repeat) return;
   const active = document.activeElement;
   if (active && (['INPUT','TEXTAREA','SELECT'].includes(active.tagName) || active.isContentEditable)) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (active && active.closest && active.closest('button, a, summary, [role="button"], [contenteditable="true"]')) return;
   // 登录弹窗开着时不要动背后的卡片
   if (!$('authModal').classList.contains('hidden')) return;
   // 详情面板开着时，方向键不该继续 mark / restore 底层卡片
@@ -2661,14 +2748,7 @@ speakBtn.addEventListener('click', event => {
 // 点红点：权重 -1，用于误判右滑后回退
 $('weightBadge').onclick = event => {
   event.stopPropagation();
-  const w = queue[idx];
-  if (!w) return;
-  const st = state[w.word];
-  if (!st || st.del || !st.w) return;
-  st.w = Math.max(0, st.w - 1);
-  save(LS_STATE, state);
-  bumpDaily(false, false);
-  renderStudy();
+  lowerWeight(queue[idx]);
 };
 // 点单词朗读；阻止冒泡避免触发卡片的翻面
 $('word').addEventListener('click', event => {
@@ -2761,6 +2841,182 @@ async function api(path, options) {
   return data || {};
 }
 
+// 本地四块进度必须一起成功或一起失败。localStorage 没有多键事务：
+// 逐键调用 save() 时，第二块写失败会留下「新 state + 旧 chapter/conf」的半导入状态。
+// 这里保留每个键的原始文本，任意一次写入失败就按原文本回滚。
+function commitStores(next) {
+  const pairs = [
+    [LS_STATE, next.state],
+    ['ky_chapter_v1', next.chapterData],
+    [LS_DAILY, next.daily],
+    [LS_CONF, next.conf],
+  ];
+  let texts;
+  try {
+    texts = pairs.map(([, value]) => JSON.stringify(value));
+  } catch {
+    return false;
+  }
+  const storageKeys = pairs.map(([key]) => scopedKey(key));
+  const before = storageKeys.map(key => {
+    try { return localStorage.getItem(key); } catch { return null; }
+  });
+  try {
+    for (let i = 0; i < storageKeys.length; i++) localStorage.setItem(storageKeys[i], texts[i]);
+  } catch (e) {
+    for (let i = 0; i < storageKeys.length; i++) {
+      try {
+        if (before[i] === null) localStorage.removeItem(storageKeys[i]);
+        else localStorage.setItem(storageKeys[i], before[i]);
+      } catch {}
+    }
+    if (!storageWarned) {
+      storageWarned = true;
+      const el = document.getElementById('storageWarn');
+      if (el) el.classList.remove('hidden');
+    }
+    return false;
+  }
+  if (next.state !== undefined) masteredWordsCache = null;
+  for (const [key] of pairs) {
+    try { bus.emit('data:change', key); } catch {}
+  }
+  return true;
+}
+
+function objectRecord(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+function boundedInt(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+// 操作时间不能来自遥远的未来，否则一次坏备份就能让后续真实操作永远合并失败。
+// due 是唯一允许向未来延伸的字段，但仍限制在一以内年，避免 Number 溢出。
+function safeTimestamp(value, now, futureMs) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(Math.floor(n), now + Math.max(0, Number(futureMs) || 0));
+}
+function cleanIcon(icon) {
+  if (!objectRecord(icon)) return null;
+  if (icon.kind === 'preset') {
+    const preset = ICON_PRESETS.find(p => p.id === icon.id);
+    return preset ? { kind: 'preset', id: preset.id } : null;
+  }
+  if (icon.kind === 'image' && typeof icon.data === 'string'
+      && icon.data.length <= ICON_DATA_MAX
+      && /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(icon.data)) {
+    const out = { kind: 'image', data: icon.data };
+    if (typeof icon.name === 'string') out.name = icon.name.slice(0, 80);
+    return out;
+  }
+  return null;
+}
+function validateStateStore(store, now) {
+  if (!objectRecord(store)) return {};
+  const out = {};
+  let count = 0;
+  for (const [name, rec] of Object.entries(store)) {
+    if (name === '__proto__' || !name || name.length > 120 || !objectRecord(rec) || count >= 20000) continue;
+    count += 1;
+    if (rec.del === 1) {
+      out[name] = { del: 1, t: safeTimestamp(rec.t, now, 0) };
+      continue;
+    }
+    const clean = {};
+    const w = boundedInt(rec.w, 0, 1000000, 0);
+    const seen = boundedInt(rec.seen, 0, 1000000, 0);
+    const due = safeTimestamp(rec.due, now, 365 * DAY);
+    const t = safeTimestamp(rec.t, now, 0);
+    if (w) clean.w = w;
+    if (rec.mastered === true) clean.mastered = true;
+    if (seen) clean.seen = seen;
+    if (due > now) clean.due = due;
+    else if (due) clean.due = due;
+    if (t) clean.t = t;
+    out[name] = clean;
+  }
+  return out;
+}
+function validateChapterStore(store, now) {
+  if (!objectRecord(store)) return {};
+  const out = {};
+  for (const [key, rec] of Object.entries(store)) {
+    if (key === '__proto__' || !/^[a-z][a-z0-9_-]{0,31}:\d{1,6}$/i.test(key) || !objectRecord(rec)) continue;
+    if (rec.del === 1) {
+      out[key] = { del: 1, t: safeTimestamp(rec.t, now, 0) };
+      continue;
+    }
+    const order = [];
+    const names = new Set();
+    if (Array.isArray(rec.order)) {
+      for (const name of rec.order) {
+        if (typeof name !== 'string' || !name || name.length > 120 || names.has(name)) continue;
+        names.add(name);
+        order.push(name);
+        if (order.length >= CHAPTER_SIZE * 2) break;
+      }
+    }
+    const clean = {
+      order,
+      pos: boundedInt(rec.pos, 0, CHAPTER_SIZE * 2, 0),
+      t: safeTimestamp(rec.t, now, 0),
+    };
+    if (typeof rec.posWord === 'string' && rec.posWord.length <= 120) clean.posWord = rec.posWord;
+    if (rec.shuffled === true) clean.shuffled = true;
+    out[key] = clean;
+  }
+  return out;
+}
+function validateDailyStore(store, now) {
+  const out = pruneDaily(store);
+  for (const [key, rec] of Object.entries(out)) {
+    const at = new Date(key + 'T00:00:00').getTime();
+    if (!Number.isFinite(at) || at > now + DAY) {
+      delete out[key];
+      continue;
+    }
+    if (!rec.del) {
+      rec.s = boundedInt(rec.s, 0, 1000000, 0);
+      rec.m = boundedInt(rec.m, 0, 1000000, 0);
+      rec.t = safeTimestamp(rec.t, now, 0);
+      if (!rec.t) delete rec.t;
+    } else {
+      rec.t = safeTimestamp(rec.t, now, 0);
+    }
+  }
+  return out;
+}
+function validateConfStore(store) {
+  if (!objectRecord(store)) return { ...conf };
+  const now = Date.now();
+  const deck = Object.prototype.hasOwnProperty.call(DECKS, store.deck) ? store.deck : 'core';
+  const chapter = boundedInt(store.chapter, 0, 100000, 0);
+  const byDeck = {};
+  if (objectRecord(store.deckChapter)) {
+    for (const [name, value] of Object.entries(store.deckChapter)) {
+      if (Object.prototype.hasOwnProperty.call(DECKS, name) && Number.isInteger(Number(value))) {
+        byDeck[name] = boundedInt(value, 0, 100000, 0);
+      }
+    }
+  }
+  byDeck[deck] = chapter;
+  const out = {
+    deck,
+    chapter,
+    deckChapter: byDeck,
+    progressAt: safeTimestamp(store.progressAt, now, 0),
+    showByDefault: store.showByDefault === true,
+    speak: store.speak !== false,
+    speakLang: store.speakLang === 'zh' ? 'zh' : 'en',
+    icon: cleanIcon(store.icon),
+    iconAt: safeTimestamp(store.iconAt, now, 0),
+  };
+  if (store.overwritePending === true) out.overwritePending = true;
+  return out;
+}
 // 只把和默认值不同的字段写进 payload。全量写 w:0 / mastered:false / due:0
 // 会把进度撑到接近 512KB 上限，一旦越线就是永久 413，同步彻底停摆且没有降级路径。
 function slimRecord(rec) {
@@ -2807,57 +3063,40 @@ function snapshot() {
 }
 
 function applySnapshot(d) {
-  if (!d || typeof d !== 'object') return;
-  if (d.state && typeof d.state === 'object') {
-    state = d.state;
-    save(LS_STATE, state);
-  }
-  if (d.chapterData && typeof d.chapterData === 'object') {
-    chapterData = d.chapterData;
-    save('ky_chapter_v1', chapterData);
-  }
-  if (d.daily && typeof d.daily === 'object') {
-    daily = pruneDaily(d.daily);
-    save(LS_DAILY, daily);
-  }
-  if (d.conf && typeof d.conf === 'object') {
-    if (d.conf.deck && DECKS[d.conf.deck]) conf.deck = d.conf.deck;
-    if (d.conf.deckChapter) conf.deckChapter = d.conf.deckChapter;
-    if (typeof d.conf.chapter === 'number') conf.chapter = d.conf.chapter;
-    if (typeof d.conf.progressAt === 'number') conf.progressAt = d.conf.progressAt;
-    if (typeof d.conf.showByDefault === 'boolean') conf.showByDefault = d.conf.showByDefault;
-    if (typeof d.conf.speak === 'boolean') conf.speak = d.conf.speak;
-    // 图标按各自的设置时间取新。云端从没设过（iconAt=0）时不要动本机图标，
-    // 否则别处一台没设图标的设备同步一次就把这里的自定义图标洗成默认。
-    const remoteIconAt = Number(d.conf.iconAt) || 0;
-    if (remoteIconAt > (Number(conf.iconAt) || 0)) {
-      conf.icon = d.conf.icon && typeof d.conf.icon === 'object' ? d.conf.icon : null;
-      conf.iconAt = remoteIconAt;
-    }
-    // 删除已改用墓碑表达，老数据里的 forceAt 留着只会误导后续判断
-    delete conf.forceAt;
-    save(LS_CONF, conf);
-    activeDeck = DECKS[conf.deck] ? conf.deck : 'core';
-    const deckSelect = $('deckSelect');
-    if (deckSelect) deckSelect.value = activeDeck;
-    updateDeckMeta();
-  }
+  if (!objectRecord(d)) return false;
+  const now = Date.now();
+  const nextState = d.state === undefined ? state : validateStateStore(d.state, now);
+  const nextChapters = d.chapterData === undefined ? chapterData : validateChapterStore(d.chapterData, now);
+  const nextDaily = d.daily === undefined ? daily : validateDailyStore(d.daily, now);
+  const nextConf = d.conf === undefined ? { ...conf } : validateConfStore(d.conf);
+  // 位置也要先以「提交成功后的 conf」计算，不能先改全局变量再落盘：
+  // 写 localStorage 失败时，页面可能已经跳到新章节，内存与磁盘永久分叉。
+  const nextDeck = Object.prototype.hasOwnProperty.call(DECKS, nextConf.deck) ? nextConf.deck : 'core';
+  const savedChapter = Number((nextConf.deckChapter || {})[nextDeck]);
+  const nextChapter = Number.isInteger(savedChapter) && savedChapter >= 0
+    ? savedChapter : Math.max(0, Number(nextConf.chapter) || 0);
+  nextConf.deck = nextDeck;
+  nextConf.chapter = nextChapter;
+  nextConf.deckChapter = { ...(nextConf.deckChapter || {}), [nextDeck]: nextChapter };
+  if (!commitStores({ state: nextState, chapterData: nextChapters, daily: nextDaily, conf: nextConf })) return false;
+  state = nextState;
+  chapterData = nextChapters;
+  daily = nextDaily;
+  conf = nextConf;
+  activeDeck = nextDeck;
+  const deckSelect = $('deckSelect');
+  if (deckSelect) deckSelect.value = activeDeck;
+  updateDeckMeta();
   // 同步回来的进度是权威位置：直接跳到云端当前词库、章节和单词，不保留本机旧位置。
-  loadChapter(resumePosition());
-  // 章号可能被 clamp（「已认识」库的词数会变），把落定后的章号写回，两边保持一致
-  conf.deckChapter = conf.deckChapter || {};
-  conf.deckChapter[activeDeck] = curChapter;
-  conf.chapter = curChapter;
-  save(LS_CONF, conf);
+  loadChapter(nextChapter);
   renderChapters();
   updateStats();
   renderList();
-  // 图标可能刚从别的设备同步过来，左上角头像、浏览器标签页和设置面板都要跟着变
   renderAuth();
   renderIconSettings();
   syncFavicon(currentIcon());
+  return true;
 }
-
 function authSay(msg, kind) {
   const el = $('authStatus');
   el.textContent = msg || '';
@@ -2866,15 +3105,38 @@ function authSay(msg, kind) {
 
 // 登录/退出后重新装载该账号自己的进度
 function reloadSpace() {
-  state = load(LS_STATE, {});
-  chapterData = load('ky_chapter_v1', {});
-  daily = load(LS_DAILY, {});
-  conf = Object.assign({ deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0, showByDefault: false, speak: true, icon: null }, load(LS_CONF, {}));
+  if (authUser) {
+    const canonical = accountScope(authUser);
+    for (const base of SCOPED_KEYS) {
+      if (base === LS_STAMP) continue;
+      const legacy = base + '@' + authUser;
+      const target = base + '@' + canonical;
+      if (legacy !== target) {
+        const legacyRaw = localStorage.getItem(legacy);
+        const targetRaw = localStorage.getItem(target);
+        if (legacyRaw && !targetRaw) {
+          localStorage.setItem(target, legacyRaw);
+          localStorage.removeItem(legacy);
+        } else if (legacyRaw) {
+          // target 已有新数据时不能覆盖；旧大小写键若确属同一账号则清掉，避免下次重复迁移。
+          try { localStorage.removeItem(legacy); } catch {}
+        }
+      }
+    }
+  }
+  const now = Date.now();
+  state = validateStateStore(load(LS_STATE, {}), now);
+  chapterData = validateChapterStore(load('ky_chapter_v1', {}), now);
+  daily = validateDailyStore(load(LS_DAILY, {}), now);
+  conf = validateConfStore(Object.assign({
+    deck: 'core', chapter: 0, deckChapter: {}, progressAt: 0,
+    showByDefault: false, speak: true, speakLang: 'en', icon: null, iconAt: 0,
+  }, load(LS_CONF, {})));
   delete conf.autoShow;
   delete conf.forceAt;
   // 换了账号，「已认识」缓存必须重建，否则会沿用上一个账号的词
   masteredWordsCache = null;
-  activeDeck = DECKS[conf.deck] ? conf.deck : 'core';
+  activeDeck = conf.deck;
   $('deckSelect').value = activeDeck;
   updateDeckMeta();
   renderChapters();
@@ -2882,7 +3144,7 @@ function reloadSpace() {
   conf.deckChapter = conf.deckChapter || {};
   conf.deckChapter[activeDeck] = curChapter;
   conf.chapter = curChapter;
-  save(LS_CONF, conf);
+  commitStores({ state, chapterData, daily, conf });
   renderChapters();
   updateStats();
   renderList();
@@ -2917,10 +3179,11 @@ function withoutTombstones(store) {
 }
 function adoptGuestProgress(username) {
   try {
-    const stateKey = LS_STATE + '@' + username;
-    const chapterStoreKey = 'ky_chapter_v1@' + username;
-    const confKey = LS_CONF + '@' + username;
-    const dailyKey = LS_DAILY + '@' + username;
+    const scope = accountScope(username);
+    const stateKey = LS_STATE + '@' + scope;
+    const chapterStoreKey = 'ky_chapter_v1@' + scope;
+    const confKey = LS_CONF + '@' + scope;
+    const dailyKey = LS_DAILY + '@' + scope;
     const guestStateStore = parseStore(localStorage.getItem(LS_STATE));
     const guestChapterStore = parseStore(localStorage.getItem('ky_chapter_v1'));
     const guestDailyStore = parseStore(localStorage.getItem(LS_DAILY));
@@ -3171,7 +3434,7 @@ function applyMergedSnapshot(merged, local) {
   );
   if (changedLocally) {
     applyingRemote = true;
-    try { applySnapshot(merged); }
+    try { if (!applySnapshot(merged)) return false; }
     finally { applyingRemote = false; }
   }
   return changedLocally;
@@ -3336,18 +3599,35 @@ async function afterLogin(username) {
   setTimeout(() => syncNow(false), 0);
 }
 
-$('accountBtn').onclick = () => {
+let authReturnFocus = null;
+function openAuthModal() {
+  authReturnFocus = document.activeElement;
   $('authModal').classList.remove('hidden');
+  setPageInert(true);
+  const target = authUser ? focusablesIn($('authModal'))[0] : $('authUser');
+  (target || $('authModal')).focus({ preventScroll: true });
+}
+function closeAuthModal() {
+  if ($('authModal').classList.contains('hidden')) return;
+  $('authModal').classList.add('hidden');
+  setPageInert(false);
+  const back = authReturnFocus;
+  authReturnFocus = null;
+  if (back && back.isConnected) back.focus({ preventScroll: true });
+}
+$('accountBtn').onclick = () => {
+  openAuthModal();
   authSay('');
   loadWechatLogin();
   refreshAuth();
   renderIconSettings();
   refreshOfflineStat();
 };
-$('authClose').onclick = () => $('authModal').classList.add('hidden');
+$('authClose').onclick = closeAuthModal;
 $('authModal').onclick = event => {
-  if (event.target === $('authModal')) $('authModal').classList.add('hidden');
+  if (event.target === $('authModal')) closeAuthModal();
 };
+$('authModal').addEventListener('keydown', event => trapModalFocus(event, $('authModal'), closeAuthModal));
 $('authMode').onclick = () => {
   authMode = authMode === 'login' ? 'register' : 'login';
   renderAuth();
@@ -3391,7 +3671,8 @@ $('authLogout').onclick = async () => {
   showSessionNotice('已退出登录，进度仍保存在本机', 5000);
 };
 $('pairClaimToggle').onclick = () => {
-  $('pairClaimBox').classList.toggle('hidden');
+  const open = $('pairClaimBox').classList.toggle('hidden') === false;
+  $('pairClaimToggle').setAttribute('aria-expanded', String(open));
 };
 $('pairClaimBtn').onclick = async () => {
   const code = $('pairCode').value.replace(/\D/g, '');
@@ -3527,6 +3808,8 @@ function updateOfflineStatus() {
 // 音频都很小（10KB 上下），并发开满，只在单条卡住时超时跳过，不做任何限速。
 const OFFLINE_CONCURRENCY = 16;
 const OFFLINE_FETCH_TIMEOUT = 20000;
+const OFFLINE_PERMANENT_KEY = 'ky_audio_permanent_fail_' + AUDIO_CACHE_VERSION;
+let offlinePermanent = (() => { try { return new Set(JSON.parse(localStorage.getItem(OFFLINE_PERMANENT_KEY)) || []); } catch { return new Set(); } })();
 let offlineJob = null;
 
 async function offlineWordList() {
@@ -3617,7 +3900,12 @@ async function refreshOfflineStat() {
 }
 
 // 一次全量下载等于几千个音频请求，撞到限流就退避重试，别让整批失败
-async function fetchOfflineAudio(text, lang) {
+function responseIsPermanentAudioFailure(err) {
+  const m = String((err && err.message) || '');
+  const status = Number((m.match(/audio (\d{3})/) || [])[1]);
+  return status >= 400 && status < 500 && status !== 408 && status !== 425 && status !== 429;
+}
+async function fetchOfflineAudio(text, lang, externalSignal) {
   const waits = [2000, 6000, 15000];
   const makeTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
     ? AbortSignal.timeout(OFFLINE_FETCH_TIMEOUT) : null;
@@ -3625,7 +3913,8 @@ async function fetchOfflineAudio(text, lang) {
     let response;
     const timeout = makeTimeout();
     try {
-      response = await fetch(offlineAudioUrl(text, lang), timeout ? { signal: timeout } : {});
+      const signal = externalSignal || timeout;
+      response = await fetch(offlineAudioUrl(text, lang) + '&offline=1', signal ? { signal } : {});
     } catch (err) {
       // 超时或断连：按普通失败退避重试，别让整批卡在这一条上
       if (attempt === waits.length) throw err;
@@ -3649,6 +3938,8 @@ async function runOfflineDownload(opts) {
   if (offlineJob) return;
   const startBtn = $('offlineStart');
   const stopBtn = $('offlineStop');
+  // 准备阶段也占住任务槽，避免双击或自动/手动任务同时进入。
+  offlineJob = { total: 0, done: 0, failed: 0, cancelled: false, phase: '正在准备词库…', preparing: true };
   startBtn.disabled = true;
   // file:// 单文件版没有 worker，中文只能靠系统语音，借这次点击把引擎唤醒
   warmChineseVoice();
@@ -3677,7 +3968,7 @@ async function runOfflineDownload(opts) {
     targets = targets.filter(t => urgent.has(t.key)).concat(targets.filter(t => !urgent.has(t.key)));
   }
   // 已经在本机的不用再下一遍
-  const pending = targets.filter(t => !audioCachedWords.has(t.key));
+  const pending = targets.filter(t => !audioCachedWords.has(audioMarkerKey(t.key, t.lang)) && !offlinePermanent.has(audioMarkerKey(t.key, t.lang)));
   // 自动模式分批：一次最多 800 条，跑完就收工，下次打开接着来。
   // 否则每次打开都在后台拖几分钟，页面和朗读都被它拖慢。
   targets = auto ? pending.slice(0, 800) : pending;
@@ -3691,6 +3982,8 @@ async function runOfflineDownload(opts) {
     total: targets.length, done: 0, failed: 0, cancelled: false,
     startedAt: Date.now(),
     phase: auto ? '后台自动缓存（每次最多 800 条）' : '正在下载发音',
+    stopReason: '',
+    controller: typeof AbortController !== 'undefined' ? new AbortController() : null,
   };
   stopBtn.classList.remove('hidden');
   renderOfflineJob();
@@ -3713,20 +4006,24 @@ async function runOfflineDownload(opts) {
         cursor += 1;
         if (index >= targets.length) return;
         const target = targets[index];
+        const marker = audioMarkerKey(target.key, target.lang);
         try {
-          // 不在这里查 Cache API：缓存堆到几千条后主线程 match 会明显变慢，
-          // 判定交给 SW 的 cache-first，命中缓存同样是秒回。
-          await fetchOfflineAudio(target.key, target.lang);
-          audioCachedWords.add(target.key);
+          const response = await fetchOfflineAudio(target.key, target.lang, job.controller && job.controller.signal);
+          if (response.headers.get(AUDIO_CACHE_CONFIRMED_HEADER) === 'store-failed') throw new Error('audio cache store failed');
+          rememberAudio(marker);
           consecutiveFailures = 0;
-        } catch {
-          job.failed += 1;
-          consecutiveFailures += 1;
-          // 连续失败说明断网或被限流，整批先停，已缓存的留着，下次启动接着补。
-          // 16 个并发一起倒下时二十次只是两轮，太容易误判成断网，放到四十。
-          if (consecutiveFailures >= 40) {
-            job.cancelled = true;
-            $('offlineStat').textContent = '网络不稳定，已暂停；下次打开会接着补。';
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+          if (responseIsPermanentAudioFailure(err)) offlinePermanent.add(marker);
+          else {
+            job.failed += 1;
+            consecutiveFailures += 1;
+            if (consecutiveFailures >= 40) {
+              job.cancelled = true;
+              job.stopReason = 'threshold';
+              if (job.controller) job.controller.abort();
+              $('offlineStat').textContent = '网络不稳定，已暂停；下次打开会接着补。';
+            }
           }
         }
         job.done += 1;
@@ -3738,13 +4035,15 @@ async function runOfflineDownload(opts) {
     const finished = offlineJob;
     renderOfflineJob();
     offlineJob = null;
-    try { localStorage.setItem(AUDIO_WORDS_KEY, JSON.stringify([...audioCachedWords])); } catch {}
+    flushAudioMarkers();
+    try { localStorage.setItem(OFFLINE_PERMANENT_KEY, JSON.stringify([...offlinePermanent])); } catch {}
     startBtn.disabled = false;
     stopBtn.classList.add('hidden');
     updateOfflineStatus();
     // 只有这一批就把剩下的全下完了，才算彻底完成；分批模式下留着下次继续
-    if (auto && finished && !finished.cancelled && !finished.failed && pending.length <= 800) {
-      try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {}
+    if (auto && finished && !finished.cancelled && !finished.failed) {
+      const stillPending = targets.some(t => !audioCachedWords.has(audioMarkerKey(t.key, t.lang)) && !offlinePermanent.has(audioMarkerKey(t.key, t.lang)));
+      if (!stillPending) { try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {} }
     }
   }
 }
@@ -3776,7 +4075,7 @@ $('offlineStart').onclick = () => {
   if (offlineJob) { $('offlineStat').textContent = '正在后台缓存中，进度见上方。'; return; }
   runOfflineDownload();
 };
-$('offlineStop').onclick = () => { if (offlineJob) offlineJob.cancelled = true; };
+$('offlineStop').onclick = () => { if (offlineJob) { offlineJob.cancelled = true; offlineJob.stopReason = 'user'; if (offlineJob.controller) offlineJob.controller.abort(); } };
 
 // ---- 安装到桌面 + 手动检查更新 ----
 let installPrompt = null;
@@ -3845,6 +4144,27 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.protocol 
       updateOfflineStatus();
     }).catch(() => updateOfflineStatus());
     navigator.serviceWorker.addEventListener('controllerchange', updateOfflineStatus);
+    navigator.serviceWorker.addEventListener('message', event => {
+      const msg = event.data || {};
+      if (msg.type === 'ky:audio-evicted' && Array.isArray(msg.urls)) {
+        let changed = false;
+        for (const raw of msg.urls) {
+          try {
+            const u = new URL(raw, location.href);
+            const word = u.searchParams.get('word') || '';
+            const lang = u.searchParams.get('lang') === 'zh' ? 'zh' : 'en';
+            const marker = audioMarkerKey(word, lang);
+            if (audioCachedWords.delete(marker)) changed = true;
+          } catch {}
+        }
+        if (changed) flushAudioMarkers();
+      } else if (msg.type === 'ky:prefetch-failed') {
+        showSessionNotice('离线缓存未完整下载，请联网后重试。', 8000);
+      } else if (msg.type === 'ky:sw-updated') {
+        showSessionNotice('离线内容已更新，刷新页面即可使用最新版。', 8000);
+      }
+    });
+
   });
 }
 </script>

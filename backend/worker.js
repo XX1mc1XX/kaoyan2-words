@@ -119,6 +119,25 @@ function stateBudget(ip) {
 const clientIp = request =>
   request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || 'unknown';
 
+// 浏览器写请求必须来自本站；Origin 是主防线，Sec-Fetch-Site 作为补充。
+// 非浏览器请求缺少两者时仍允许，以兼容 API/测试客户端，但绝不接受明确跨站来源。
+function requestOriginAllowed(request, url) {
+  const site = (request.headers.get('sec-fetch-site') || '').toLowerCase();
+  if (site && site !== 'same-origin' && site !== 'none') return false;
+  const origin = request.headers.get('origin');
+  if (!origin) return true;
+  try {
+    const got = new URL(origin);
+    return got.protocol === url.protocol && got.host === url.host;
+  } catch {
+    return false;
+  }
+}
+
+function isJsonRequest(request) {
+  return /^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') || '');
+}
+
 // 读请求体时一边读一边累计大小，超限立刻取消。
 // 不能用 request.json()：它会把整个 body 读进内存，一个解压后几百 MB 的
 // gzip 请求就足以把 isolate 打 OOM。
@@ -234,13 +253,16 @@ async function handleAudio(request, env, ctx) {
   const site = request.headers.get('sec-fetch-site');
   if (site && site !== 'same-origin') return json({ error: '不允许跨站调用' }, 403);
   const url = new URL(request.url);
+  if (!requestOriginAllowed(request, url)) return json({ error: 'cross-site denied' }, 403);
   const word = url.searchParams.get('word') || '';
   const isZh = url.searchParams.get('lang') === 'zh';
   if (isZh ? !AUDIO_ZH_RE.test(word) : !AUDIO_WORD_RE.test(word)) {
     return json({ error: '发音词格式不对' }, 400);
   }
 
-  const cacheKey = new Request(url.toString());
+  const cacheUrl = new URL(url.toString());
+  cacheUrl.searchParams.delete('offline');
+  const cacheKey = new Request(cacheUrl.toString());
   if (request.method === 'GET') {
     const hit = await caches.default.match(cacheKey);
     if (hit) return hit;
@@ -252,12 +274,20 @@ async function handleAudio(request, env, ctx) {
     const target = isZh
       ? 'https://fanyi.baidu.com/gettts?lan=zh&text=' + encodeURIComponent(word) + '&spd=7&source=web'
       : 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2';
-    const upstream = await fetch(target, {
-      headers: isZh
-        ? { 'user-agent': 'Mozilla/5.0', 'referer': 'https://fanyi.baidu.com/' }
-        : { 'user-agent': 'Mozilla/5.0', 'referer': 'https://dict.youdao.com/' },
-      cf: { cacheEverything: true, cacheTtl: 31536000 },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    let upstream;
+    try {
+      upstream = await fetch(target, {
+        signal: controller.signal,
+        headers: isZh
+          ? { 'user-agent': 'Mozilla/5.0', 'referer': 'https://fanyi.baidu.com/' }
+          : { 'user-agent': 'Mozilla/5.0', 'referer': 'https://dict.youdao.com/' },
+        cf: { cacheEverything: true, cacheTtl: 31536000 },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const type = upstream.headers.get('content-type') || '';
     if (!upstream.ok || !type.startsWith('audio/')) {
       return json({ error: '在线发音暂时不可用' }, 502);
@@ -283,8 +313,15 @@ async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '').replace(/^\/api/, '') || '/';
   const method = request.method;
+  if (method !== 'GET' && method !== 'HEAD' && !requestOriginAllowed(request, url)) {
+    return json({ error: '请求来源不合法' }, 403);
+  }
 
   if (path === '/audio' && (method === 'GET' || method === 'HEAD')) return handleAudio(request, env, ctx);
+  if (path === '/health' && (method === 'GET' || method === 'HEAD')) {
+    if (method === 'HEAD') return new Response(null, { status: 200, headers: { 'cache-control': 'no-store' } });
+    return json({ ok: true, database: !!env.DB }, 200, { 'cache-control': 'no-store' });
+  }
   if (!env.DB) return json({ error: '数据库未绑定' }, 500);
 
   try {
@@ -296,6 +333,7 @@ async function handleApi(request, env, ctx) {
     }
 
     if (path === '/register' && method === 'POST') {
+      if (!isJsonRequest(request)) return json({ error: '请求格式不对' }, 415);
       if (!(await allowRate(env, 'reg:' + clientIp(request), 5, 3600_000))) {
         return json({ error: '注册太频繁，请稍后再试' }, 429);
       }
@@ -334,6 +372,7 @@ async function handleApi(request, env, ctx) {
     }
 
     if (path === '/login' && method === 'POST') {
+      if (!isJsonRequest(request)) return json({ error: '请求格式不对' }, 415);
       if (!(await allowRate(env, 'login:' + clientIp(request), 30, 600_000))) {
         return json({ error: '登录尝试太频繁，请 10 分钟后再试' }, 429);
       }
@@ -423,6 +462,7 @@ async function handleApi(request, env, ctx) {
     }
 
     if (path === '/pair/claim' && method === 'POST') {
+      if (!isJsonRequest(request)) return json({ error: '请求格式不对' }, 415);
       // 6 位码 + 5 分钟有效期，按 IP 限次是唯一挡猜测的手段，放宽等于送
       if (!(await allowRate(env, 'pair:' + clientIp(request), 6, 600_000))) {
         return json({ error: '尝试太频繁，请 10 分钟后再试' }, 429);

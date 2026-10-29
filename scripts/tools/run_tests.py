@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import csv
 import gzip
 import io
 import json
@@ -63,7 +64,7 @@ def static_checks():
           and "__MERGE__" in io.open(os.path.join(ROOT, "backend", "worker.js"), encoding="utf-8").read())
     check("清空用墓碑而非 forceAt", "tombstone(now)" in t and "conf.forceAt =" not in t)
     check("清空/导入请求服务端补墓碑", "overwritePending" in t)
-    check("导入保留备份里的墓碑", "if (rec.del) {" in t and "incoming[name] = { del: 1, t: Number(rec.t) || NOW_T }" in t)
+    check("导入保留备份里的墓碑", "const incoming = validateStateStore(d.state, now);" in t and "if (rec.del === 1)" in t)
     check("竞态跳过不推进同步版本",
           t.index("return { result, changedLocally: false, skipped: true };")
           < t.index("lastSyncAt = result.updatedAt || Date.now();"),
@@ -107,6 +108,9 @@ def static_checks():
     check("全量表惰性构建", "const allWords =" in t and "allWordsCache" in t)
     check("词位索引惰性构建", "wordLocationCache" in t)
     check("首卡渲染打点", "__firstCardAt" in t)
+    check("source text is clean", not any(ch in t for ch in ("\ufffd", chr(0xfffd))) and not any(ch in io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read() for ch in ("\ufffd", chr(0xfffd))))
+    check("模板占位符完整", io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read().count("/*__MERGE__*/") == 1)
+    check("交互元素无重复ID", len(re.findall(r'\bid="([^"]+)"', t)) == len(set(re.findall(r'\bid="([^"]+)"', t))))
 
     # --- 离线 ---
     sw_path = os.path.join(ROOT, "software", "sw.js")
@@ -125,9 +129,15 @@ def static_checks():
           "AUDIO_CACHE_VERSION = 'v2'" in t and "AUDIO_CACHE = 'ky-audio-v2'" in sw
           and "'ky_audio_words_v1'" not in t and "'ky_auto_offline_v1'" not in t)
     check("SW 音频缓存只存成功响应", "if (!response.ok) return response;" in sw)
+    check("SW缓存写入反馈协议", "x-ky-cache" in sw and "store-failed" in sw and "AUDIO_CACHE_CONFIRMED_HEADER" in t)
+    check("SW淘汰通知页面", "ky:audio-evicted" in sw and "ky:audio-evicted" in t)
+    check("离线下载有取消控制器", "new AbortController()" in t and "offlineJob.controller" in t)
+    check("详情失败不缓存网络空分片", "delete detailShards[key]; throw new Error(\x27detail load failed\x27)" in io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read())
+    check("章节音频定时器可取消", "chapterPrefetchTimer" in t and "clearTimeout(chapterPrefetchTimer)" in t)
+    check("清空只删除旧记录保留并发新学习", "stamp > t ? rec : tombstone(t)" in io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read() or "isTombstone(rec) || stamp > t ? rec : tombstone(t)" in io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read())
     # 页面把下载成功记成「已缓存」，SW 要是因配额紧张就跳过存储，两边状态会分叉
     check("SW 配额紧张时淘汰而不是拒存", "Math.floor(AUDIO_CACHE_MAX * 0.9)" in sw)
-    check("SW 新版本自动刷新", "hadOldShell" in sw and "client.navigate(client.url)" in sw)
+    check("SW 新版本通知刷新", "ky:sw-updated" in sw and "client.navigate(client.url)" not in sw)
     mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
     mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""
     check("manifest 独立显示", '"display": "standalone"' in mf)
@@ -260,11 +270,32 @@ def data_checks():
     pairs = {x["word"]: x["family"] for x in deriv}
     loops = [word for word, family in pairs.items() if pairs.get(family) == word]
     check("派生词没有互相指认", not loops, str(loops[:5]))
+    # 生成脚本目前只维护 JSON 为权威数据；CSV 必须与同源结果一致，不能一边 1545 条、一边 1456 条。
+    for deck in ("words", "insurance"):
+        csv_path = os.path.join(D, deck + ".csv")
+        json_path = os.path.join(D, deck + ".json")
+        rows = json.load(io.open(json_path, encoding="utf-8"))
+        if not os.path.exists(csv_path):
+            check("%s CSV 与 JSON 同源" % deck, False, "CSV 缺失")
+            continue
+        with io.open(csv_path, encoding="utf-8-sig", newline="") as f:
+            csv_rows = list(csv.reader(f))[1:]
+        # 不依赖中文表头：固定第二列就是单词；CSV 只用于人工查看，JSON 是权威来源。
+        csv_words = [(r[1] or "").strip().lower() for r in csv_rows if len(r) > 1]
+        json_words = [r["word"].strip().lower() for r in rows]
+        check("%s CSV 与 JSON 同源" % deck, len(csv_words) == len(json_words) and set(csv_words) == set(json_words),
+              "CSV=%d JSON=%d" % (len(csv_words), len(json_words)))
+        if deck == "insurance":
+            missing_score = [r["word"] for r in rows if "priority_score" not in r]
+            bad_weight = [r["word"] for r in rows if r.get("en1_coverage", 0) > 0 and r.get("weighted_coverage", 0) == 0]
+            check("insurance 优先级分数完整", not missing_score, str(missing_score[:5]))
+            check("insurance 英一覆盖计入加权", not bad_weight, str(bad_weight[:5]))
 
 
 # ---------- 浏览器内行为测试 ----------
 BROWSER_SUITE = r"""
 <script>
+window.addEventListener('error', e => { try { document.title = 'RESULT:' + JSON.stringify({ error: String((e.error && e.error.stack) || e.message || e.error) }); } catch {} });
 function fire(card, type, x, y) {
   const t = new Touch({ identifier: 1, target: card, clientX: x, clientY: y,
                         pageX: x, pageY: y, screenX: x, screenY: y });
@@ -354,7 +385,6 @@ setTimeout(function () {
           chapterData[key] = { order: queue.map(x => x.word), pos: 3, posWord: target.word };
           loadChapter(curChapter);
           out.resume_ok = queue[idx] && queue[idx].word === target.word;
-
           // G. 默认顺序稳定，只有手动打乱才变
           const k0 = chapterKey(0);
           delete chapterData[k0];
@@ -729,8 +759,26 @@ setTimeout(async function(){
     renderStudy();
     out.partial_denominator = document.getElementById('position').textContent;
     out.partial_bar_max = document.getElementById('progressBar').max;
+    // Partial first shard: saved word #80 must not be replaced by word #1.
+    const resumeFull = fullWords;
+    const resumeTarget = resumeFull[80].word;
+    const resumeOrder = resumeFull.slice(0, 200).map(x => x.word);
+    _deckReady.delete('words');
+    _deckCache.words = resumeFull.slice(0, 40);
+    chapterData['core:0'] = { order: resumeOrder, pos: 80, posWord: resumeTarget };
+    curChapter = 0;
+    loadChapter(0);
+    out.partial_resume_pending = pendingSeek && pendingSeek.word;
+    out.partial_resume_loading = studyLoading;
+    out.partial_resume_word = document.getElementById('word').textContent;
+    out.partial_resume_stays_loading = !!(pendingSeek && pendingSeek.word === resumeTarget && studyLoading && document.getElementById('word').textContent !== resumeFull[0].word);
+    _deckCache.words = resumeFull;
     _deckReady.add('words');
     _deckCache.words = fullWords;
+    _deckReady.add('words');
+    chapterData['core:0'] = { order: resumeOrder, pos: 80, posWord: resumeTarget };
+    loadChapter(0);
+    out.partial_resume_after_fill = !!(queue[idx] && queue[idx].word === resumeTarget);
     loadChapter(curChapter, undefined, 0);
 
     // 拖动进度条：拖动中不朗读，松手必须立刻读出新目标词，不能等用户再去点喇叭
@@ -806,6 +854,40 @@ setTimeout(async function(){
       { state: {}, chapterData: {}, daily: { [dkToday]: { s: 3, m: 0 } }, conf: { forceAt: 0 } },
       { state: {}, chapterData: {}, daily: { [dkToday]: { s: 5, m: 2 } }, conf: { forceAt: 0 } });
     out.web_daily_merge = dailyMerged.daily[dkToday].s === 5 && dailyMerged.daily[dkToday].m === 2;
+    // —— 云端快照与导入必须共用校验，且不能被畸形数据打崩 ——
+    const future = Date.now() + 365 * 864e5;
+    const cleanedState = validateStateStore({
+      good: { w: 3, mastered: true, due: future, t: Date.now(), extra: 'drop' },
+      bad: 'not-a-record', ['__proto__']: { mastered: true },
+    }, Date.now());
+    out.validate_state = cleanedState.good && cleanedState.good.w === 3
+      && cleanedState.good.mastered === true && !('extra' in cleanedState.good) && !('bad' in cleanedState);
+    const snapshotBefore = JSON.stringify({ state, chapterData, daily, conf, activeDeck, curChapter });
+    applyingRemote = true;
+    const applied = applySnapshot({
+      state: { valid: { w: 1, t: Date.now() } },
+      chapterData: { 'core:0': { order: ['valid'], pos: 0, t: Date.now() } },
+      daily: { [dayKey(Date.now())]: { s: 1, m: 0, t: Date.now() } },
+      conf: { deck: 'core', chapter: 0, deckChapter: { core: 0 }, progressAt: Date.now() },
+    });
+    applyingRemote = false;
+    out.apply_snapshot = applied === true && !!state.valid && activeDeck === 'core' && curChapter === 0;
+    const prepared = prepareImport({
+      state: { imported: { w: 2, t: Date.now() } },
+      chapterData: { 'core:0': { order: ['imported'], pos: 0, posWord: 'imported', t: Date.now() } },
+      daily: { [dayKey(Date.now())]: { s: 2, m: 0, t: Date.now() } },
+      conf: { deck: 'core', chapter: 0, deckChapter: { core: 0 }, progressAt: Date.now(), speak: false },
+    });
+    out.import_atomic = prepared.state.imported && prepared.state.valid
+      && prepared.state.valid.del === 1 && prepared.chapterData['core:0'].posWord === 'imported'
+      && prepared.conf.speak === false && prepared.conf.overwritePending === true;
+    let importRejected = false;
+    try { prepareImport({ state: [], chapterData: {}, daily: {}, conf: {} }); }
+    catch { importRejected = true; }
+    out.import_rejects_array = importRejected;
+    const restored = JSON.parse(snapshotBefore);
+    state = restored.state; chapterData = restored.chapterData; daily = restored.daily; conf = restored.conf;
+    activeDeck = restored.activeDeck; curChapter = restored.curChapter;
 
     // 游客空间「清空过」留下的墓碑，登录时不能把账号里同样的词一起删掉
     localStorage.setItem('ky_words_v1@probe2', JSON.stringify({ cherry: { mastered: true, t: 900 } }));
@@ -871,6 +953,8 @@ setTimeout(async function(){
         check("章号同时写进 deckChapter", data.get("pos_deck_chapter") == 2,
               "实际=%s" % data.get("pos_deck_chapter"))
         check("恢复位置与当前章节一致", data.get("pos_resume") == 2, "实际=%s" % data.get("pos_resume"))
+        check("首屏 40 条时保留后半章恢复目标", data.get("partial_resume_stays_loading") is True, "pending=%s loading=%s word=%s" % (data.get("partial_resume_pending"), data.get("partial_resume_loading"), data.get("partial_resume_word")))
+        check("后台补全后恢复后半章词", data.get("partial_resume_after_fill") is True)
         check("章内位次落盘", data.get("pos_idx") == 3, "实际=%s" % data.get("pos_idx"))
         check("切库各记各的章", data.get("deriv_chapter") == 0 and data.get("back_chapter") == 2,
               "派生=%s 回核心=%s" % (data.get("deriv_chapter"), data.get("back_chapter")))
@@ -886,6 +970,10 @@ setTimeout(async function(){
               "实际=%s" % data.get("adopt_keeps_account_word"))
         check("游客有效进度仍然并入", data.get("adopt_still_merges_live") is True)
         check("游客清空标志不串账号", data.get("adopt_drops_guest_reset") is True)
+        check("云端快照校验生效", data.get("validate_state") is True)
+        check("应用云端快照不报未定义函数", data.get("apply_snapshot") is True, "error=%s" % data.get("error"))
+        check("导入事务保留墓碑并覆盖进度", data.get("import_atomic") is True)
+        check("导入拒绝畸形数组", data.get("import_rejects_array") is True)
     finally:
         server.terminate()
         try:

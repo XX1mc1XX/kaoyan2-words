@@ -26,6 +26,7 @@ DATA = ROOT / "data"
 CORE = DATA / "words.json"
 DERIVATIVES = DATA / "derivatives.json"
 BASIC_REMOVED = DATA / "basic_removed_words.json"
+BASIC_REMOVED_ARCHIVE = DATA / "archive" / "basic_removed_words.json"
 REVIEW = DATA / "selection_review.json"
 MEANINGS = DATA / "meanings_curated.json"
 MEANINGS_FINAL = DATA / "meanings_final.json"
@@ -43,7 +44,14 @@ def main() -> None:
     derivative_rows = load(DERIVATIVES, [])
     core = {row["word"] for row in core_rows}
     derivatives = {row["word"] for row in derivative_rows}
-    basic_rows = load(BASIC_REMOVED, [])
+    # 输入文件缺失时绝不能继续：空的基础词库会被写成 basic.json，
+    # 下一次 make_html.py 就会发布一套没有自测词的半成品数据。
+    basic_source = BASIC_REMOVED if BASIC_REMOVED.exists() else BASIC_REMOVED_ARCHIVE
+    if not basic_source.exists():
+        raise SystemExit("missing %s (or %s); refusing to build empty basic deck" % (BASIC_REMOVED, BASIC_REMOVED_ARCHIVE))
+    basic_rows = json.loads(basic_source.read_text(encoding="utf-8"))
+    if not basic_rows:
+        raise SystemExit("%s is empty; refusing to build empty basic deck" % basic_source)
     basic = {row["word"] for row in basic_rows}
     reviewed_out = {
         row["word"] for row in load(REVIEW, [])
@@ -181,10 +189,12 @@ def main() -> None:
 
     with io.open(DATA / "insurance.csv", "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["序号", "单词", "核心释义", "考查形式", "补漏优先级"])
+        writer.writerow(["序号", "单词", "核心释义", "考查形式", "补漏优先级", "覆盖", "英一覆盖", "加权覆盖", "优先级分数"])
         for row in candidates:
-            writer.writerow([row["id"], row["word"], row["meaning"], " / ".join(row["forms"]), row["priority"]])
-
+            writer.writerow([
+                row["id"], row["word"], row["meaning"], " / ".join(row["forms"]), row["priority"],
+                row["coverage"], row["en1_coverage"], row["weighted_coverage"], row["priority_score"],
+            ])
     summary = {
         "basic_total": len(normalized_basic),
         "insurance_total": len(candidates),

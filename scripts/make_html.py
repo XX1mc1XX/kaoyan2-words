@@ -11,7 +11,7 @@ import re
 import shutil
 import stat
 import subprocess
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -65,12 +65,12 @@ for exam, folder in (("english_2", "ky2"), ("english_1", "ky1")):
     folder_path = ROOT / "ref" / folder
     if not folder_path.exists():
         continue
-    for path in sorted(folder_path.glob("*.pdf")):
+    for path in sorted(folder_path.rglob("*.pdf")):
         source_files.append({"exam": exam, "name": path.name, "sha256": sha256(path)})
 
 meta = dict(freq.get("meta", {}))
 meta.update({
-    "generated_at": date.today().isoformat(),
+    "generated_at": os.environ.get("KY_BUILD_DATE") or datetime.fromtimestamp(int(os.environ.get("SOURCE_DATE_EPOCH", "1793203200")), timezone.utc).date().isoformat(),
     "selection_total": len(rows),
     "selection_bands": summary.get("bands", {}),
     "exam_weights": summary.get("weights", {"english_2": 1.0, "english_1": 0.35, "english_3": 0.0}),
@@ -247,7 +247,8 @@ def build_detail(rows):
         groups = []
         for line in translation.split("\n"):
             line = line.strip()
-            if not line or line.startswith("["):   # 跳过 [计] [医] 这类领域行
+            line = re.sub(r"^\[[^\]]+\]\s*", "", line).strip()   # 去掉 [计] [医] 等领域标签，保留实际释义
+            if not line:
                 continue
             groups.append(line[:46] + "…" if len(line) > 46 else line)
         if not groups:
@@ -425,13 +426,17 @@ build_version = hashlib.sha256(
         re.sub(r'"generated_at":"[^"]*"', "", web_html),
         sw_template,
         merge_source,
+        sha256(SOFT / "manifest.webmanifest"),
+        sha256(SOFT / "icon-192.png"),
+        sha256(SOFT / "icon-512.png"),
     )).encode("utf-8")
 ).hexdigest()[:12]
 # 详情分片不进 SW 预缓存：它只在第一次长按时才用到，不该拖慢首次安装
-runtime_assets = [asset_map[k] for k in ("words", "derivatives", "basic", "insurance")] + [app_asset]
+runtime_assets = [asset_map[k] for k in ("words", "derivatives", "basic", "insurance")]
 sw_js = (
     sw_template
     .replace("__BUILD_VERSION__", build_version)
+    .replace("__APP_ASSET__", app_asset)
     .replace("__DATA_ASSETS__", json.dumps(runtime_assets, ensure_ascii=False))
 )
 (SOFT / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
@@ -466,14 +471,43 @@ worker_source = inject(
 
 # 临时目录写完再整体替换 deploy/：一边清空一边写会让目录短暂处于半成品状态，
 # 已经打开的旧页面按需去拉旧哈希分片就会 404。
+# 发布互斥：两个构建不能同时改写相同临时目录/最终目录。
+LOCK = ROOT / "deploy.lock"
+LOCK_FD = None
+try:
+    import msvcrt
+    LOCK_FD = os.open(str(LOCK), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    os.write(LOCK_FD, str(os.getpid()).encode("ascii"))
+except FileExistsError:
+    raise RuntimeError("另一个构建正在运行（deploy.lock 已存在）")
+except ImportError:
+    LOCK_FD = None
+
 STALE = ROOT / "deploy.old"
+moved_old = False
+try:
+    if STALE.exists():
+        rmtree_force(STALE)
+    if DEPLOY_FINAL.exists():
+        os.replace(DEPLOY_FINAL, STALE)
+        moved_old = True
+    os.replace(DEPLOY, DEPLOY_FINAL)
+except Exception:
+    # 第二次 rename 失败时恢复旧版本，不能把唯一可用目录留在 deploy.old。
+    if moved_old and not DEPLOY_FINAL.exists() and STALE.exists():
+        os.replace(STALE, DEPLOY_FINAL)
+    raise
+finally:
+    if LOCK_FD is not None:
+        try: os.close(LOCK_FD)
+        except Exception: pass
+        try: os.unlink(LOCK)
+        except Exception: pass
 if STALE.exists():
-    rmtree_force(STALE)
-if DEPLOY_FINAL.exists():
-    os.replace(DEPLOY_FINAL, STALE)
-os.replace(DEPLOY, DEPLOY_FINAL)
-if STALE.exists():
-    rmtree_force(STALE)
+    try:
+        rmtree_force(STALE)
+    except Exception as exc:
+        print("warning: deploy.old cleanup failed: %s" % exc)
 
 print(f"output={OUT}")
 print(f"deploy={DEPLOY_FINAL / 'index.html'}")

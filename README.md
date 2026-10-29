@@ -72,12 +72,12 @@ python scripts/build_optional_decks.py  # -> insurance.json
 python scripts/make_html.py         # -> software/考研核心词.html
 python scripts/make_pdf.py          # -> 打印版 PDF（可选）
 
-# 5. 部署到 Cloudflare Pages（需要代理）
-#    make_html.py 已经把 deploy/ 写成可直接上传的形态（含 index.html、_worker.js、分片资源），
-#    不要再把 software\考研核心词.html 复制进去 —— 那会把按需加载版覆盖成单文件版。
-$env:HTTP_PROXY="http://127.0.0.1:7897"
-npx wrangler pages deploy deploy --project-name=kaoyan2-words --branch=main
-```
+# 5. 构建、测试、部署、健康检查（推荐，一条命令）
+python scripts/deploy.py
+
+# 部署脚本会检查构建/测试返回码、发布锁、迁移门禁、deployment URL 和 /api/health。
+# 确认远端迁移已执行后，才能追加 --allow-pending-migrations。
+# 不要再把 software\考研核心词.html 复制进 deploy/，那会覆盖按需加载版。```
 
 **只改前端**（不动数据）的话，只需跑第 4、5 步。
 

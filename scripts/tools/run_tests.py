@@ -21,6 +21,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 import textwrap
 import time
 
@@ -40,7 +41,7 @@ def file_sha256(path):
 def expected_source_digest():
     paths = [
         "software/template.html", "software/sw.template.js", "backend/worker.js",
-        "shared/merge.js", "scripts/make_html.py", "data/words.json", "data/words_order.json",
+        "shared/merge.js", "scripts/make_html.py", "software/src", "data/words.json", "data/words_order.json",
         "data/derivatives.json", "data/basic.json", "data/insurance.json",
         "data/ky2_freq.json", "data/selection_summary.json", "data/ky1_freq.json",
         "data/meanings_curated.json", "data/meanings_final.json",
@@ -49,7 +50,14 @@ def expected_source_digest():
     parts = []
     for rel in paths:
         path = os.path.join(ROOT, rel)
-        if os.path.exists(path):
+        if not os.path.exists(path):
+            continue
+        if os.path.isdir(path):
+            for child in sorted((Path(path).rglob("*")), key=lambda item: item.as_posix()):
+                if child.is_file():
+                    child_rel = child.relative_to(ROOT).as_posix()
+                    parts.append(child_rel + ":" + file_sha256(child))
+        else:
             parts.append(rel + ":" + file_sha256(path))
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
@@ -185,6 +193,12 @@ def static_checks():
     source_paths = [os.path.join(ROOT, "software", "template.html"), os.path.join(ROOT, "software", "sw.template.js"), os.path.join(ROOT, "backend", "worker.js"), os.path.join(ROOT, "shared", "merge.js"), os.path.join(ROOT, "scripts", "make_html.py"), os.path.join(ROOT, "scripts", "deploy.py")]
     dirty_sources = [os.path.relpath(p, ROOT) for p in source_paths if os.path.exists(p) and chr(0xfffd) in io.open(p, encoding="utf-8").read()]
     check("source text is clean", not dirty_sources, str(dirty_sources[:5]))
+    bundle_proc = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "scripts", "frontend_bundle.py"), "--check"],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+    )
+    check("前端源片段可重建模板", bundle_proc.returncode == 0,
+          (bundle_proc.stdout + bundle_proc.stderr).strip()[:160])
     check("模板占位符完整", io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read().count("/*__MERGE__*/") == 1)
     check("交互元素无重复ID", len(re.findall(r'\bid="([^"]+)"', t)) == len(set(re.findall(r'\bid="([^"]+)"', t))))
 

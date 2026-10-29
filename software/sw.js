@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'cc8b3b5f7f4b';
+const BUILD_VERSION = '76e36c52bd77';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v2';
 const AUDIO_PROTOCOL_VERSION = 1;

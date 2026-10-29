@@ -16,6 +16,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from frontend_bundle import assemble_template
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 SOFT = ROOT / "software"
@@ -40,6 +42,7 @@ INPUT_MANIFEST = (
     ("worker_template", "backend/worker.js", True, True, "file", "Worker 模板"),
     ("merge_source", "shared/merge.js", True, True, "file", "前后端共享合并算法"),
     ("make_html", "scripts/make_html.py", True, True, "file", "构建脚本自身"),
+    ("frontend_src", "software/src", True, True, "dir", "有序前端源片段、样式和 shell"),
     ("words", "data/words.json", True, True, "file", "核心词库"),
     ("words_order", "data/words_order.json", False, True, "file", "上游排序参考，仅用于来源指纹"),
     ("derivatives", "data/derivatives.json", True, True, "file", "派生词库"),
@@ -266,11 +269,17 @@ def sha256(path: Path) -> str:
 def source_digest_entries():
     entries = []
     for key, rel_path, required, include_digest, kind, _role in INPUT_MANIFEST:
-        if not include_digest or kind != "file":
+        if not include_digest:
             continue
         path = require_input_path(key) if required else get_input_path(key)
-        if path is not None:
+        if path is None:
+            continue
+        if kind == "file":
             entries.append(rel_path + ":" + sha256(path))
+        elif kind == "dir":
+            for child in sorted((item for item in path.rglob("*") if item.is_file()), key=lambda item: item.as_posix()):
+                child_rel = child.relative_to(ROOT).as_posix()
+                entries.append(child_rel + ":" + sha256(child))
     return entries
 
 source_files = []
@@ -334,7 +343,10 @@ insurance_slim = slim_rows(insurance)
 
 
 
-template = require_input_path("template").read_text(encoding="utf-8")
+template_path = require_input_path("template")
+template = assemble_template()
+# Keep the tracked compatibility artifact in sync with ordered source fragments.
+atomic_write_text(template_path, template)
 # 合并算法只有一份实现，构建时分别注入前端和 Worker
 merge_source = require_input_path("merge_source").read_text(encoding="utf-8")
 

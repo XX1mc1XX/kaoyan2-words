@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "files": [
+    "00-deck-loader.js",
+    "10-storage.js",
+    "20-decks.js",
+    "30-study.js",
+    "40-audio.js",
+    "50-list-stats.js",
+    "60-deck-actions.js",
+    "70-input.js",
+    "80-import-export.js",
+    "90-sync-auth.js",
+    "95-events-errors.js",
+    "99-offline-main.js"
+  ]
+}

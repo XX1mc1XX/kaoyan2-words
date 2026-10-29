@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<link rel="icon" id="appFavicon" type="image/png" href="./icon-192.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" id="appleTouchIcon" href="./icon-192.png">
+<title>考研核心词汇</title>
+<style>__KY_STYLES__</style>
+</head>
+<body>
+<header>
+  <button class="account-btn" id="accountBtn" aria-label="账号">
+    <span class="avatar" id="accountAvatar"></span>
+  </button>
+  <div class="deck-inline">
+    <select class="deck-select" id="deckSelect" aria-label="选择背诵词库">
+      <option value="core">阶段一 · 核心词</option>
+      <option value="derivative">阶段二 · 核心派生</option>
+      <option value="foundation">基础词自测</option>
+      <option value="insurance">高/中频保险库</option>
+      <option value="mastered">已认识</option>
+    </select>
+    <span class="deck-meta" id="deckMeta"></span>
+  </div>
+  <div class="tabs" role="tablist" aria-label="主要视图">
+    <button class="tab active" id="tabStudy" role="tab" aria-selected="true" aria-controls="viewStudy">学习</button>
+    <button class="tab" id="tabList" role="tab" aria-selected="false" aria-controls="viewList">词表</button>
+    <button class="tab" id="tabStat" role="tab" aria-selected="false" aria-controls="viewStat">统计</button>
+  </div>
+</header>
+<div class="storage-warn hidden" id="speakWarn" role="status" aria-live="polite"></div>
+<div class="storage-warn hidden" id="storageWarn" role="status" aria-live="polite">进度保存失败：浏览器存储已满或处于隐私模式，刷新后可能丢失。</div>
+<div class="storage-warn hidden" id="sessionWarn" role="status" aria-live="polite"></div>
+<main>
+  <section class="view" id="viewStudy" role="tabpanel" aria-labelledby="tabStudy" tabindex="0">
+    <div class="study-head">
+      <div class="position" id="position">第 <b>1</b> / 1 个</div>
+      <select class="chapter-select" id="chapterSelect" aria-label="跳转章节"></select>
+      <div class="head-btns">
+        <button class="meaning-toggle" id="speakToggle" aria-pressed="true">朗读开</button>
+        <button class="meaning-toggle" id="meaningToggle" aria-pressed="false">释义关</button>
+      </div>
+    </div>
+    <input class="progress" id="progressBar" type="range" min="0" max="0" value="0" step="1" aria-label="进度，可拖动跳转">
+    <div class="swipe-stage" id="swipeStage">
+      <div class="swipe-track" id="swipeTrack">
+      <aside class="swipe-action good" id="swipeLeftCard" aria-label="左滑：认识，不再出现">
+        <span class="swipe-arrow" aria-hidden="true">←</span>
+        <span class="swipe-label">左滑</span>
+        <strong id="swipeLeftAction">认识</strong>
+        <span class="swipe-detail" id="swipeLeftDetail">不再出现</span>
+      </aside>
+      <article class="card" id="card">
+      <div class="badges">
+        <span class="priority b" id="priorityBadge">B 次重点</span>
+        <button type="button" class="weight-badge hidden" id="weightBadge" title="点一下减 1 次权重"></button>
+      </div>
+      <div class="word" id="word" role="button" tabindex="0" lang="en">加载中</div>
+      <div class="family-note hidden" id="familyNote"></div>
+      <div class="forms-box hidden" id="formsBox">
+        <div class="forms" id="forms"></div>
+      </div>
+      <div class="rule"></div>
+      <div class="meaning" id="meaning"></div>
+      <div class="swipe-hint" id="swipeHint">左滑 = 认识（不再出现）· 右滑 = 不认识（权重+1）</div>
+      </article>
+      <aside class="swipe-action bad" id="swipeRightCard" aria-label="右滑：不认识，权重加一">
+        <span class="swipe-arrow" aria-hidden="true">→</span>
+        <span class="swipe-label">右滑</span>
+        <strong id="swipeRightAction">不认识</strong>
+        <span class="swipe-detail" id="swipeRightDetail">权重 +1</span>
+      </aside>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" id="prevWord">← 上一个</button>
+      <span class="word-id" id="wordId">--</span>
+      <button class="nav-btn" id="nextWord">下一个 →</button>
+    </div>
+    <div class="order-btns">
+      <button class="shuffle-btn" id="shuffleChapter">↻ 打乱顺序</button>
+      <button class="shuffle-btn" id="restoreOrder">⟲ 恢复原序</button>
+    </div>
+    <div class="empty hidden" id="done">
+      <strong id="doneTitle">本章过完了</strong>
+      <span id="doneHint">还有没掌握的词，可以再过一轮。</span>
+      <button class="btn" id="doneAction">再过一轮</button>
+    </div>
+  </section>
+
+  <section class="view hidden" id="viewList" role="tabpanel" aria-labelledby="tabList">
+    <div class="list-head">
+      <label class="sr-only" for="searchInput">搜索单词或中文释义</label>
+      <input class="search" id="searchInput" type="search" placeholder="搜索单词或中文释义" aria-label="搜索单词或中文释义">
+      <div class="filters" role="group" aria-label="筛选词表">
+        <button type="button" class="filter active" data-priority="all" aria-pressed="true">全部</button>
+        <button type="button" class="filter" data-priority="S" aria-pressed="false">S</button>
+        <button type="button" class="filter" data-priority="A" aria-pressed="false">A</button>
+        <button type="button" class="filter" data-priority="B" aria-pressed="false">B</button>
+        <button type="button" class="filter" data-priority="C" aria-pressed="false">C</button>
+        <button type="button" class="filter" data-priority="mastered" aria-pressed="false">已掌握</button>
+      </div>
+    </div>
+    <div class="list-wrap"><ol class="word-list" id="wordList"></ol></div>
+  </section>
+
+  <section class="view hidden" id="viewStat" role="tabpanel" aria-labelledby="tabStat">
+    <div class="stats">
+      <div class="stat"><b id="sTotal">0</b><span>总词数</span></div>
+      <div class="stat"><b id="sLearned">0</b><span>学过</span></div>
+      <div class="stat"><b id="sMastered">0</b><span>掌握</span></div>
+      <div class="stat"><b id="sDue">0</b><span>未学</span></div>
+      <div class="stat"><b id="sReview">0</b><span>待复习</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">学习节奏</div>
+      <div class="streak"><b id="sStreak">0</b><span>天连续学习</span></div>
+      <div class="week" id="sWeek"></div>
+      <div class="note" id="sToday">今天还没开始背。</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">应用图标</div>
+      <div class="icon-editor">
+        <div class="icon-preview" id="iconPreview" aria-hidden="true"></div>
+        <div class="icon-copy">
+          <b id="iconCurrentName">默认 Logo</b>
+          <span>显示在左上角和浏览器标签页</span>
+        </div>
+      </div>
+      <div class="icon-choices" id="iconChoices" role="group" aria-label="选择应用图标"></div>
+      <div class="daily">
+        <button type="button" id="iconUpload">上传图片</button>
+        <button type="button" id="iconReset">恢复默认</button>
+      </div>
+      <input type="file" id="iconFile" accept="image/*" class="hidden">
+      <div class="note" id="iconStatus">可从相册选择图片，会自动裁成方形；左上角、浏览器标签页立即更新，并跟着账号同步到其它设备。手机主屏图标由系统缓存，换图标后需要重新「添加到主屏幕」才会变。</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">背诵优先级</div>
+      <div class="note">
+        <b>S 必背</b> → <b>A 重点</b> → <b>B 次重点</b> → <b>C 补充</b><br>右滑（不认识）会给这个词加权重，卡片上显示「错 N 次」；点「打乱本章」时权重越高越可能排前面，但不会强制置顶。<br>
+        系统已综合真题权重、词书分层和五书共识，按优先级从高到低排好。你不需要自己再看次数、覆盖套数和频段。
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">发音</div>
+      <div class="daily"><button id="testSpeak">点这里测试发音</button></div>
+      <div class="note" id="speakDiag">已预加载的真人发音会立即播放；新词先用系统语音即时发声，真人音频会在后台准备好。</div>
+      <div class="offline-note" id="offlineDiag">正在检查离线缓存…</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">进度备份</div>
+      <div class="daily">
+        <button id="exportProgress">导出进度</button>
+        <button id="importProgress">导入进度</button>
+      </div>
+      <div class="note">换手机、清缓存前先导出。导入会覆盖当前进度。</div>
+      <input type="file" id="importFile" accept=".json" class="hidden">
+    </div>
+    <div class="panel"><button class="danger" id="resetAll">清空全部学习记录</button></div>
+  </section>
+</main>
+<div class="undo-bar hidden" id="undoBar">
+  <span id="undoText">已认识</span>
+  <button id="undoBtn">撤销</button>
+</div>
+<div class="modal hidden" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="modal-card">
+    <button class="modal-close" id="authClose" aria-label="关闭">×</button>
+    <div class="modal-title" id="authTitle">登录</div>
+    <p class="modal-note">登录后进度在手机和电脑之间同步。</p>
+    <form class="auth-form" id="authForm">
+      <label class="sr-only" for="authUser">用户名</label>
+      <input class="auth-input" id="authUser" placeholder="用户名" autocomplete="username" required>
+      <label class="sr-only" for="authPass">密码，至少 6 位</label>
+      <input class="auth-input" id="authPass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" required>
+      <button class="btn primary" id="authSubmit" type="submit">登录</button>
+    </form>
+    <button class="auth-switch" id="authMode">没有账号？注册一个</button>
+    <div class="auth-sep"><span>或</span></div>
+    <button class="wx-btn" id="wxLogin" disabled title="需微信开放平台网站应用资质">微信扫码登录（暂不可用）</button>
+    <button class="auth-switch" id="pairClaimToggle" aria-expanded="false" aria-controls="pairClaimBox">用配对码登录（在电脑上生成）</button>
+    <div class="auth-pair hidden" id="pairClaimBox">
+      <label class="sr-only" for="pairCode">6 位配对码</label>
+      <input class="auth-input" id="pairCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位配对码">
+      <button class="btn" id="pairClaimBtn">登录</button>
+    </div>
+    <div class="auth-pair hidden" id="pairNewBox">
+      <button class="btn" id="pairNewBtn">在另一台设备登录</button>
+      <div class="pair-code hidden" id="pairCodeShow"></div>
+    </div>
+    <div class="auth-status" id="authStatus" role="status" aria-live="polite"></div>
+    <div class="auth-sync hidden" id="authSync">
+      <div class="sync-note">进度会自动同步，不用手动操作</div>
+      <button class="btn" id="syncNowBtn">立即同步</button>
+      <button class="auth-switch danger-link" id="authLogout">退出登录</button>
+    </div>
+    <div class="offline-box hidden" id="offlineBox">
+      <div class="offline-title">离线缓存</div>
+      <div class="offline-line" id="offlineStat">正在统计…</div>
+      <div class="offline-line" id="zhVoiceStat">中文语音：检测中…</div>
+      <div class="offline-bar"><i id="offlineFill"></i></div>
+      <div class="daily">
+        <button class="btn" id="offlineStart" type="button">下载全部</button>
+        <button class="btn hidden" id="offlineStop" type="button">停止</button>
+      </div>
+      <div class="offline-line">把四本词库、词典释义和中文英文发音都存进本机，没网也能背。约 60MB，随时可停。</div>
+    </div>
+    <div class="offline-box" id="appBox">
+      <div class="offline-title">安装与更新</div>
+      <div class="daily">
+        <button class="btn" id="installApp" type="button">安装到桌面</button>
+        <button class="btn" id="checkUpdate" type="button">检查更新</button>
+      </div>
+      <div class="offline-line" id="appStat">装到桌面后会全屏运行、启动更快，也不会被浏览器清掉缓存。</div>
+    </div>
+  </div>
+</div>
+<div class="detail-mask hidden" id="detailMask">
+  <div class="detail-sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="detailWord">
+    <button class="detail-close" id="detailClose" type="button" aria-label="关闭">×</button>
+    <div class="detail-word" id="detailWord" lang="en"></div>
+    <div class="detail-phonetic" id="detailPhonetic"></div>
+    <div class="detail-block" id="detailStatus"></div>
+    <div class="detail-block" id="detailExam"></div>
+    <div class="detail-block" id="detailForms"></div>
+    <details class="detail-dict" id="detailDictBox">
+      <summary>词典释义（含考研不考的义项，仅供对照）</summary>
+      <div class="detail-dict-body" id="detailDict"></div>
+    </details>
+    <button class="detail-again" id="detailAgain" type="button">朗读一遍</button>
+    <div class="detail-hint">点空白处或右上角 × 关闭</div>
+  </div>
+</div>
+<script type="application/json" id="ky-deck-words">__DATA__</script>
+<script type="application/json" id="ky-deck-derivatives">__DERIVATIVES__</script>
+<script type="application/json" id="ky-deck-basic">__BASIC__</script>
+<script type="application/json" id="ky-deck-insurance">__INSURANCE__</script>
+
+<script type="application/json" id="ky-deck-detail">__DETAIL__</script>
+<script type="application/json" id="ky-deck-meta">__META__</script>
+<script id="ky-app">__KY_APP__</script>
+</body>
+</html>

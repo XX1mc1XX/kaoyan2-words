@@ -54,27 +54,28 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 
 | 优先级 | 任务 | 状态 | 当前事实 | 完成标准 |
 |---|---|---|---|---|
-| P0 | 配置远程 Git 仓库并跑通托管 CI | 未开始 | 仓库无 remote；`.github/workflows/ci.yml` 只是本地配置，没有 GitHub Actions 运行记录 | 远程 HEAD 与本地一致；CI 在干净 checkout 跑通数据测试、319 项回归、离线检查和性能门禁 |
-| P0 | 建立 release tag 和构建产物归档 | 未开始 | 已记录 build `c18904c08771` / app `app.4defd52cb022.js`，但没有 tag、附件或不可变归档 | 创建 release tag；归档 `deploy/`、`build-meta.json`、app、SW、单文件版并校验 SHA-256 |
-| P0 | D1 备份、恢复和 migration 回滚演练 | 未开始 | 迁移账本存在；没有实际恢复演练记录 | 从明确备份点恢复测试库；账号、会话、进度完整；回滚步骤有真实命令和结果 |
-| P0 | 真实双设备生产同步演练 | 未开始 | 已有 Worker harness 和本地并发回归，但没有两台真实浏览器对线上 D1 演练 | 覆盖 clear/import、响应丢失重试、游客登录、会话过期、旧设备重连和乱序请求；两端最终收敛 |
-| P0 | 旧 Service Worker 升级到新 build | 未开始 | 部署验收使用全新技术 Edge profile，只证明新用户正常 | 旧 profile 已由旧 SW 控制后升级到新 build，页面不白屏，旧 shell 淘汰，新版本断网仍可启动 |
-| P0 | 用修复后的 `deploy.py` 完整跑一次发布 | 未开始 | 本次线上验收已人工全通过；但首次脚本因 Python TLS 假失败，修复后遵守“一轮只部署一次”没有重发 | 下次发布由修复后的 `deploy.py` 从构建到双域名验收一次跑完并打印 `release=ok` |
-| P1 | 真机与浏览器矩阵 | 未开始 | 当前性能是 Windows Edge headless + 本地 HTTP + 本地 WAV | 至少覆盖 iPhone Safari、Android Chrome、低端安卓和微信内置浏览器；首卡、滑动、音频、SW、断网和锁屏恢复通过 |
+| P0 | 配置远程 Git 仓库并跑通托管 CI | 已完成 | remote 指向 `XX1mc1XX/kaoyan2-words`，远程 HEAD 与本地一致；CI run `40903352211` 在干净 Windows checkout 跑通数据测试、319 项回归、离线检查与性能门禁 | 远程 HEAD 与本地一致；CI 在干净 checkout 跑通数据测试、319 项回归、离线检查和性能门禁 |
+| P0 | 建立 release tag 和构建产物归档 | 已完成 | tag `v1.0.0`；GitHub Release 附 `kaoyan2-words-c18904c08771.zip`、`SHA256SUMS`、`build-meta.json`；归档由 `scripts/tools/archive_release.py` 生成 | 创建 release tag；归档 `deploy/`、`build-meta.json`、app、SW、单文件版并校验 SHA-256 |
+| P0 | D1 备份、恢复和 migration 回滚演练 | 已完成（本地） | `python scripts/tools/d1_drill.py` 全绿：导出→清空→导入→进度 payload 逐字节一致→clear+reimport 回滚路径验证；远程模式需 `CLOUDFLARE_API_TOKEN`，尚未在生产库执行 | 从明确备份点恢复测试库；账号、会话、进度完整；回滚步骤有真实命令和结果 |
+| P0 | 真实双设备生产同步演练 | 已完成（契约级） | `python scripts/tools/sync_two_device.py` 覆盖游客登录合并、旧设备重连、clear 不复活、重试幂等、乱序同步、过期会话 401；两个独立会话对同一 Worker，不是两台真实浏览器 | 覆盖 clear/import、响应丢失重试、游客登录、会话过期、旧设备重连和乱序请求；两端最终收敛 |
+| P0 | 旧 Service Worker 升级到新 build | 已完成（本地） | `python scripts/tools/sw_upgrade_check.py`：持久 profile 先被 build A 控制，改写 sw.js 后升级到 B，旧 shell 只保留一版，页面不白屏，升级后断网仍可启动 | 旧 profile 已由旧 SW 控制后升级到新 build，页面不白屏，旧 shell 淘汰，新版本断网仍可启动 |
+| P0 | 用修复后的 `deploy.py` 完整跑一次发布 | 未开始 | 本机 wrangler 认证已过期且非交互环境无法登录，也没有 `CLOUDFLARE_API_TOKEN`，无法执行部署；构建与测试在本地全绿 | 下次发布由修复后的 `deploy.py` 从构建到双域名验收一次跑完并打印 `release=ok` |
+| P1 | 真机与浏览器矩阵 | 未开始 | 无真实移动设备可用；当前仍是 Windows Edge headless + 本地 HTTP | 至少覆盖 iPhone Safari、Android Chrome、低端安卓和微信内置浏览器；首卡、滑动、音频、SW、断网和锁屏恢复通过 |
 | P1 | 真实音频服务 soak test | 未开始 | 代理、缓存状态和离线写入已测；真实英文源与中文 TTS 未做长时间限流测试 | 连续下载章节/词库、429/5xx、断网续传、Wi-Fi/移动网络切换均符合预期 |
-| P1 | 接近 512 KiB 的数据规模压测 | 未开始 | 当前基准约 2400 条记录、同步快照 182,332 B | 接近上限的真实账号仍可同步；400 天墓碑清理、重复导入导出和长期每日记录不造成 413 或存储膨胀 |
-| P2 | 线上监控和告警 | 未开始 | 目前只有 `/api/health` 人工检查 | Worker 5xx、D1 错误、音频失败、前端未捕获错误、同步冲突和版本分布有监控与告警 |
-| P2 | 正式回滚演练 | 未开始 | 有构建/发布检查，没有线上回滚演练记录 | 能从 Cloudflare Pages 回退到上一个 deployment；旧前端与当前 Worker 兼容；D1 数据不丢失 |
+| P1 | 接近 512 KiB 的数据规模压测 | 已完成（本地） | `python scripts/tools/payload_soak.py`：137/266/499 KB 同步返回 200，576 KB 正确 413，11600 个词键重复同步不膨胀、回读一致 | 接近上限的真实账号仍可同步；400 天墓碑清理、重复导入导出和长期每日记录不造成 413 或存储膨胀 |
+| P2 | 线上监控和告警 | 进行中 | `python scripts/tools/uptime_watch.py` 已可轮询 health、build-meta、首页与 app 资产，连续失败推送 `KY_ALERT_WEBHOOK`；Worker 侧指标与告警渠道尚未接入。实测本机到生产首页偶发读超时（3 次中 2 次），已内置重试 | Worker 5xx、D1 错误、音频失败、前端未捕获错误、同步冲突和版本分布有监控与告警 |
+| P2 | 正式回滚演练 | 未开始 | 有构建/发布检查，没有线上回滚演练记录；回退 deployment 需要 Cloudflare 凭据 | 能从 Cloudflare Pages 回退到上一个 deployment；旧前端与当前 Worker 兼容；D1 数据不丢失 |
 
 ## 下次执行顺序
 
-1. **先做可追溯和备份**：配置 remote，跑托管 CI，创建 release tag 并归档本次构建；随后导出 D1 并完成恢复演练。
-2. **再做真实同步验证**：用两个独立测试账号和两台真实浏览器，验证 clear/import、响应丢失、游客登录、会话过期、旧设备和多标签位置。
-3. **验证升级路径**：准备一个被旧 Service Worker 控制的持久 profile，部署下一个候选版本，确认自动更新、旧缓存淘汰和断网启动。
-4. **补真机矩阵**：iPhone Safari、Android Chrome、低端安卓、微信内置浏览器；记录首卡、第一章 200 词、音频、SW、锁屏恢复和弱网表现。
-5. **验证音频与数据上限**：真实音频源 soak test；构造接近 512 KiB 的测试账号，确认不会永久 413。
-6. **最后补监控和回滚**：接入错误/版本/同步指标；演练回退上一个 deployment，并记录结果。
-7. **下一轮发布验收**：由修复后的 `deploy.py` 一次跑完，确认 `release=ok`，同时记录 public URL、deployment URL、build、app、tag 和归档位置。
+已完成（2026-10-30）：remote + 托管 CI、release tag 与 SHA-256 归档、D1 本地备份/恢复/回滚演练、双设备语义收敛演练、旧 SW 升级演练、512 KiB 同步上限压测。
+
+剩下的事项都卡在“本机没有 Cloudflare 凭据或没有真机”：
+
+1. **拿到 `CLOUDFLARE_API_TOKEN` 后**：`python scripts/tools/d1_drill.py --remote` 导出生产库；再按 `deploy.py` 完整跑一次发布，确认 `release=ok`；随后演练回退到上一个 deployment。
+2. **补真机矩阵**：iPhone Safari、Android Chrome、低端安卓、微信内置浏览器；记录首卡、第一章 200 词、音频、SW、锁屏恢复和弱网表现。
+3. **验证音频与数据上限的生产侧**：真实音频源 soak test；生产 D1 上构造接近 512 KiB 的测试账号。
+4. **补监控闭环**：把 `uptime_watch.py` 挂到本机计划任务，设置 `KY_ALERT_WEBHOOK`；Worker 侧再补 5xx/D1/同步冲突计数与版本分布。
 
 以上 P0 全部完成后，当前版本才算“生产化关键闭环完成”；P1/P2 完成后才算长期稳定性闭环。
 
@@ -105,6 +106,23 @@ python scripts/make_html.py
 python scripts/tools/run_tests.py
 python scripts/tools/offline_check.py --json
 python scripts/tools/measure_perf.py
+```
+
+生产化专项演练（与上面并用，互不替代）：
+
+```powershell
+python scripts/tools/d1_drill.py            # 备份→清空→恢复→回滚（本地 D1；--remote 需 token）
+python scripts/tools/sw_upgrade_check.py    # 旧 SW profile 升级到新 build，含断网启动
+python scripts/tools/payload_soak.py        # 512 KiB 同步上限（需先起 pages dev）
+python scripts/tools/sync_two_device.py     # 两台设备语义收敛（需先起 pages dev）
+python scripts/tools/uptime_watch.py --once # 线上探活：health/build-meta/首页/app
+python scripts/tools/archive_release.py     # 生成带 SHA-256 的 release 归档
+```
+
+`payload_soak.py` 和 `sync_two_device.py` 需要一个运行中的本地 Worker：
+
+```powershell
+npx wrangler pages dev deploy --port 8799 --ip 127.0.0.1
 ```
 
 当前本地基线：

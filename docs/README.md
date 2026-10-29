@@ -37,9 +37,9 @@
 | 缓存 | shell 按 build 版本分命名空间，音频固定 `ky-audio-v2`；页面只认 `x-ky-cache=stored/hit` 的落盘凭据 |
 | 测试 | 数据 14/14、回归 319/319、离线 20/20（2026-10-29 本地实测） |
 | 性能 | 首屏 HTML gzip 11,813 B、主程序 gzip 37,131 B；首卡 p50/p95 120/154.8 ms；详见根 README |
-| CI | `.github/workflows/ci.yml` 已定义 Windows 构建、数据测试、回归、离线、性能测量；仓库无远程，尚无托管 CI 运行记录 |
-| 发布 | 已上线 build `c18904c08771` / app `app.4defd52cb022.js`；public URL 与 deployment URL 均通过 HTTP + fresh Edge + health 验收 |
-| 剩余 | 远程 CI、tag/产物归档、D1 恢复、双设备同步、旧 SW 升级、真机矩阵、音频 soak、规模压测、监控和回滚演练未完成；详见 `PHASES.md` |
+| CI | `.github/workflows/ci.yml` 定义 Windows 构建、数据测试、回归、离线、性能测量；远程 `XX1mc1XX/kaoyan2-words` 已跑通（run `40903352211`） |
+| 发布 | 已上线 build `c18904c08771` / app `app.4defd52cb022.js`；tag `v1.0.0` + GitHub Release 附 SHA-256 归档 |
+| 剩余 | 真机矩阵、音频 soak、生产 D1 恢复与回滚演练、监控告警闭环未完成（均需 Cloudflare 凭据或真机）；详见 `PHASES.md` |
 
 ## 开工硬门禁
 

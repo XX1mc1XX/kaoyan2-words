@@ -35,10 +35,10 @@
 | 本地状态 | 主状态为 generation + 64 shard；位置为 `ky_pos_v1` 小键，不再每次翻词重写整份章节队列 |
 | 同步 | `shared/merge.js` 唯一实现；Worker 使用权威 `serverFence` 处理 clear/import，D1 `updated_at` 做乐观锁 |
 | 缓存 | shell 按 build 版本分命名空间，音频固定 `ky-audio-v2`；页面只认 `x-ky-cache=stored/hit` 的落盘凭据 |
-| 测试 | 数据 14/14、回归 318/318、离线 20/20（2026-10-29 本地实测） |
+| 测试 | 数据 14/14、回归 319/319、离线 20/20（2026-10-29 本地实测） |
 | 性能 | 首屏 HTML gzip 11,813 B、主程序 gzip 37,131 B；首卡 p50/p95 120/154.8 ms；详见根 README |
 | CI | `.github/workflows/ci.yml` 已定义 Windows 构建、数据测试、回归、离线、性能测量；仓库无远程，尚无托管 CI 运行记录 |
-| 发布 | 候选 HEAD `4368766`，build `c18904c08771`；公共域名尚未切到该版本 |
+| 发布 | 已上线 build `c18904c08771` / app `app.4defd52cb022.js`；public URL 与 deployment URL 均通过 HTTP + fresh Edge + health 验收 |
 
 ## 开工硬门禁
 

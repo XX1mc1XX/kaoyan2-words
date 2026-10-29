@@ -117,7 +117,7 @@ python scripts/tools/offline_check.py --json
 python scripts/tools/measure_perf.py
 ```
 
-当前基准：数据测试 14/14、回归 318/318、离线 20/20。没有实际命令和退出码，不能写“完成”。
+当前基准：数据测试 14/14、回归 319/319、离线 20/20。没有实际命令和退出码，不能写“完成”。
 
 ### 6.3 发布
 
@@ -151,12 +151,12 @@ python scripts/deploy.py
 
 ## 8. 当前发布事实
 
-截至 2026-10-29 20:41 +08:00：
+截至 2026-10-29 21:11 +08:00：
 
-- HEAD：`4368766`；
-- 本地构建：build `c18904c08771`，app `./app.4defd52cb022.js`；
-- 公共域名在本轮部署前仍返回旧 app `./app.9775dd28fffb.js`、SW `4e120f40cd87`；
-- 公共 `/build-meta.json` 未返回有效 JSON，健康检查正常；
-- 因此候选 build `c18904c08771` 尚未确认上线；发布后必须写回双域名实际结果。
+- 发布源码：`4368766`；后续发布验收修复为 `3afb365`；
+- 线上构建：build `c18904c08771`，app `./app.4defd52cb022.js`；
+- public URL 与 deployment URL `https://138572ea.kaoyan2-words.pages.dev/` 均已返回新 app 与对应 SW；
+- `/build-meta.json` 已返回有效 JSON，与本地 build/source/app 一致；
+- 双域名 HTTP、fresh Edge、SW 控制与 health 均已通过，本轮发布完成。
 
-下一次发布必须让 `deploy.py` 的 deployment URL + public URL 双域名验收全部通过，并在提交信息中记录对应 `app.<hash>.js`。
+本轮已完成；下一次发布仍需记录对应 `app.<hash>.js` 并重跑双域名验收。

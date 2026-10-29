@@ -119,7 +119,7 @@ python scripts/tools/measure_perf.py
 python scripts/deploy.py
 ```
 
-当前本地实测（2026-10-29）：数据测试 14/14，回归 318/318，离线端到端 20/20。
+当前本地实测（2026-10-29）：数据测试 14/14，回归 319/319，离线端到端 20/20。
 
 `run_tests.py` 覆盖源码片段可重建、64 shard、`ky_pos_v1`、导入/清空 generation 切换、serverFence、SW 缓存反馈、40→200 词补全和首卡性能。`offline_check.py` 使用全新临时 Edge profile，实际验证 SW 控制、四本词库、切章、词表、详情、中英文音频及断网重启。
 
@@ -157,11 +157,11 @@ python scripts/deploy.py
 
 ## 发布状态
 
-截至 **2026-10-29 20:41 +08:00**：
+截至 **2026-10-29 21:11 +08:00**：
 
-- 当前 HEAD：`4368766`；本地 `deploy/build-meta.json` 为 build `c18904c08771`、app `./app.4defd52cb022.js`。
-- 公共域名在本轮部署前仍返回旧 app `./app.9775dd28fffb.js`、SW build `4e120f40cd87`；`/api/health` 返回 `{"ok":true,"database":true}`。
-- 因此本轮候选 `c18904c08771` 尚未确认上线；发布后必须用 `deploy.py` 的双域名和 fresh Edge 验收结果覆盖本节。
+- 发布源码提交：`4368766`；`deploy/build-meta.json` 为 build `c18904c08771`、app `./app.4defd52cb022.js`。
+- 公共域名 `https://kaoyan2-words.pages.dev/` 与 deployment URL `https://138572ea.kaoyan2-words.pages.dev/` 均已返回 build `c18904c08771`、app `./app.4defd52cb022.js` 和对应 SW。
+- 验收已通过：两个域名的 build-meta、SW、HTML、主程序 SHA-256一致，各自全新 Edge profile 运行时通过，`/api/health` 的 D1 查询为 `{"ok":true,"database":true}`。
 - 仓库当前没有配置远程；`.github/workflows/ci.yml` 已定义 Windows CI，但本地没有 GitHub Actions 运行记录。不能把“workflow 已提交”说成“托管 CI 已全绿”。
 
 ## 数据规则

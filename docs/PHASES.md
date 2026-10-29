@@ -13,27 +13,27 @@
 |---|---|---|---|
 | 0 性能基线 | Edge fresh-profile 基线覆盖冷启动、首章补全、切章、搜索、分页、64 shard 写入、音频和同步快照 | 完成 | 2026-10-29 `measure_perf.py`：首卡 p50/p95 120/154.8 ms，DOM 240，HTML gzip 11,813 B，JS gzip 37,131 B |
 | 1 热路径存储 | generation + 64 shard；翻词只写一个分片；`ky_pos_v1` 单独保存位置 | 完成 | `run_tests.py` 覆盖旧键迁移、单分片写、账号隔离、失败不切换 generation；分片写 p50/p95 0.00/0.10 ms |
-| 2 启动与恢复 | 40 词内联 + 200 词首章补全；`pendingSeek` 按词恢复；第一章显示 `第 1 / 200 个` | 完成 | 回归测试 318/318；离线检查第 1 章 200/200；partial resume 测试通过 |
+| 2 启动与恢复 | 40 词内联 + 200 词首章补全；`pendingSeek` 按词恢复；第一章显示 `第 1 / 200 个` | 完成 | 回归测试 319/319；离线检查第 1 章 200/200；partial resume 测试通过 |
 | 3 详情、音频与离线 | 详情按字母分片；音频规范化、去重、确认落盘、淘汰通知；fresh-profile 断网验收 | 完成 | `offline_check.py` 20/20，覆盖四本词库、切章、词表、详情、中英音频、断网重启 |
 | 4 同步与 serverFence | `shared/merge.js` 唯一实现；服务端权威 fence；clear/import 分流；D1 乐观锁 | 完成 | 回归覆盖 reset/import fence、旧设备防复活、每日合并、gzip 解压上限、Worker 合并；导入使用稳定 operationId 和点击时刻 fence，重试幂等，游客破坏字段不进入账号 |
-| 5 前端拆分与交付 | 12 个有序源码片段；bundle 装配；CI；构建锁；发布锁；双域名验收 | 完成（本地） | `frontend_bundle.py --check` 通过；数据测试 14/14、回归 318/318；CI workflow 已定义；无远程，尚无托管 CI 运行记录 |
+| 5 前端拆分与交付 | 12 个有序源码片段；bundle 装配；CI；构建锁；发布锁；双域名验收 | 完成（本地） | `frontend_bundle.py --check` 通过；数据测试 14/14、回归 319/319；CI workflow 已定义；无远程，尚无托管 CI 运行记录 |
 
 Phase 0–5 的工程交付已闭合。当前没有“全部未开始”或“等待建立基线”的任务。
 
 ## 当前发布状态
 
-截至 **2026-10-29 20:41 +08:00**：
+截至 **2026-10-29 21:11 +08:00**：
 
 | 项 | 事实 |
 |---|---|
-| HEAD | `4368766` |
-| 本地构建 | build `c18904c08771`，app `./app.4defd52cb022.js` |
-| 公共域名 | app `./app.9775dd28fffb.js`，SW `4e120f40cd87` |
-| `/build-meta.json` | 公共域名未返回有效构建元数据 |
+| 发布源码 | `4368766` |
+| 线上构建 | build `c18904c08771`，app `./app.4defd52cb022.js` |
+| 公共域名 | app `./app.4defd52cb022.js`，SW build `c18904c08771` |
+| `/build-meta.json` | 200 JSON，与本地 build/source/app 完全一致 |
 | `/api/health` | 200，`{"ok":true,"database":true}` |
-| 结论 | 当前 HEAD 尚未确认上线；下一次发布必须以 `deploy.py` 的双域名验收通过为准 |
+| 结论 | 已上线；public URL + deployment URL 双域名 fresh Edge 验收通过 |
 
-这不是待开发阶段，而是唯一的发布闭环动作：确认最近 10 分钟无并发提交/部署后，执行一次 `python scripts/deploy.py`，全绿后才可更新本节和提交信息。
+本轮发布闭环已完成；下次发布仍必须重跑 10 分钟互斥、构建、回归、离线与双域名 fresh Edge 验收。
 
 ## 每次开工门禁
 
@@ -67,7 +67,7 @@ python scripts/tools/measure_perf.py
 当前本地基线：
 
 - 数据测试：14/14。
-- 回归：318/318。
+- 回归：319/319。
 - 离线：20/20。
 - 首屏性能：首卡 p50/p95 120/154.8 ms；DOM 240；首屏 HTML gzip 11,813 B；主程序 gzip 37,131 B。
 

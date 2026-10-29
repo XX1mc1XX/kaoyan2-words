@@ -201,8 +201,11 @@ function mergeConf(local, cloud, localChapters, cloudChapters, localActivityAt, 
   const aIconAt = Number(a.iconAt) || 0;
   const bIconAt = Number(b.iconAt) || 0;
   if (aIconAt || bIconAt) {
+    // 时间打平时必须以 winner 的 icon 为准，哪怕它是 null：
+    // 用 `??` 会把「winner 主动恢复默认图标（icon:null）」跳过，退回另一端的旧图标。
+    // 只有 winner 根本没有这个字段（老数据）时才借用另一端的。
     const icon = aIconAt === bIconAt
-      ? (winner.icon ?? other.icon)
+      ? (winner.icon === undefined ? other.icon : winner.icon)
       : (aIconAt > bIconAt ? a.icon : b.icon);
     out.icon = (icon && typeof icon === 'object') ? icon : null;
     out.iconAt = Math.max(aIconAt, bIconAt);

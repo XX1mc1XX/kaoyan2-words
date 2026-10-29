@@ -2558,9 +2558,12 @@ function snapshot() {
       progressAt: Number(conf.progressAt) || 0,
       showByDefault: !!conf.showByDefault,
       speak: conf.speak !== false,
+      speakLang: conf.speakLang === 'zh' ? 'zh' : 'en',
       // 图标是账号级偏好：跟着账号走，换手机不用重设。体积由 ICON_DATA_MAX 兜住。
+      // iconAt 必须无条件上传：icon 为 null 时 iconOk 是 false，若这时把 iconAt 也归零，
+      // 服务端会判定「本机这次没动过图标」，云端旧图标永远删不掉，另一台设备也变不回默认。
       icon: iconOk ? conf.icon : null,
-      iconAt: iconOk ? (Number(conf.iconAt) || 0) : 0,
+      iconAt: Number(conf.iconAt) || 0,
     },
   };
 }
@@ -3219,6 +3222,9 @@ bus.on('data:change', () => updateStats());
 bus.on('deck:change', () => {
   renderChapters();
   updateDeckMeta();
+  // 统计按「当前词书」算，统计页开着时切词书必须跟着重算，
+  // 否则数字还停在上一个词库上。
+  updateStats();
 });
 
 // ---- 错误上报 ----

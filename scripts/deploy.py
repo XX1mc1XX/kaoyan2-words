@@ -198,7 +198,42 @@ def load_release_artifact():
     return meta, app_bytes, app_digest
 
 
-def http_bytes(url, timeout=20):
+def http_bytes(url, timeout=60):
+    # Cloudflare Pages ??? Windows ?????? Python/OpenSSL ? TLS?
+    # curl ??????? KB??? PowerShell ? Invoke-WebRequest ???
+    # ??????????? HTTP ??????????????????
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if shell:
+        handle, name = tempfile.mkstemp(prefix="ky-http-", suffix=".bin")
+        os.close(handle)
+        env = dict(os.environ)
+        env.update({
+            "KY_HTTP_URL": url,
+            "KY_HTTP_OUT": name,
+            "KY_HTTP_TIMEOUT": str(max(1, int(timeout))),
+        })
+        ps = (
+            "$ProgressPreference='SilentlyContinue'; "
+            "$r=Invoke-WebRequest -UseBasicParsing -Uri $env:KY_HTTP_URL "
+            "-OutFile $env:KY_HTTP_OUT -TimeoutSec ([int]$env:KY_HTTP_TIMEOUT); "
+            "[Console]::Out.Write([int]$r.StatusCode)"
+        )
+        try:
+            result = subprocess.run(
+                [shell, "-NoProfile", "-NonInteractive", "-Command", ps],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=timeout + 15, env=env,
+            )
+            if result.returncode != 0:
+                detail = (result.stderr or result.stdout or "PowerShell HTTP failed").strip()
+                raise RuntimeError("HTTP ?????" + detail[:240])
+            return 200, Path(name).read_bytes()
+        finally:
+            try:
+                Path(name).unlink()
+            except OSError:
+                pass
+
     req = urllib.request.Request(
         url, headers={"user-agent": "ky-deploy-check/2", "cache-control": "no-cache"},
     )
@@ -686,9 +721,17 @@ def verify_target(base_url, meta, app_bytes, app_digest):
     if last:
         return False, "构建校验失败：" + last
 
-    ok, detail = verify_browser_release(base_url, meta, app_digest)
-    if not ok:
-        return False, "全新 Edge 验收失败：" + detail
+    browser_detail = ""
+    for attempt in range(3):
+        ok, detail = verify_browser_release(base_url, meta, app_digest)
+        if ok:
+            browser_detail = ""
+            break
+        browser_detail = detail
+        if attempt < 2:
+            time.sleep(4)
+    if browser_detail:
+        return False, "全新 Edge 验收失败：" + browser_detail
 
     ok, detail = verify_health(base_url)
     if not ok:

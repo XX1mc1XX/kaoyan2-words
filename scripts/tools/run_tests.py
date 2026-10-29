@@ -2070,6 +2070,9 @@ def runtime_checks():
           and "recent_release_activity()" in io.open(deploy_path, encoding="utf-8").read())
     check("\u6570\u636e\u5e93\u8fc1\u79fb\u6709\u5df2\u6267\u884c\u8d26\u672c", not deploy_module.pending_migrations(),
           str([str(path) for path in deploy_module.pending_migrations()]))
+    deploy_text = io.open(deploy_path, encoding="utf-8").read()
+    check("发布 HTTP 验收使用系统网络栈",
+          "Invoke-WebRequest" in deploy_text and "browser_detail" in deploy_text)
     check("合并键序规范化后比较", "const mergedText = stableJson(merged);" in worker_text
           and "mergedText === row.payload" in worker_text)
     check("版本号严格单调", "MAX(?, updated_at + 1)" in worker_text)

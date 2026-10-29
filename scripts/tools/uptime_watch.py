@@ -144,17 +144,44 @@ def alert(payload: dict) -> None:
         print("webhook failed: %s" % exc, file=sys.stderr)
 
 
+def read_streak(path: str | None) -> int:
+    if not path:
+        return 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return int(json.load(fh).get("streak") or 0)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0
+
+
+def write_streak(path: str | None, streak: int) -> None:
+    """把连续失败次数落盘。
+
+    计划任务用 `--once` 每几分钟起一个新进程，内存里的 streak 活不过一次运行，
+    `--fail-after` 就永远等不到——那不叫静默失败，叫告警被关掉了。
+    """
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"streak": streak, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}, fh)
+    except OSError:
+        pass
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default=os.environ.get("KY_UPTIME_BASE", DEFAULT_BASE))
     ap.add_argument("--interval", type=int, default=300, help="seconds between probes")
     ap.add_argument("--once", action="store_true", help="single probe, then exit")
     ap.add_argument("--fail-after", type=int, default=3, help="consecutive failures before alerting")
+    ap.add_argument("--state-file", default=os.environ.get("KY_UPTIME_STATE"),
+                    help="连续失败次数落盘路径；--once 配计划任务时必须给，否则 fail-after 不跨进程生效")
     ap.add_argument("--metrics-token", default=os.environ.get("KY_METRICS_TOKEN"),
                     help="Worker 的 METRICS_TOKEN；不传就只做可用性探活")
     args = ap.parse_args()
 
-    streak = 0
+    streak = read_streak(args.state_file)
     while True:
         result = probe(args.base_url, args.metrics_token)
         result["at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -169,6 +196,8 @@ def main() -> int:
             print(json.dumps(result, ensure_ascii=False))
             if streak >= args.fail_after:
                 alert(result)
+        if args.state_file:
+            write_streak(args.state_file, streak)
         if args.once:
             return 0 if result["ok"] else 1
         time.sleep(max(30, args.interval))

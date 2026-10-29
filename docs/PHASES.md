@@ -58,7 +58,7 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 |---|---|---|---|---|
 | P0 | 配置远程 Git 仓库并跑通托管 CI | 已完成 | remote 指向 `XX1mc1XX/kaoyan2-words`，远程 HEAD 与本地一致；CI run `40903352211` 在干净 Windows checkout 跑通数据测试、319 项回归、离线检查与性能门禁 | 远程 HEAD 与本地一致；CI 在干净 checkout 跑通数据测试、319 项回归、离线检查和性能门禁 |
 | P0 | 建立 release tag 和构建产物归档 | 已完成 | tag `v1.0.0`；GitHub Release 附 `kaoyan2-words-c18904c08771.zip`、`SHA256SUMS`、`build-meta.json`；归档由 `scripts/tools/archive_release.py` 生成 | 创建 release tag；归档 `deploy/`、`build-meta.json`、app、SW、单文件版并校验 SHA-256 |
-| P0 | D1 备份、恢复和 migration 回滚演练 | 已完成（本地） | `python scripts/tools/d1_drill.py` 全绿：导出→清空→导入→进度 payload 逐字节一致→clear+reimport 回滚路径验证；远程模式需 `CLOUDFLARE_API_TOKEN`，尚未在生产库执行 | 从明确备份点恢复测试库；账号、会话、进度完整；回滚步骤有真实命令和结果 |
+| P0 | D1 备份、恢复和 migration 回滚演练 | 已完成（本地） | `python scripts/tools/d1_drill.py` 全绿：导出→清空→导入→进度 payload 逐字节一致→clear+reimport 回滚路径验证，六张表（含 `metrics`）全部纳入计数前后一致；远程模式需 `CLOUDFLARE_API_TOKEN`，尚未在生产库执行 | 从明确备份点恢复测试库；账号、会话、进度完整；回滚步骤有真实命令和结果 |
 | P0 | 真实双设备生产同步演练 | 已完成（契约级） | `python scripts/tools/sync_two_device.py` 覆盖游客登录合并、旧设备重连、clear 不复活、重试幂等、乱序同步、过期会话 401；两个独立会话对同一 Worker，不是两台真实浏览器 | 覆盖 clear/import、响应丢失重试、游客登录、会话过期、旧设备重连和乱序请求；两端最终收敛 |
 | P0 | 旧 Service Worker 升级到新 build | 已完成（本地） | `python scripts/tools/sw_upgrade_check.py`：持久 profile 先被 build A 控制，改写 sw.js 后升级到 B，旧 shell 只保留一版，页面不白屏，升级后断网仍可启动 | 旧 profile 已由旧 SW 控制后升级到新 build，页面不白屏，旧 shell 淘汰，新版本断网仍可启动 |
 | P0 | 用修复后的 `deploy.py` 完整跑一次发布 | 未开始 | 本机 wrangler 认证已过期且非交互环境无法登录，也没有 `CLOUDFLARE_API_TOKEN`，无法执行部署；构建与测试在本地全绿 | 下次发布由修复后的 `deploy.py` 从构建到双域名验收一次跑完并打印 `release=ok` |
@@ -77,7 +77,14 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 1. **拿到 `CLOUDFLARE_API_TOKEN` 后**：先 `npx wrangler d1 execute kaoyan2-users --remote --file backend/migrations/003_metrics.sql`（跑完删掉 `applied.json` 里 `003_metrics.sql` 的 `remotePending`，否则 `deploy.py` 会一直拒绝发布），再给 Pages 项目注入 `METRICS_TOKEN`；然后 `python scripts/tools/d1_drill.py --remote` 导出生产库；再按 `deploy.py` 完整跑一次发布，确认 `release=ok`；随后演练回退到上一个 deployment。
 2. **补真机矩阵**：iPhone Safari、Android Chrome、低端安卓、微信内置浏览器；记录首卡、第一章 200 词、音频、SW、锁屏恢复和弱网表现。
 3. **验证音频与数据上限的生产侧**：真实音频源 soak test；生产 D1 上构造接近 512 KiB 的测试账号。
-4. **补监控闭环**：把 `uptime_watch.py` 挂到本机计划任务，设置 `KY_ALERT_WEBHOOK`；Worker 侧再补 5xx/D1/同步冲突计数与版本分布。
+4. **补监控闭环**：Worker 侧 5xx / D1 / 音频 / 同步冲突 / 客户端错误计数已完成（见 P2 行）。剩下配 `KY_ALERT_WEBHOOK` 再把探活挂到计划任务：
+
+   ```powershell
+   schtasks /Create /TN "ky-uptime-watch" /SC MINUTE /MO 5 /F /TR `
+     "python `"$PWD\scripts\tools\uptime_watch.py`" --once --state-file `"$PWD\dist\uptime-state.json`" --fail-after 3"
+   ```
+
+   `--state-file` 必须给：`--once` 每次是新进程，不落盘的话 `--fail-after` 永远等不到。版本分布仍缺客户端 boot 上报，当前错误上报不带 build。
 
 以上 P0 全部完成后，当前版本才算“生产化关键闭环完成”；P1/P2 完成后才算长期稳定性闭环。
 
@@ -119,6 +126,7 @@ python scripts/tools/payload_soak.py        # 512 KiB 同步上限（需先起 p
 python scripts/tools/sync_two_device.py     # 两台设备语义收敛（需先起 pages dev）
 python scripts/tools/uptime_watch.py --once # 线上探活：health/build-meta/首页/app
 python scripts/tools/uptime_watch.py --once --metrics-token $env:KY_METRICS_TOKEN  # 加上指标阈值
+python scripts/tools/uptime_watch.py --once --state-file dist/uptime-state.json    # 计划任务用：streak 跨进程
 python scripts/tools/archive_release.py     # 生成带 SHA-256 的 release 归档
 ```
 

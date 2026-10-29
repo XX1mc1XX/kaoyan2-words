@@ -24,11 +24,11 @@ DB_NAME = "kaoyan2-users"
 SCHEMA = ROOT / "backend" / "schema.sql"
 DRILL_DIR = ROOT / "dist" / "d1-drill"
 
-TABLES = ("users", "sessions", "progress", "pair_codes", "rate")
+TABLES = ("users", "sessions", "progress", "pair_codes", "rate", "metrics")
 
 # 删除必须子表先于父表：sessions/progress/pair_codes 都引用 users(id)，
 # D1 默认开外键约束，先删 users 会让后续 DELETE 整条语句失败。
-DELETE_ORDER = ("progress", "sessions", "pair_codes", "rate", "users")
+DELETE_ORDER = ("progress", "sessions", "pair_codes", "rate", "metrics", "users")
 
 SEED_SQL = """
 INSERT INTO users (username, pass_hash, pass_salt, created_at) VALUES
@@ -40,6 +40,10 @@ INSERT INTO progress (user_id, payload, updated_at) VALUES
   (2, '{"words":{},"pos":{}}', 1700000101);
 INSERT INTO pair_codes (code, user_id, expires_at) VALUES ('ABC123', 1, 1900000000);
 INSERT INTO rate (key, n, reset_at) VALUES ('login:127.0.0.1', 4, 1700000200);
+INSERT INTO metrics (day, name, n) VALUES
+  ('2026-10-28', 'http.5xx', 3),
+  ('2026-10-29', 'client.error:app', 7),
+  ('2026-10-29', 'sync.conflict', 1);
 """
 
 
@@ -193,10 +197,10 @@ def main() -> int:
         sys.exit(f"payload round-trip mismatch: {before} != {after}")
     steps.append("verify: progress payloads restored byte-identical")
 
+    # 回滚命令必须和 clear_all 同源：这里原先手写死了五张表，
+    # 加了 metrics 之后回滚并不真的清干净，随后的 reimport 直接撞 UNIQUE。
     rollback = write_sql(
-        "rollback.sql",
-        "DELETE FROM progress;\nDELETE FROM sessions;\nDELETE FROM pair_codes;\n"
-        "DELETE FROM rate;\nDELETE FROM users;\n")
+        "rollback.sql", "".join(f"DELETE FROM {t};\n" for t in DELETE_ORDER))
     execute_file(rollback, False)
     if counts(False)["users"] != 0:
         sys.exit("rollback statement did not clear users")

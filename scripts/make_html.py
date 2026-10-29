@@ -721,11 +721,11 @@ source_digest = hashlib.sha256(
 build_version = hashlib.sha256(
     "\n".join((
         re.sub(r'"generated_at":"[^"]*"', "", web_html),
-        sw_template,
-        worker_template,
-        merge_source,
+        source_sha256(require_input_path("sw_template")),
+        source_sha256(require_input_path("worker_template")),
+        source_sha256(require_input_path("merge_source")),
         source_digest,
-        sha256(require_input_path("manifest")),
+        source_sha256(require_input_path("manifest")),
         sha256(require_input_path("icon_192")),
         sha256(require_input_path("icon_512")),
     )).encode("utf-8")

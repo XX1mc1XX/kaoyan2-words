@@ -8,6 +8,7 @@ a Task Scheduler job; set KY_ALERT_WEBHOOK to POST failures anywhere that accept
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import sys
@@ -17,8 +18,15 @@ import urllib.request
 
 DEFAULT_BASE = "https://kaoyan2-words.pages.dev/"
 
+# 只看今天（UTC，与 Worker 的 metricDay 对齐）。阈值给的是「一天内允许多少条」：
+# 5xx 留一点余量给偶发上游抖动，D1 健康检查失败一次就说明绑定或查询有问题。
+METRIC_LIMITS = {
+    "http.5xx": 20,
+    "d1.health_fail": 1,
+}
 
-def fetch(url: str, timeout: int = 25, retries: int = 2) -> tuple[int, bytes, dict]:
+
+def fetch(url: str, timeout: int = 25, retries: int = 2, headers: dict | None = None) -> tuple[int, bytes, dict]:
     # 生产上首页偶发读超时（实测 3 次里 2 次 45s 超时、第 3 次 1.6s 返回），
     # 单次失败就告警会天天误报，所以同一 URL 先重试再判死。
     last: tuple[int, bytes, dict] = (0, b"", {})
@@ -27,6 +35,7 @@ def fetch(url: str, timeout: int = 25, retries: int = 2) -> tuple[int, bytes, di
             "user-agent": "ky-uptime/1.0",
             "cache-control": "no-cache",
             "connection": "close",
+            **(headers or {}),
         })
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -42,7 +51,7 @@ def fetch(url: str, timeout: int = 25, retries: int = 2) -> tuple[int, bytes, di
     return last
 
 
-def probe(base: str) -> dict:
+def probe(base: str, metrics_token: str | None = None) -> dict:
     base = base.rstrip("/") + "/"
     problems: list[str] = []
     detail: dict = {}
@@ -84,7 +93,43 @@ def probe(base: str) -> dict:
         if st != 200 or len(body) < 10000:
             problems.append("app-asset")
 
+    if metrics_token:
+        problems.extend(metrics_problems(base, metrics_token, detail))
+
     return {"ok": not problems, "problems": problems, "detail": detail}
+
+
+def metrics_problems(base: str, token: str, detail: dict) -> list[str]:
+    """今天的异常事件计数有没有越过容忍线。
+
+    端点没配置或 token 不对同样是故障：那意味着 Worker 侧指标或这里的配置已经
+    悄悄失效，采不到数据却以为一切正常，比指标超标更危险。
+    """
+    today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    st, body, _ = fetch(base + "api/metrics?days=1", headers={"x-ky-metrics-token": token})
+    if st != 200:
+        detail["metrics_status"] = st
+        return ["metrics-endpoint"]
+    try:
+        payload = json.loads(body.decode("utf-8", "replace"))
+    except json.JSONDecodeError:
+        detail["metrics_status"] = "bad-json"
+        return ["metrics-endpoint"]
+
+    counts: dict[str, int] = {}
+    for row in payload.get("rows") or []:
+        if row.get("day") != today:
+            continue
+        name = str(row.get("name") or "")
+        counts[name] = counts.get(name, 0) + int(row.get("n") or 0)
+    detail["metrics"] = counts
+
+    breaches = []
+    for name, limit in METRIC_LIMITS.items():
+        value = counts.get(name, 0)
+        if value > limit:
+            breaches.append("%s=%d>%d" % (name, value, limit))
+    return breaches
 
 
 def alert(payload: dict) -> None:
@@ -105,11 +150,13 @@ def main() -> int:
     ap.add_argument("--interval", type=int, default=300, help="seconds between probes")
     ap.add_argument("--once", action="store_true", help="single probe, then exit")
     ap.add_argument("--fail-after", type=int, default=3, help="consecutive failures before alerting")
+    ap.add_argument("--metrics-token", default=os.environ.get("KY_METRICS_TOKEN"),
+                    help="Worker 的 METRICS_TOKEN；不传就只做可用性探活")
     args = ap.parse_args()
 
     streak = 0
     while True:
-        result = probe(args.base_url)
+        result = probe(args.base_url, args.metrics_token)
         result["at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         result["base_url"] = args.base_url
         if result["ok"]:

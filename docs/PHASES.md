@@ -13,10 +13,10 @@
 |---|---|---|---|
 | 0 性能基线 | Edge fresh-profile 基线覆盖冷启动、首章补全、切章、搜索、分页、64 shard 写入、音频和同步快照 | 完成 | 2026-10-29 `measure_perf.py`：首卡 p50/p95 120/154.8 ms，DOM 240，HTML gzip 11,813 B，JS gzip 37,131 B |
 | 1 热路径存储 | generation + 64 shard；翻词只写一个分片；`ky_pos_v1` 单独保存位置 | 完成 | `run_tests.py` 覆盖旧键迁移、单分片写、账号隔离、失败不切换 generation；分片写 p50/p95 0.00/0.10 ms |
-| 2 启动与恢复 | 40 词内联 + 200 词首章补全；`pendingSeek` 按词恢复；第一章显示 `第 1 / 200 个` | 完成 | 回归测试 319/319；离线检查第 1 章 200/200；partial resume 测试通过 |
+| 2 启动与恢复 | 40 词内联 + 200 词首章补全；`pendingSeek` 按词恢复；第一章显示 `第 1 / 200 个` | 完成 | 回归测试 321/321；离线检查第 1 章 200/200；partial resume 测试通过 |
 | 3 详情、音频与离线 | 详情按字母分片；音频规范化、去重、确认落盘、淘汰通知；fresh-profile 断网验收 | 完成 | `offline_check.py` 20/20，覆盖四本词库、切章、词表、详情、中英音频、断网重启 |
 | 4 同步与 serverFence | `shared/merge.js` 唯一实现；服务端权威 fence；clear/import 分流；D1 乐观锁 | 完成 | 回归覆盖 reset/import fence、旧设备防复活、每日合并、gzip 解压上限、Worker 合并；导入使用稳定 operationId 和点击时刻 fence，重试幂等，游客破坏字段不进入账号 |
-| 5 前端拆分与交付 | 12 个有序源码片段；bundle 装配；CI；构建锁；发布锁；双域名验收 | 完成（本地） | `frontend_bundle.py --check` 通过；数据测试 14/14、回归 319/319；CI workflow 已定义；无远程，尚无托管 CI 运行记录 |
+| 5 前端拆分与交付 | 12 个有序源码片段；bundle 装配；CI；构建锁；发布锁；双域名验收 | 完成（本地） | `frontend_bundle.py --check` 通过；数据测试 14/14、回归 321/321；CI workflow 已定义；无远程，尚无托管 CI 运行记录 |
 
 Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚未全部完成；后续任务顺序以本文件的“发布后生产化剩余任务”为准。
 
@@ -32,6 +32,8 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 | `/build-meta.json` | 200 JSON，与本地 build/source/app 完全一致 |
 | `/api/health` | 200，`{"ok":true,"database":true}` |
 | 结论 | 已上线；public URL + deployment URL 双域名 fresh Edge 验收通过 |
+
+本地构建已前进到 build `0e51ab571177`（含 Worker 侧指标与 `/api/metrics`），**尚未部署**：线上仍是 `c18904c08771`。本地与线上的 build 不同是预期状态，不是漂移。
 
 本轮发布闭环已完成；下次发布仍必须重跑 10 分钟互斥、构建、回归、离线与双域名 fresh Edge 验收。
 ## 两个发布地址的区别
@@ -63,7 +65,7 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 | P1 | 真机与浏览器矩阵 | 未开始 | 无真实移动设备可用；当前仍是 Windows Edge headless + 本地 HTTP | 至少覆盖 iPhone Safari、Android Chrome、低端安卓和微信内置浏览器；首卡、滑动、音频、SW、断网和锁屏恢复通过 |
 | P1 | 真实音频服务 soak test | 未开始 | 代理、缓存状态和离线写入已测；真实英文源与中文 TTS 未做长时间限流测试 | 连续下载章节/词库、429/5xx、断网续传、Wi-Fi/移动网络切换均符合预期 |
 | P1 | 接近 512 KiB 的数据规模压测 | 已完成（本地） | `python scripts/tools/payload_soak.py`：137/266/499 KB 同步返回 200，576 KB 正确 413，11600 个词键重复同步不膨胀、回读一致 | 接近上限的真实账号仍可同步；400 天墓碑清理、重复导入导出和长期每日记录不造成 413 或存储膨胀 |
-| P2 | 线上监控和告警 | 进行中 | `python scripts/tools/uptime_watch.py` 已可轮询 health、build-meta、首页与 app 资产，连续失败推送 `KY_ALERT_WEBHOOK`；Worker 侧指标与告警渠道尚未接入。实测本机到生产首页偶发读超时（3 次中 2 次），已内置重试 | Worker 5xx、D1 错误、音频失败、前端未捕获错误、同步冲突和版本分布有监控与告警 |
+| P2 | 线上监控和告警 | 进行中 | Worker 侧已落地 `metrics` 表（按 UTC 天聚合）与只读 `/api/metrics`（未配 `METRICS_TOKEN` 时当接口不存在，配了则 token 校验）：记 `http.5xx`、`d1.health_fail`、`audio.upstream_fail`、`sync.conflict`、`client.error:<来源>`，写入走 `waitUntil` 且失败静默，表缺失时只降级不报错。`uptime_watch.py --metrics-token` 已能按阈值告警，本地 pages dev 实测注入 `d1.health_fail=5` 后输出 `["d1.health_fail=5>1"]` 并 exit 1。剩余：生产 D1 未执行 `003_metrics.sql`（`applied.json` 标了 `remotePending`，`deploy.py` 会因此拒绝发布）、`METRICS_TOKEN` 未注入、版本分布无客户端上报来源（前端目前没有 `/api/log` 调用）、`KY_ALERT_WEBHOOK` 未配置。实测本机到生产首页偶发读超时（3 次中 2 次），已内置重试 | Worker 5xx、D1 错误、音频失败、前端未捕获错误、同步冲突和版本分布有监控与告警 |
 | P2 | 正式回滚演练 | 未开始 | 有构建/发布检查，没有线上回滚演练记录；回退 deployment 需要 Cloudflare 凭据 | 能从 Cloudflare Pages 回退到上一个 deployment；旧前端与当前 Worker 兼容；D1 数据不丢失 |
 
 ## 下次执行顺序
@@ -72,7 +74,7 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 
 剩下的事项都卡在“本机没有 Cloudflare 凭据或没有真机”：
 
-1. **拿到 `CLOUDFLARE_API_TOKEN` 后**：`python scripts/tools/d1_drill.py --remote` 导出生产库；再按 `deploy.py` 完整跑一次发布，确认 `release=ok`；随后演练回退到上一个 deployment。
+1. **拿到 `CLOUDFLARE_API_TOKEN` 后**：先 `npx wrangler d1 execute kaoyan2-users --remote --file backend/migrations/003_metrics.sql`（跑完删掉 `applied.json` 里 `003_metrics.sql` 的 `remotePending`，否则 `deploy.py` 会一直拒绝发布），再给 Pages 项目注入 `METRICS_TOKEN`；然后 `python scripts/tools/d1_drill.py --remote` 导出生产库；再按 `deploy.py` 完整跑一次发布，确认 `release=ok`；随后演练回退到上一个 deployment。
 2. **补真机矩阵**：iPhone Safari、Android Chrome、低端安卓、微信内置浏览器；记录首卡、第一章 200 词、音频、SW、锁屏恢复和弱网表现。
 3. **验证音频与数据上限的生产侧**：真实音频源 soak test；生产 D1 上构造接近 512 KiB 的测试账号。
 4. **补监控闭环**：把 `uptime_watch.py` 挂到本机计划任务，设置 `KY_ALERT_WEBHOOK`；Worker 侧再补 5xx/D1/同步冲突计数与版本分布。
@@ -116,6 +118,7 @@ python scripts/tools/sw_upgrade_check.py    # 旧 SW profile 升级到新 build�
 python scripts/tools/payload_soak.py        # 512 KiB 同步上限（需先起 pages dev）
 python scripts/tools/sync_two_device.py     # 两台设备语义收敛（需先起 pages dev）
 python scripts/tools/uptime_watch.py --once # 线上探活：health/build-meta/首页/app
+python scripts/tools/uptime_watch.py --once --metrics-token $env:KY_METRICS_TOKEN  # 加上指标阈值
 python scripts/tools/archive_release.py     # 生成带 SHA-256 的 release 归档
 ```
 
@@ -128,7 +131,7 @@ npx wrangler pages dev deploy --port 8799 --ip 127.0.0.1
 当前本地基线：
 
 - 数据测试：14/14。
-- 回归：319/319。
+- 回归：321/321。
 - 离线：20/20。
 - 首屏性能：首卡 p50/p95 120/154.8 ms；DOM 240；首屏 HTML gzip 11,813 B；主程序 gzip 37,131 B。
 

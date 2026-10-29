@@ -2073,6 +2073,7 @@ def runtime_checks():
         r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True)
         check("发音代理可返回音频", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:200])
         body_checks(worker_url)
+        metrics_checks(worker_url)
 
     worker_text = io.open(worker, encoding="utf-8").read() if os.path.exists(worker) else ""
     check("同步写入合并为单次 D1", "RETURNING updated_at" in worker_text and "ON CONFLICT(user_id) DO UPDATE" in worker_text)
@@ -2095,6 +2096,10 @@ def runtime_checks():
           and "recent_release_activity()" in io.open(deploy_path, encoding="utf-8").read())
     check("\u6570\u636e\u5e93\u8fc1\u79fb\u6709\u5df2\u6267\u884c\u8d26\u672c", not deploy_module.pending_migrations(),
           str([str(path) for path in deploy_module.pending_migrations()]))
+    check("\u53ea\u5728\u672c\u5730\u6267\u884c\u8fc7\u7684\u8fc1\u79fb\u4f1a\u62e6\u4f4f\u53d1\u5e03",
+          hasattr(deploy_module, "remote_pending_migrations")
+          and "remotePending" in io.open(
+              os.path.join(ROOT, "backend", "migrations", "applied.json"), encoding="utf-8").read())
     deploy_text = io.open(deploy_path, encoding="utf-8").read()
     check("发布 HTTP 验收使用系统网络栈",
           "Invoke-WebRequest" in deploy_text and "browser_detail" in deploy_text)
@@ -2134,6 +2139,69 @@ def body_checks(worker_url):
     )
     r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, timeout=180)
     check("超大请求体一律 413", r.returncode == 0, r.stderr.decode("utf-8", "replace")[:300])
+
+
+def metrics_checks(worker_url):
+    """异常事件要计进 metrics，只读端点在没配 token 时必须当作不存在。"""
+    js = (
+        "const writes = [];"
+        "const rows = [{day:'2026-10-30', name:'http.5xx', n:2}];"
+        "const DB = {"
+        "  prepare(sql) {"
+        "    const s = {"
+        "      _args: [],"
+        "      bind(...a) { s._args = a; return s; },"
+        "      async first() {"
+        # health 真的碰 D1；让它抛错来验证 d1.health_fail 会被记上
+        "        if (/SELECT 1 AS ok/.test(sql)) throw new Error('d1 down');"
+        "        return null;"
+        "      },"
+        "      async run() {"
+        "        if (/INSERT INTO metrics/.test(sql)) writes.push(s._args[1]);"
+        "        return {};"
+        "      },"
+        "      async all() { return { results: rows }; },"
+        "    };"
+        "    return s;"
+        "  },"
+        "  async batch() { return []; },"
+        "};"
+        "const pending = [];"
+        "const ctx = { waitUntil: (p) => pending.push(p) };"
+        "const {default:worker} = await import(%r);"
+        "const env = {DB: DB, ASSETS:{fetch:async()=>new Response('')}};"
+        "const call = (u, init, e) => worker.fetch(new Request(u, init), e || env, ctx);"
+        "const errors = [];"
+        "const health = await call('https://example.com/api/health');"
+        "if (health.status !== 503) errors.push('health status ' + health.status);"
+        "const logRes = await call('https://example.com/api/log', {"
+        "method:'POST', headers:{'content-type':'application/json','cf-connecting-ip':'7.7.7.7'},"
+        "body: JSON.stringify({message:'boom', source:'attacker-chosen'})});"
+        "if (logRes.status !== 200) errors.push('log status ' + logRes.status);"
+        "const noToken = await call('https://example.com/api/metrics');"
+        "if (noToken.status !== 404) errors.push('metrics without token=' + noToken.status);"
+        # 未配置 METRICS_TOKEN 时即使带对了猜测也必须当作不存在
+        "if ((await noToken.text()).indexOf('metrics') >= 0) errors.push('metrics hint leaked');"
+        "const secured = Object.assign({}, env, {METRICS_TOKEN:'s3cret'});"
+        "const bad = await call('https://example.com/api/metrics',"
+        "{headers:{'x-ky-metrics-token':'wrong'}}, secured);"
+        "if (bad.status !== 401) errors.push('metrics wrong token=' + bad.status);"
+        "const good = await call('https://example.com/api/metrics',"
+        "{headers:{'x-ky-metrics-token':'s3cret'}}, secured);"
+        "if (good.status !== 200) errors.push('metrics ok token=' + good.status);"
+        "const body = good.status === 200 ? await good.json() : {};"
+        "if (!body.rows || body.rows.length !== 1) errors.push('metrics rows=' + JSON.stringify(body.rows));"
+        "if (good.headers.get('cache-control') !== 'no-store') errors.push('metrics cacheable');"
+        "await Promise.all(pending);"
+        "if (writes.indexOf('d1.health_fail') < 0) errors.push('missing d1.health_fail [' + writes.join(',') + ']');"
+        "if (writes.indexOf('client.error:other') < 0) errors.push('missing client.error:other [' + writes.join(',') + ']');"
+        "if (writes.length !== 2) errors.push('unexpected metric writes [' + writes.join(',') + ']');"
+        "if (errors.length) { console.error(errors.join(' | ')); process.exit(1); }"
+        % worker_url
+    )
+    r = subprocess.run(["node", "--input-type=module", "-e", js], capture_output=True, timeout=180)
+    check("异常事件计入指标且端点受 token 保护",
+          r.returncode == 0, r.stderr.decode("utf-8", "replace")[:400])
 
 
 def browser_checks():

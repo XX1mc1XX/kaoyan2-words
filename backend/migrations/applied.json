@@ -5,6 +5,13 @@
       "sha256": "bd22777db41b2dfc4d5b3bf56866c6d5b72a3e1838754d1d61626668c0971012",
       "appliedAt": "2026-10-29T12:00:00Z",
       "verifiedBy": "remote D1 users_username_nocase index confirmed"
+    },
+    "003_metrics.sql": {
+      "sha256": "391e7b96872b21ce14cced2ad7bb279dca97c9cce5d4090a30aea6b225b0a01a",
+      "appliedAt": "2026-10-29T17:18:09Z",
+      "verifiedBy": "local D1: CREATE TABLE metrics executed twice, second run idempotent",
+      "remotePending": true,
+      "remoteNote": "本机无 CLOUDFLARE_API_TOKEN，生产 D1 尚未执行。缺表时 bumpMetric 静默失败，现象是指标恒为 0 而不是报错。"
     }
   }
 }

@@ -44,6 +44,21 @@ async function hashPassword(password, saltHex) {
   return hex(bits);
 }
 
+// 先各自摘要再逐字节比较：直接比字符串会在第一个不同字符处提前返回，
+// 而指标端点的 token 是长期有效的，不该给旁路推断留下的余地。
+async function tokenMatches(provided, expected) {
+  if (typeof provided !== 'string' || !provided || typeof expected !== 'string' || !expected) return false;
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(provided)),
+    crypto.subtle.digest('SHA-256', enc.encode(expected)),
+  ]);
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
 function cookieFrom(request, name) {
   const raw = request.headers.get('cookie') || '';
   for (const part of raw.split(';')) {
@@ -94,6 +109,29 @@ async function allowRate(env, key, limit, windowMs) {
   return (await bumpRate(env, key, windowMs)) <= limit;
 }
 
+// 指标按 UTC 天聚合，只记异常事件。写入走 waitUntil：指标表写失败、D1 短暂不可用
+// 都不能把已经在处理的请求带崩，也不该让客户端为了「记一条数」多等一个 RTT。
+function metricDay(offsetDays = 0) {
+  return new Date(Date.now() - offsetDays * 86400_000).toISOString().slice(0, 10);
+}
+
+function bumpMetric(env, ctx, name) {
+  try {
+    if (!env || !env.DB || typeof name !== 'string') return;
+    const pending = env.DB.prepare(
+      'INSERT INTO metrics (day, name, n) VALUES (?, ?, 1) ' +
+      'ON CONFLICT(day, name) DO UPDATE SET n = n + 1',
+    ).bind(metricDay(), name).run();
+    if (pending && typeof pending.catch === 'function') {
+      const swallowed = pending.catch(() => {});
+      if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(swallowed);
+      else swallowed.catch(() => {});
+    }
+  } catch {
+    // prepare/bind 同步抛错（绑定失效等）同样只吞掉，监控不能反过来制造故障
+  }
+}
+
 // Pages 没有定时任务，只能在低频入口顺手清过期数据（一天前的限流行、过期的会话）
 async function sweepExpired(env) {
   const now = Date.now();
@@ -101,6 +139,7 @@ async function sweepExpired(env) {
     env.DB.prepare('DELETE FROM rate WHERE reset_at < ?').bind(now - 86400_000),
     env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now),
     env.DB.prepare('DELETE FROM pair_codes WHERE expires_at < ?').bind(now),
+    env.DB.prepare('DELETE FROM metrics WHERE day < ?').bind(metricDay(30)),
   ]);
 }
 const stateHits = new Map();
@@ -388,12 +427,13 @@ async function handleAudio(request, env, ctx) {
     }
     return response;
   } catch {
+    bumpMetric(env, ctx, 'audio.upstream_fail');
     return json({ error: '在线发音加载失败' }, 502);
   }
 }
 
 // 健康检查必须真的碰一下 D1；只检查 env.DB 是否存在无法发现绑定失效或查询故障。
-async function handleHealth(request, env) {
+async function handleHealth(request, env, ctx) {
   if (!stateBudget('health:' + clientIp(request), 60, 60_000)) {
     const headers = { 'cache-control': 'no-store', 'retry-after': '60' };
     return request.method === 'HEAD'
@@ -407,6 +447,7 @@ async function handleHealth(request, env) {
     healthy = !!row && Number(row.ok) === 1;
   } catch (e) {
     console.error('[health] D1 check failed', e);
+    bumpMetric(env, ctx, 'd1.health_fail');
   }
   if (request.method === 'HEAD') {
     return new Response(null, { status: healthy ? 200 : 503, headers: { 'cache-control': 'no-store' } });
@@ -423,7 +464,7 @@ async function handleApi(request, env, ctx) {
   }
 
   if (path === '/audio' && (method === 'GET' || method === 'HEAD')) return handleAudio(request, env, ctx);
-  if (path === '/health' && (method === 'GET' || method === 'HEAD')) return handleHealth(request, env);
+  if (path === '/health' && (method === 'GET' || method === 'HEAD')) return handleHealth(request, env, ctx);
   if (!env.DB) return json({ error: '数据库未绑定' }, 500);
 
   try {
@@ -542,8 +583,27 @@ async function handleApi(request, env, ctx) {
       if (body && typeof body.message === 'string') {
         const clip = v => String(v == null ? '' : v).replace(/[\r\n]+/g, ' ').slice(0, 400);
         console.error('[client]', clip(body.message), clip(body.source), clip(body.stack));
+        // 只接受已知来源，其余归 other：客户端给什么就存什么，等于让它把指标表基数任意撑大。
+        const source = clip(body.source);
+        const known = ['app', 'audio', 'sync', 'ui'];
+        bumpMetric(env, ctx, 'client.error:' + (known.includes(source) ? source : 'other'));
       }
       return json({ ok: true });
+    }
+
+    // 指标只读端点。没配 METRICS_TOKEN 就当这个接口不存在，
+    // 免得把线上故障率暴露给任何能打开站点的人。
+    if (path === '/metrics' && method === 'GET') {
+      const expected = env.METRICS_TOKEN;
+      if (!expected) return json({ error: '没有这个接口' }, 404);
+      if (!(await tokenMatches(request.headers.get('x-ky-metrics-token'), expected))) {
+        return json({ error: '未授权' }, 401);
+      }
+      const days = Math.max(1, Math.min(30, Number(url.searchParams.get('days')) || 7));
+      const rows = await env.DB.prepare(
+        'SELECT day, name, n FROM metrics WHERE day >= ? ORDER BY day DESC, name',
+      ).bind(metricDay(days - 1)).all();
+      return json({ ok: true, days, rows: rows.results || [] }, 200, { 'cache-control': 'no-store' });
     }
 
     // 配对码：电脑已登录后生成 6 位码，手机输入即登录同一账号
@@ -697,6 +757,7 @@ async function handleApi(request, env, ctx) {
           return json({ ok: true, payload: merged, updatedAt: updated.updated_at, merged: true });
         }
       }
+      bumpMetric(env, ctx, 'sync.conflict');
       return json({ error: 'conflict' }, 409);
     }
 
@@ -810,6 +871,7 @@ async function handleApi(request, env, ctx) {
         if (String(row.username).toLowerCase() !== expectedUser.toLowerCase()) return json({ error: '账号已切换，请重新打开页面', code: 'ACCOUNT_MISMATCH' }, 409);
         let payload = null;
         try { payload = row.payload ? JSON.parse(row.payload) : null; } catch {}
+        bumpMetric(env, ctx, 'sync.conflict');
         return json({ error: 'conflict', updatedAt: Number(row.updated_at || 0), payload }, 409);
       }
     }
@@ -818,6 +880,7 @@ async function handleApi(request, env, ctx) {
   } catch (e) {
     // 不把 SQL 错误、上游异常原文回给客户端
     console.error(e);
+    bumpMetric(env, ctx, 'http.5xx');
     return json({ error: '服务器内部错误，请稍后再试' }, 500);
   }
 }

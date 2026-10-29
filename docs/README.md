@@ -35,11 +35,11 @@
 | 本地状态 | 主状态为 generation + 64 shard；位置为 `ky_pos_v1` 小键，不再每次翻词重写整份章节队列 |
 | 同步 | `shared/merge.js` 唯一实现；Worker 使用权威 `serverFence` 处理 clear/import，D1 `updated_at` 做乐观锁 |
 | 缓存 | shell 按 build 版本分命名空间，音频固定 `ky-audio-v2`；页面只认 `x-ky-cache=stored/hit` 的落盘凭据 |
-| 测试 | 数据 14/14、回归 319/319、离线 20/20（2026-10-29 本地实测） |
+| 测试 | 数据 14/14、回归 321/321、离线 20/20（2026-10-30 本地实测） |
 | 性能 | 首屏 HTML gzip 11,813 B、主程序 gzip 37,131 B；首卡 p50/p95 120/154.8 ms；详见根 README |
 | CI | `.github/workflows/ci.yml` 定义 Windows 构建、数据测试、回归、离线、性能测量；远程 `XX1mc1XX/kaoyan2-words` 已跑通（run `40903352211`） |
 | 发布 | 已上线 build `c18904c08771` / app `app.4defd52cb022.js`；tag `v1.0.0` + GitHub Release 附 SHA-256 归档 |
-| 剩余 | 真机矩阵、音频 soak、生产 D1 恢复与回滚演练、监控告警闭环未完成（均需 Cloudflare 凭据或真机）；详见 `PHASES.md` |
+| 剩余 | 真机矩阵、音频 soak、生产 D1 恢复与回滚演练、监控告警闭环未完成（均需 Cloudflare 凭据或真机）；Worker 侧指标与 `/api/metrics` 已实现并本地验证，但生产 D1 未执行 `003_metrics.sql`、`METRICS_TOKEN` 未注入；详见 `PHASES.md` |
 
 ## 开工硬门禁
 

@@ -118,6 +118,27 @@ def pending_migrations():
     return pending
 
 
+def remote_pending_migrations():
+    """账本已登记、但还没在远程 D1 执行过的迁移。
+
+    本地跑过 DDL 不等于生产库有这张表。缺表时新代码会静默降级（例如指标写入
+    被 catch 掉，表现为计数恒为 0），没有报错就没人会发现，所以发布前要拦住。
+    """
+    folder = ROOT / "backend" / "migrations"
+    if not folder.is_dir():
+        return []
+    applied = applied_migration_hashes()
+    pending = []
+    for path in sorted(folder.glob("*.sql")):
+        entry = applied.get(path.name)
+        if not isinstance(entry, dict) or not entry.get("remotePending"):
+            continue
+        if entry.get("sha256") != migration_sha256(path):
+            continue
+        pending.append(path)
+    return pending
+
+
 def recent_release_activity():
     now = time.time()
     blocked = []
@@ -795,6 +816,15 @@ def main():
             for path in migrations:
                 print("  - " + str(path.relative_to(ROOT)))
             print("确认已执行后追加 --allow-pending-migrations。")
+            return 2
+
+        remote_migrations = remote_pending_migrations()
+        if remote_migrations and not allow_migrations:
+            print("以下迁移只在本地执行过，生产 D1 还是旧 schema，拒绝部署：")
+            for path in remote_migrations:
+                print("  - " + str(path.relative_to(ROOT)))
+            print("执行：npx wrangler d1 execute kaoyan2-users --remote --file <上面的文件>")
+            print("跑完删掉 applied.json 里该条的 remotePending；确认本次不需要该表时追加 --allow-pending-migrations。")
             return 2
 
         print("[1/5] 构建")

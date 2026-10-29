@@ -1,223 +1,113 @@
-# 分阶段执行单（唯一任务源）
+# 分阶段执行单（当前实现）
 
-> 本文件是仓库里唯一的任务顺序来源。架构参考和技能矩阵都不另排 Phase。
-> 从第一个「未开始」且前置依赖已满足的 Phase 开始，一次只做一个可独立验收的子任务。
+> 更新时间：2026-10-29。这里记录已验证的阶段结果、剩余发布动作和执行门禁。
 >
-> 方向与不变量 → [AI_EXECUTION_PLAN.md](./AI_EXECUTION_PLAN.md)
-> 架构边界 → [ARCHITECTURE_REFERENCE.md](./ARCHITECTURE_REFERENCE.md)
-> 多 Agent 并发 / 租约 / worktree → [AGENT_PROTOCOL.md](./AGENT_PROTOCOL.md)
+> 方向与不变量：[AI_EXECUTION_PLAN.md](./AI_EXECUTION_PLAN.md)
+> 当前架构：[ARCHITECTURE_REFERENCE.md](./ARCHITECTURE_REFERENCE.md)
 
 ## 执行状态总表
 
-状态只能填：`未开始`、`进行中`、`阻塞`、`完成`。完成后必须追加证据链接或摘要，不能只打勾。
+状态只使用：`未开始`、`进行中`、`阻塞`、`完成`。完成必须有命令或可复核证据。
 
-| Phase | 目标 | 前置依赖 | 状态 | 验收证据 |
-|---|---|---|---|---|
-| 0 性能基线 | 可重复记录冷/热/离线及交互数据 | 无 | 未开始 | 待填写 |
-| 1 热路径止血 | 存储和滑动不再产生同步大写入 | Phase 0 | 未开始 | 待填写 |
-| 2 启动与恢复 | 40 条内联、200 词章节、上次词恢复稳定 | Phase 0；恢复回归已具备 | 未开始 | 执行时重跑并填写当前计数 |
-| 3 IndexedDB | 大进度迁移且可双读、回退、回滚 | Phase 1、2 | 未开始 | 待填写 |
-| 4 详情与音频 | 去重、取消、失败不缓存、预算可控 | Phase 0；相关回归测试 | 未开始 | 待填写 |
-| 5 模块与 CI | 模块拆分、架构规则和性能门禁 | Phase 1–4 | 未开始 | 待填写 |
+| Phase | 已交付结果 | 状态 | 证据 |
+|---|---|---|---|
+| 0 性能基线 | Edge fresh-profile 基线覆盖冷启动、首章补全、切章、搜索、分页、64 shard 写入、音频和同步快照 | 完成 | 2026-10-29 `measure_perf.py`：首卡 p50/p95 120/154.8 ms，DOM 240，HTML gzip 11,813 B，JS gzip 37,131 B |
+| 1 热路径存储 | generation + 64 shard；翻词只写一个分片；`ky_pos_v1` 单独保存位置 | 完成 | `run_tests.py` 覆盖旧键迁移、单分片写、账号隔离、失败不切换 generation；分片写 p50/p95 0.00/0.10 ms |
+| 2 启动与恢复 | 40 词内联 + 200 词首章补全；`pendingSeek` 按词恢复；第一章显示 `第 1 / 200 个` | 完成 | 回归测试 318/318；离线检查第 1 章 200/200；partial resume 测试通过 |
+| 3 详情、音频与离线 | 详情按字母分片；音频规范化、去重、确认落盘、淘汰通知；fresh-profile 断网验收 | 完成 | `offline_check.py` 20/20，覆盖四本词库、切章、词表、详情、中英音频、断网重启 |
+| 4 同步与 serverFence | `shared/merge.js` 唯一实现；服务端权威 fence；clear/import 分流；D1 乐观锁 | 完成 | 回归覆盖 reset/import fence、旧设备防复活、每日合并、gzip 解压上限、Worker 合并；导入使用稳定 operationId 和点击时刻 fence，重试幂等，游客破坏字段不进入账号 |
+| 5 前端拆分与交付 | 12 个有序源码片段；bundle 装配；CI；构建锁；发布锁；双域名验收 | 完成（本地） | `frontend_bundle.py --check` 通过；数据测试 14/14、回归 318/318；CI workflow 已定义；无远程，尚无托管 CI 运行记录 |
 
-## 每次开工的门禁
+Phase 0–5 的工程交付已闭合。当前没有“全部未开始”或“等待建立基线”的任务。
 
-单 Agent 顺序执行也必须跑；多 Agent 的写任务另加租约和固定 SHA 门禁（见 AGENT_PROTOCOL.md）。
+## 当前发布状态
+
+截至 **2026-10-29 20:41 +08:00**：
+
+| 项 | 事实 |
+|---|---|
+| HEAD | `2d2eaa5b6f9db8879a20447edee3cbe2eb655a09` |
+| 本地构建 | build `76060d85d857`，app `./app.4defd52cb022.js` |
+| 公共域名 | app `./app.9775dd28fffb.js`，SW `4e120f40cd87` |
+| `/build-meta.json` | 公共域名未返回有效构建元数据 |
+| `/api/health` | 200，`{"ok":true,"database":true}` |
+| 结论 | 当前 HEAD 尚未确认上线；下一次发布必须以 `deploy.py` 的双域名验收通过为准 |
+
+这不是待开发阶段，而是唯一的发布闭环动作：确认最近 10 分钟无并发提交/部署后，执行一次 `python scripts/deploy.py`，全绿后才可更新本节和提交信息。
+
+## 每次开工门禁
+
+单 Agent 也必须执行：
 
 ```powershell
 git status
 git log --oneline -3
-Get-Item software/template.html | Select-Object LastWriteTime
+Get-Item software/src/app.manifest.json, software/template.html | Select-Object LastWriteTime
+python scripts/frontend_bundle.py --check
 python scripts/tools/run_tests.py
 ```
 
-- 发现不是本任务产生的改动时，记录并按路径避开，不得回滚或覆盖。
-- 出现以下任一情况时**停止并确认归属，不可覆盖**：工作区有别人的在制改动；`template.html` 几分钟内被改过；改动涉及 `zhVoice`、卡片 padding 等他人功能；部署目录被占用。
-- `software/template.html` 同一时间只允许一个会话修改；mtime 在几分钟内且归属不明时，任务状态写"阻塞"。
-- 不修改他人正在处理的 `zhVoice`、卡片 padding、undo、音频缓存和章节位次逻辑。
-- 同一轮只部署一次；部署前必须最近 10 分钟无人提交或部署，并使用全新 Edge `--user-data-dir` 验证。
+- 发现不是本任务产生的改动：记录、避开，不覆盖、不回滚。
+- `software/src/`、`software/src/shell.html`、`software/src/styles.css`、`software/template.html` 属于同一前端写域；同一时间只允许一个会话修改。
+- `software/template.html` 是 `frontend_bundle.py` 生成物，不手工改。
+- `shared/merge.js`、D1 迁移和生产部署不能并行写。
+- 涉及 `zhVoice`、卡片 padding、undo、音频缓存、章节位次等在制工作时先确认归属。
+- 发布前必须确认最近 10 分钟无人提交或部署；一轮改动只部署一次。
 
-> 现状（2026-10-29 实测）：工作区约 28 条未提交改动（15 修改 + 13 未跟踪），`main` 无远程、无 PR。多 Agent 要求的"干净基线"当前**不满足**——开工前必须先厘清这批改动归属并提交或清理，否则 worktree 基线不可追溯。
+## 修改后的验收入口
 
-## 任务卡模板
+```powershell
+python scripts/frontend_bundle.py --check
+python scripts/make_html.py
+python scripts/tools/run_tests.py
+python scripts/tools/offline_check.py --json
+python scripts/tools/measure_perf.py
+```
 
-每个子任务开工前复制模板并填完整；没有测量结果不得标"完成"。
+当前本地基线：
 
-单 Agent 任务只填**前 10 行 + 验收 + 结果**即可。租约、fencingToken、rootRunId/depth、teamSlot 这些字段只有多 Agent 并发写任务才需要，规则见 AGENT_PROTOCOL.md。
+- 数据测试：14/14。
+- 回归：318/318。
+- 离线：20/20。
+- 首屏性能：首卡 p50/p95 120/154.8 ms；DOM 240；首屏 HTML gzip 11,813 B；主程序 gzip 37,131 B。
+
+测试失败、生成物过期、离线检查失败或性能门禁失败时不得部署。
+
+## 发布验收
+
+一条命令：
+
+```powershell
+python scripts/deploy.py
+```
+
+`deploy.py` 会：
+
+1. 创建 `deploy.publish.lock`；默认拒绝脏工作区和未确认的迁移；
+2. 运行 `make_html.py`；
+3. 校验 `build-meta.json`、`app.<hash>.js` 文件名与内容 SHA；
+4. 运行回归和真实离线检查；
+5. 部署到 Cloudflare Pages；
+6. 同时验收 deployment URL 和 public URL 的 build-meta、SW、HTML、主程序字节、fresh Edge 运行时、SW 控制与 `/api/health`。
+
+只有最后打印 `release=ok` 且双域名均通过，才能把版本写入提交信息并对外宣称已上线。
+
+## 任务记录模板
+
+只保留足够让下一会话复核的字段：
 
 ```text
 Task ID:
-Phase:
-Run ID:
-父 Agent:
-实现 Agent / 模型:
-验收 Agent:
-目标（只写一个可验证结果）:
-worktree（仅写任务）:
-branch:
+目标（一个可验证结果）:
+允许修改文件:
+禁止修改:
 base commit:
-允许修改的文件:
-禁止修改的文件/行为:
-租约资源（repo:<relative-path> / deploy: / d1:）:
-leaseKey:
-fencingToken:
-heartbeatAt / expiresAt:
-resourceType:
-contractsTouched:
-mergeGroup:
-generatedFiles:
-teamSlot / parentPid:
-rootRunId / parentRunId:
-depth / max_depth:
-canSpawn:
-spawnBudgetRemaining / childQuota:
-allowedSkills:
-contextWindow / checkpoint 阈值:
-前置证据:
-实施步骤:
+实施命令:
+功能/离线结果:
+性能前后:
 回滚方法:
-功能验收:
-性能验收:
-实际命令:
-实际结果:
-上下文 checkpoint:
+发布 build / app hash:
 遗留风险:
 ```
 
----
-
-## Phase 0：性能基线
-
-现状（2026-10-29 核对）：`scripts/tools/measure_perf.py` 已存在，用 Edge headless 注入探针，只测 `fcp / dcl / load / firstCard / nodes` 五个值。它**不覆盖** localStorage 写入、滑动 p50/p95、章节切换、详情打开、音频延迟，也不区分冷/热/离线。所以本 Phase 是"扩展现有脚本"，不是新建第二套。
-
-文件：
-
-- `scripts/tools/measure_perf.py`（扩展此文件，不新建平行脚本）
-- 结果目录 `artifacts/perf/`
-
-任务（按顺序，前一项跑通再做下一项）：
-
-1. 冷启动基线：全新 `--user-data-dir` + 生产构建 → `fcp / dcl / firstCard / nodes / 请求数`。
-2. 热启动基线：同一 profile 二次加载 → 同上一组指标。
-3. 离线基线：断网后加载 → 首卡片是否出现、耗时多少。
-4. localStorage 写入插桩：在现有 `save` 旁加计数器（仅测试环境开启，默认关闭），记录 key、字节数、调用来源。跑 100 次滑动，统计写入次数与单次耗时峰值，并断言 pointermove 期间写入数为 0。
-5. 滑动帧率：100 次与 1000 次滑动，记录帧间隔 p50 / p95 和 >50 ms 长任务数。
-6. 章节切换：记录从触发到"可用卡片出现"的耗时，当前章节与跨章节各测一次。
-7. 详情打开：分片已缓存 / 未缓存两种各测一次，记录耗时与网络请求数。
-8. 音频：记录热缓存命中耗时、在线拉取耗时、系统语音回退占比。
-
-退出：
-
-- 冷 / 热 / 离线三组都有一份可复跑的 JSON。
-- 第 4–8 项每项至少一组数字；确实测不到的项在基线文件里写 `not-measured` + 原因，不能留空。
-- 基线文件带 `commit`（当前 HEAD SHA）与 `measuredAt` 字段。
-- 不修改业务逻辑；插桩代码默认关闭。
-
-> 为什么这步不能跳：Phase 1 / Phase 4 的验收写的是"100 次滑动通过""详情打开 < 200 ms"，没有第 4–7 项的数字就无法判定通过与否。
-
-## Phase 1：热路径止血
-
-文件：
-
-- `software/template.html`
-- 必要时 `shared/merge.js`
-
-任务：
-
-- 消除 pointermove 中存储写入。
-- 合并高频状态写入。
-- 减少滑动期间全量序列化。
-- 减少重复 DOM 更新。
-- 延迟统计和同步。
-
-退出：
-
-- 100 次滑动测试通过。
-- 进度恢复通过。
-- 首卡片不退化。
-
-## Phase 2：启动与恢复
-
-文件：
-
-- `software/template.html`
-- `scripts/tools/run_tests.py`
-
-任务：
-
-- 保留 40 条内联数据和 200 词章节语义。
-- 补全前不渲染错误第一词。
-- `pendingSeek` 按词恢复。
-- 保存位次作为词丢失后的回退。
-- 增加对应回归测试。
-
-退出：
-
-- 第 80 词恢复测试通过。
-- 第一章 200 词测试通过。
-- 离线恢复测试通过。
-
-## Phase 3：IndexedDB 存储
-
-文件：
-
-- 新增 `software/storage.js` 或等效模块
-- `software/template.html`
-- `scripts/tools/run_tests.py`
-
-任务：
-
-- 建立 IndexedDB adapter。
-- 双读迁移。
-- 批量事务。
-- 失败回退。
-- 删除旧 key 前校验。
-
-退出：
-
-- 大状态不阻塞。
-- 刷新、账号切换、导入导出全绿。
-- 可人为回滚。
-
-## Phase 4：详情与音频
-
-文件：
-
-- 详情加载模块
-- 音频缓存模块
-- `software/sw.template.js`
-
-任务：
-
-- 请求去重。
-- 失败不缓存。
-- 取消无效请求。
-- 控制预取数量和缓存预算。
-- 保持离线回退。
-
-退出：
-
-- 详情和音频基准通过。
-- 无缓存标记错位。
-- 不影响首屏。
-
-## Phase 5：模块拆分和 CI 门禁
-
-文件：
-
-- 拆分后的 Web 模块
-- `scripts/tools/run_tests.py`
-- CI 配置
-
-任务：
-
-- 拆出 storage、api、deck、study、sync、audio、view。
-- 加入循环依赖和文件大小检查。
-- 加入 bundle 和性能预算。
-- 建立前后截图和性能对比。
-
-退出：
-
-- 单文件职责达标。
-- 首屏不退化。
-- 全量回归通过。
+多 Agent 并发时再使用 [AGENT_PROTOCOL.md](./AGENT_PROTOCOL.md) 的租约、worktree、fencingToken 和独立验收字段；单 Agent 不复制整套控制面。

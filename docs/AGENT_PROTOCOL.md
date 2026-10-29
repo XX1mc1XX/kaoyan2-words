@@ -12,7 +12,7 @@
 执行时必须遵守：
 
 1. 阶段顺序以 [PHASES.md](./PHASES.md) 为准。
-2. 架构边界以 [ARCHITECTURE_REFERENCE.md](./ARCHITECTURE_REFERENCE.md) 第 2、7、10、11、12 节为准。
+2. 架构边界以 [ARCHITECTURE_REFERENCE.md](./ARCHITECTURE_REFERENCE.md) 的构建链、缓存、同步和“明确不做的事”章节为准。
 3. 文档冲突时，任务顺序和验收门槛以 PHASES.md 为准；但不得突破架构参考中的安全、数据正确性和解耦红线。
 4. 一项任务完成后更新 PHASES.md 的复选框、证据和日期；不另写第二份任务计划。
 
@@ -20,10 +20,10 @@
 
 按以下顺序执行，禁止跳步：
 
-1. 建立真实设备性能基线。
+1. 用 `measure_perf.py` 和 fresh profile 复跑性能基线；已有基线不能替代本次前后数据。
 2. 先优化主线程和存储，不先改 UI 框架。
 3. 保留现有 40 条启动内联数据、200 词章节补全、Service Worker 和离线能力。
-4. 每次改动必须提供前后测量。
+4. 性能、缓存、同步改动必须提供前后测量。
 5. 超过性能预算立即回滚，不允许"以后优化"。
 
 ### 0.2 直接复制给 AI 的启动提示词
@@ -41,8 +41,8 @@
 不要读 docs/AGENT_PROTOCOL.md —— 单 Agent 顺序执行用不上。
 
 执行规则：
-- 从 PHASES.md「执行状态总表」中第一个"未开始"且依赖已满足的 Phase 开始。
-- 开工前先跑门禁（git status / git log / template.html mtime / run_tests.py），填写任务卡。
+- 从 PHASES.md 选择当前待办或用户指定的单一任务；阶段表没有“未开始”项时不要自造 Phase。
+- 开工前先跑门禁（git status / git log / software/src 与 template.html mtime / frontend_bundle.py --check / run_tests.py），填写任务卡。
 - 一次只做一个可独立验收的子任务。
 - 只修改任务卡"允许修改的文件"，保留 40 条启动内联数据、200 词章节补全和上次学习位置恢复语义。
 - 不覆盖其他会话的改动，不改题外功能，不部署，除非我明确要求部署。
@@ -68,7 +68,7 @@
 实现者、验收者、合并者、部署者权限分离；实现者不能自己标记 accepted。
 
 执行规则：
-- 从 PHASES.md「执行状态总表」中第一个"未开始"且依赖已满足的 Phase 开始。
+- 从 PHASES.md 选择当前待办或用户指定的单一任务；阶段表没有“未开始”项时不要自造 Phase。
 - 开工前先跑执行门禁，填完整任务卡（本文件 0.3 节）。
 - 只修改任务卡"允许修改的文件"，保留 40 条启动内联数据、200 词章节补全和上次学习位置恢复语义。
 - 不覆盖其他会话的改动，不改题外功能，不部署，除非我明确要求部署。
@@ -125,7 +125,7 @@ Depth 0  Root Orchestrator（唯一合并、部署）
 4. 实现者只能修改任务卡列出的 `allowed_paths`；越界即失败，不接受"顺手优化"。
 5. 验收者不得改代码；实现者不得自己标 `accepted`；最终合并和部署只能由 Root 完成。
 6. 所有写任务必须使用独立 `git worktree`；主工作区只用于 Root 集成，禁止并发写。每个写 Agent 的 worktree 由父层绑定，不能和兄弟节点共享。
-7. `software/template.html`、`shared/merge.js`、D1 迁移、生产部署是排他资源，名称相同但路径不同的租约也不能重叠。
+7. `software/src/`、`software/template.html`、`shared/merge.js`、D1 迁移、生产部署是排他资源；前端源片段与生成模板视为同一写域，名称相同但路径不同的租约也不能重叠。
 8. mtime 只是警告，不是锁。租约必须使用 Windows 可用的原子创建（`New-Item`/`CreateNew`/Python `O_CREAT|O_EXCL`）。
 9. 当前工作区有未知归属改动时，先冻结基线；不得把别人的改动当成自己的提交。
 10. 递归不是目标本身：当任务强依赖、共享契约或合并收益低于协调成本时，必须退回单 Agent 顺序执行。
@@ -243,7 +243,7 @@ contextUsed / contextWindow / threshold
 - 为了"架构漂亮"拆出大量只有一层的接口。
 - 把完整词库重新内联到首屏。
 - 破坏上次学习位置恢复。
-- 覆盖其他会话正在修改的 `software/template.html`。
+- 覆盖其他会话正在修改的 `software/src/`、`software/template.html` 或其生成链。
 
 ---
 
@@ -273,7 +273,7 @@ $stream = [IO.File]::Open(
 
 租约至少包含：`runId`、`taskId`、`agent`、`worktree`、`branch`、`paths`、`baseCommit`、`createdAt`、`expiresAt`、`pid/sessionId`。只由父 Agent 续租/释放；回收前确认进程已退出且超过 TTL。mtime 只作额外警告。
 
-租约 key 必须使用仓库相对路径，例如 repo:software/template.html、repo:shared/merge.js、contract:sync-state-schema、d1:migration、deploy:production；不能使用 worktree 的绝对路径，否则不同 worktree 会把同一文件误判成不同资源。租约还要记录 fencingToken、heartbeatAt、parentPid、resourceType 和 generation；过期租约不能让旧进程继续提交。
+租约 key 必须使用仓库相对路径，例如 repo:software/src、repo:software/template.html、repo:shared/merge.js、contract:sync-state-schema、d1:migration、deploy:production；修改前端源时必须同时持有 repo:software/src 和 repo:software/template.html 的同一 owner 租约；不能使用 worktree 的绝对路径，否则不同 worktree 会把同一文件误判成不同资源。租约还要记录 fencingToken、heartbeatAt、parentPid、resourceType 和 generation；过期租约不能让旧进程继续提交。
 
 每个任务实例化：
 
@@ -437,7 +437,7 @@ $proc.Id | Set-Content -LiteralPath $pidFile
 - 只允许父 Agent 进入主工作区合并，合并前检查 `git diff --name-only` 与 `git diff --check`。
 - 合并后必须重新跑完整测试，不能继承子 Agent 的测试结果。
 - 生产部署和 D1 migration 使用独立排他租约；同一时间只允许一个。
-- 部署前确认最近 10 分钟无人提交/部署；部署后使用全新 Edge `--user-data-dir` 验证。
+- 部署前由 `deploy.py` 检查最近 10 分钟提交和上次成功发布标记；默认拒绝，不能靠口头判断绕过。
 - 部署失败不自动重试；先确认线上版本、回滚点和实际部署产物。
 
 ### 父 Agent 合并前验收

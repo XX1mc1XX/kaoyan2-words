@@ -1,147 +1,205 @@
 # 考研英语二核心词
 
-一个给考研英语二用的背单词应用。数据来自 2010-2024 年英语二真题（17 套）的真实词频统计，不是通用词表。
+一个面向考研英语二的离线优先背单词 PWA。词频来自 2010–2024 年英语二 17 套真题；不是通用词表。
 
-线上地址：https://kaoyan2-words.pages.dev/
+线上地址：<https://kaoyan2-words.pages.dev/>
+
+## 当前形态
+
+- 前端是原生 HTML/CSS/JavaScript，不引入 React，也没有 C++/Qt 客户端；当前没有重写 UI 的计划。
+- 托管在 Cloudflare Pages，动态接口由 Pages Functions/Worker + D1 提供，静态词库与用户进度分离。
+- 四本牌组：核心词 1342、核心派生 120、基础词 349、保险库 1545，共 3356 词。
+- 章节大小为 200。网页首屏只内联前 40 词，再用既有的 `fillDeckInBackground`、`pendingSeek`、`chapterExpectedLength` 补齐第一章，不为启动补全另写第二套逻辑。
 
 ## 目录结构
 
-```
+```text
 单词/
-├── software/           应用源码与产物
-│   ├── template.html   单文件前端（数据通过占位符注入）
-│   └── 考研核心词.html  打包产物（可直接双击打开，离线可用）
-├── scripts/            构建脚本（共 11 个，按执行顺序）
-├── data/               数据
-│   ├── words.json          阶段一 · 核心词 1342
-│   ├── derivatives.json    阶段二 · 核心派生 120（S/A/B/C 四档）
-│   ├── basic.json          基础词自测 349
-│   ├── insurance.json      保险库 1545
-│   ├── ky2_freq.json       英语二真题词频
-│   ├── ky1_freq.json       英语一词频（低权重参考）
-│   ├── ecdict.csv          词典源数据（77 万条，需单独下载）
-│   ├── lemma.en.txt        词形还原表（需单独下载）
-│   ├── archive/            历史中间产物（不参与构建）
-│   └── reviews/            审查结果
-├── ref/                真题原件与红宝书词表
-├── output/             调试截图
-└── scripts/archive/    已完成使命的一次性脚本（路径已失效，仅留档）
+├── software/
+│   ├── src/                   前端唯一手写源
+│   │   ├── shell.html         页面壳
+│   │   ├── styles.css         样式
+│   │   ├── app.manifest.json  有序 JS 片段清单
+│   │   └── app/*.js           12 个有序源码片段
+│   ├── template.html          scripts/frontend_bundle.py 生成，勿手改
+│   ├── sw.template.js         Service Worker 源模板
+│   ├── sw.js                  make_html.py 注入版本后的生成物
+│   └── 考研核心词.html         单文件版生成物
+├── backend/
+│   ├── worker.js              Pages Functions / API / D1
+│   ├── schema.sql             D1 基线结构
+│   └── migrations/            手工执行的数据库迁移
+├── shared/merge.js            前后端共享的进度合并与 serverFence
+├── scripts/
+│   ├── frontend_bundle.py     装配 software/src
+│   ├── make_html.py           构建单文件版与 deploy/
+│   ├── deploy.py              构建、测试、发布、线上验收
+│   └── tools/                 回归、离线与性能测量
+├── data/                      词库、词频、审查结果、ECDICT 子集
+├── ref/                       真题原件与原词表
+└── .github/workflows/ci.yml   Windows CI 门禁
 ```
 
-## 数据来源
+`software/template.html` 是装配产物，不是手写入口。`software/sw.js`、`deploy/` 和单文件 HTML 也都是生成物；不要直接编辑或在部署后手工复制覆盖。
+
+## 前端装配
+
+`software/src/app.manifest.json` 固定 12 个 JS 片段的顺序。`scripts/frontend_bundle.py` 把以下内容装入 `software/template.html`：
+
+1. `shell.html` 的 `__KY_STYLES__`、`__KY_APP__` 占位符；
+2. `styles.css`；
+3. `app/*.js`，按清单顺序在同一经典脚本作用域内拼接。
+
+这是源码布局拆分，不是运行时模块系统；片段中禁止 `import`/`export`，以免改变单文件离线版和首卡行为。修改源后执行：
+
+```powershell
+python scripts/frontend_bundle.py --write
+python scripts/make_html.py
+```
+
+`make_html.py` 还会：
+
+- 把 `shared/merge.js` 注入模板和 Worker 的 `/*__MERGE__*/` 占位符；
+- 生成带内容哈希的 `deploy/app.<hash>.js`；
+- 生成带内容哈希的四本词库、按字母拆分的详情分片和 `build-meta.json`；
+- 生成 `deploy/index.html`、`deploy/sw.js`、`deploy/_worker.js` 与缓存头；
+- 通过 `deploy.lock` 互斥、独立暂存目录和目录切换完成原子构建。
+
+## 本地状态
+
+主状态使用 `generation + 64 shard`：
+
+- `ky_words_v1#meta[@account]` 保存当前 generation；
+- `ky_words_v1#<generation>-<0..63>[@account]` 保存按词名稳定 hash 分片的记录；
+- 单次翻词只重写一个分片；一次完整迁移/导入/清空先写新 generation，最后原子切换 meta，再清理旧 generation；
+- 旧 `ky_words_v1` 会迁移到新格式，读取时保留兼容回退。
+
+`ky_pos_v1[@account]` 单独保存每章的小型 `{pos, posWord, t}` 位置记录。翻词不再反复写整份章节队列，刷新后仍优先按 `posWord` 恢复。
+
+其他键包括 `ky_chapter_v1`（队列与位置）、`ky_conf_v1`（牌组/章节/设置）、`ky_daily_v1`（每日学习节奏）和 `ky_stamp_v1`。删除使用墓碑 `{del: 1, t}`，账号数据通过 `@account` 隔离。
+
+## 缓存协议
+
+Service Worker 使用两套缓存：
+
+- `ky-shell-<BUILD_VERSION>`：页面壳、哈希主程序、manifest、图标和四本词库；
+- `ky-audio-v2`：中英文音频，规范化 `word/lang/v` 后缓存，最多 8000 条，并有配额保护。
+
+关键语义：
+
+- 导航请求 network-first，3 秒弱网超时后回退缓存；哈希静态资源 cache-first。
+- 响应头 `x-ky-cache` 给出 `hit`、`stored` 或 `store-failed`；页面只有收到成功落盘确认后才写“已缓存”标记。
+- `x-ky-cache-revision` 与 `x-ky-cache-epoch` 用于丢弃跨标签页乱序到达的旧缓存消息；淘汰通过 `ky:audio-evicted` 通知页面。
+- 新 SW 安装时核心壳必须成功，随后 `skipWaiting`/`clients.claim`；激活时删除旧 shell 和旧音频缓存命名空间。页面以 `updateViaCache: 'none'` 注册，并在已有控制器发生替换时刷新。
+- 词库和详情使用内容哈希；`/data/*` 与 `/app.*.js` 为长期 immutable，HTML、`sw.js`、`build-meta.json` 不使用旧缓存判断发布结果。
+
+## 同步与 serverFence
+
+合并算法只有一个源：`shared/merge.js`，由构建注入前端和 Worker。普通同步、首次登录、冲突后的 `/api/state/sync` 都走同一套逻辑。
+
+- `clear`/`import` 不靠客户端时间戳强推；Worker 用服务端时间生成单调 `conf.serverFenceAt`，并用 `conf.serverFenceMode` 区分 `clear` 与 `import`。
+- 普通 PUT 会先剥掉客户端提供的 fence，再读取云端权威 fence；旧设备不能靠旧时钟复活 fence 之前的记录。
+- `clear` 以 `resetAt` 兼容旧数据；`import` 使用独立 import fence 且不留下长期 clear 栅栏。
+- 合并结果按稳定键序序列化；D1 `updated_at` 兼作乐观锁版本，避免同毫秒双写和无效轮询。
+- 删除墓碑、账号校验、压缩体大小检查和 512KB 上限仍由测试覆盖。
+
+## 构建、测试与发布
+
+```powershell
+# 文档/源码一致性
+python scripts/frontend_bundle.py --check
+
+# 当前构建门禁
+python scripts/make_html.py
+python scripts/tools/run_tests.py
+python scripts/tools/offline_check.py --json
+python scripts/tools/measure_perf.py
+
+# 一条命令完成构建、回归、离线实测、部署和双域名验收
+python scripts/deploy.py
+```
+
+当前本地实测（2026-10-29）：数据测试 14/14，回归 318/318，离线端到端 20/20。
+
+`run_tests.py` 覆盖源码片段可重建、64 shard、`ky_pos_v1`、导入/清空 generation 切换、serverFence、SW 缓存反馈、40→200 词补全和首卡性能。`offline_check.py` 使用全新临时 Edge profile，实际验证 SW 控制、四本词库、切章、词表、详情、中英文音频及断网重启。
+
+`deploy.py` 的发布门禁：
+
+- `deploy.publish.lock` 互斥；提交和上次成功发布都有 10 分钟冷却，可用 `--allow-recent-release` 显式覆盖；超过 30 分钟才视为残锁；
+- 工作区有未提交改动默认拒绝，必须显式 `--allow-dirty-release`；
+- `backend/migrations/applied.json` 记录已人工确认的迁移文件 SHA-256；新增或改动迁移而未更新账本时默认拒绝；
+- 校验 `build-meta.json` 与 `app.<hash>.js` 内容哈希；
+- 部署后同时检查 deployment URL 和 public URL：build-meta、SW 版本/主程序、HTML 引用、主程序字节、全新 Edge 运行时和 `/api/health` 的 D1 查询。
+
+默认不跳过测试；`--skip-test` 只用于明确确认的紧急发布。
+
+## 真实性能基线
+
+2026-10-29 使用 `python scripts/tools/measure_perf.py` 实测。环境为 Windows Edge headless + Playwright，5 个全新 profile，生产等价本地 HTTP，Service Worker 阻止，外部音频替换为本地 WAV。
+
+| 指标 | p50 | p95 |
+|---|---:|---:|
+| 冷启动 FCP | 244.00 ms | 278.40 ms |
+| 冷启动首卡 | 120.00 ms | 154.80 ms |
+| DOMContentLoaded | 122.80 ms | 157.82 ms |
+| 首屏 DOM | 240 | 240 |
+| 40→200 词补全 | 323.60 ms | 370.20 ms |
+| 章节切换 | 0.10 ms | 0.46 ms |
+| 词表搜索 | 0.65 ms | 1.09 ms |
+| 词表分页 | 0.50 ms | 0.70 ms |
+| 64 shard 单次写 | 0.00 ms | 0.10 ms |
+| 同步快照序列化 | 0.40 ms | 0.77 ms |
+| 同步快照 gzip | 2.30 ms | 4.35 ms |
+
+体积与数据：首屏 HTML gzip 11,813 B，主程序 gzip 37,131 B，启动总 gzip 48,944 B；完整 state 175,201 B，最大单分片 2,994 B；2400 条同步快照 182,332 B，gzip 后 14,961 B；本地音频窗口 11 个请求，p50/p95 为 23.15/26.45 ms。
+
+这组数据是桌面 headless 基线，不等同于真实移动设备验收；完整冷/热/离线与 CPU 降速结论应继续用同一脚本和 fresh profile 复跑。
+
+## 发布状态
+
+截至 **2026-10-29 20:41 +08:00**：
+
+- 当前 HEAD：`2d2eaa5b6f9db8879a20447edee3cbe2eb655a09`；本地 `deploy/build-meta.json` 为 build `76060d85d857`、app `./app.4defd52cb022.js`。
+- 公共域名在本轮部署前仍返回旧 app `./app.9775dd28fffb.js`、SW build `4e120f40cd87`；`/api/health` 返回 `{"ok":true,"database":true}`。
+- 因此本轮候选 `76060d85d857` 尚未确认上线；发布后必须用 `deploy.py` 的双域名和 fresh Edge 验收结果覆盖本节。
+- 仓库当前没有配置远程；`.github/workflows/ci.yml` 已定义 Windows CI，但本地没有 GitHub Actions 运行记录。不能把“workflow 已提交”说成“托管 CI 已全绿”。
+
+## 数据规则
 
 | 数据 | 来源 | 说明 |
 |---|---|---|
-| 词频 | 2010-2024 英语二真题 17 套 | 提取全文后统计 lemma 级出现次数 |
-| 释义 | 红宝书 2027 版（不背单词 App） | 已按「只留核心义」二次加工 |
-| 词形变化 | ECDICT + lemma.en.txt | 屈折变化与派生词 |
-| 派生关系 | WordNet derivationally_related_forms | 用于校验词族归属 |
+| 词频 | 2010–2024 英语二真题 17 套 | 正文、题干、选项统计 lemma 词次 |
+| 释义 | 红宝书 2027 版 | 已按“只留核心义”校订 |
+| 词形变化 | ECDICT + lemma.en.txt | `data/ecdict_subset.json` 是可复现构建输入 |
+| 派生关系 | WordNet derivationally_related_forms | 校验词族归属 |
 
-### 选词规则
+1. 必须真实出现在真题中。
+2. 必须命中考研大纲、红宝书或可靠词表门槛。
+3. 排除纯功能词、数词、中学基础词、专有名词和词根碎片。
+4. 真题出现 ≥20 次最多保留 2 个义项；少于 20 次只留 1 个核心义。
 
-1. 必须在真题里真实出现过
-2. 必须在考研大纲词表 / 红宝书 / 柯林斯 3 星以上
-3. 排除纯功能词（the/and/that）、数词、中学基础词
-4. 排除专有名词（>70% 出现为大写开头）
-5. 排除词根碎片（如 `tract`、`voc` 这类不是英文单词的构词成分）
+完整 `data/ecdict.csv` 和 `data/lemma.en.txt` 不属于常规构建必需输入；前者只在重建 ECDICT 子集时需要。
 
-### 释义规则
-
-- 真题出现 ≥ 20 次：最多 2 个义项，且优先不同词性（`approach → 接近、方法`）
-- 真题出现 < 20 次：只留 1 个核心义
-
-## 构建流程
-
-完整顺序（从零复现）：
-
-```bash
-# 1. 下载真题 PDF 到 ref/ky2/、ref/ky1/
-python scripts/fetch_corpus.py
-
-# 2. 统计词频
-python scripts/build_freq.py        # -> data/ky2_freq.json
-python scripts/build_freq_ky1.py    # -> data/ky1_freq.json
-
-# 3. 构建词库（依赖 data/ 下的校订释义文件，缺失会报错）
-python scripts/build_words.py       # -> words.json（需 meanings_*.json）
-python scripts/build_derivatives.py # -> derivatives.json（需 derivatives_curated.tsv）
-python scripts/build_basic_words.py # -> basic.json
-python scripts/build_optional_decks.py  # -> insurance.json
-
-# 4. 打包
-python scripts/make_html.py         # -> software/考研核心词.html
-python scripts/make_pdf.py          # -> 打印版 PDF（可选）
-
-# 5. 构建、测试、部署、健康检查（推荐，一条命令）
-python scripts/deploy.py
-
-# 部署脚本会检查构建/测试返回码、发布锁、迁移门禁、deployment URL 和 /api/health。
-# 确认远端迁移已执行后，才能追加 --allow-pending-migrations。
-# 不要再把 software\考研核心词.html 复制进 deploy/，那会覆盖按需加载版。```
-
-**只改前端**（不动数据）的话，只需跑第 4、5 步。
-
-构建失败会直接报错退出（包括 terser 压缩失败），不会静默产出未压缩或半成品的产物。
-确实要跳过压缩时显式设置 `$env:KY_NO_MINIFY="1"`。
-
-`data/ecdict.csv` 和 `data/lemma.en.txt` 不在仓库里，需要从 [ECDICT](https://github.com/skywind3000/ECDICT) 下载。
-
-`scripts/archive/` 是已完成使命的一次性脚本，内部路径已失效，仅供追溯历史改动，**不要执行**。
-
-`shared/merge.js` 是前后端共用的进度合并实现（含删除墓碑）。`software/template.html` 和
-`backend/worker.js` 里只留 `/*__MERGE__*/` 占位符，由 `make_html.py` 在构建时注入——
-**改合并逻辑只改 shared/merge.js，不要在两边各写一份**。
-
-数据库结构变更放在 `backend/migrations/`，部署前手工执行一次，例如：
-
-```powershell
-npx wrangler d1 execute kaoyan2-users --remote --file backend/migrations/002_username_nocase.sql
-```
-
-回归测试跑的是构建产物，先构建再测：
-
-```powershell
-python scripts/make_html.py
-python scripts/tools/run_tests.py
-```
-
-
-## 应用功能
+## 主要功能
 
 | 功能 | 说明 |
 |---|---|
-| 手势 | 左滑=认识（7 天后复习）、右滑=不认识（权重+1）、上下滑翻词、点卡片翻面 |
-| 章节 | 每 200 词一章，进度按「词」记录而非下标，切换章节不丢 |
-| 权重 | 右滑次数记在卡片左上角，洗牌时权重越高越可能排前面（概率性，不强制置顶） |
-| 撤销 | 左滑后 5 秒内可撤销 |
-| 已掌握 | 词表页单独分区，可恢复 |
-| 备份 | 统计页支持导出/导入进度 JSON |
-| 图标 | 统计页可切换 5 个内置图标或上传自定义图片，立即应用到左上角和浏览器标签页 |
+| 手势 | 左滑认识、右滑不认识、上下滑翻词、点卡翻面 |
+| 章节 | 每 200 词一章，按词和 `posWord` 恢复位置 |
+| 权重 | 右滑累计权重，洗牌时概率提高 |
+| 撤销 | 左滑后 5 秒可撤销，并回滚每日计数 |
+| 已掌握 | 单独分区，可恢复 |
+| 备份 | JSON 导入/导出，导入/清空使用 generation 原子切换 |
+| 账号 | 游客与账号隔离；登录后服务端合并并同步 |
+| 离线 | 支持完整词库、词表、详情和中英文音频缓存 |
 
-状态全部存在浏览器 localStorage：
-- `ky_words_v1` — 每词状态 `{w: 权重, mastered: 已掌握, due: 到期时间, seen: 次数}`；
-  删除写成墓碑 `{del: 1, t: 删除时间}`，「清空 / 导入」也靠它同步，不靠时间戳压制云端
-- `ky_chapter_v1` — 每章的队列顺序与位置（同样支持墓碑）
-- `ky_conf_v1` — 当前词库、当前章节、显示/朗读设置与自定义图标
-- `ky_daily_v1` — 每日过卡次数与新掌握数，每条带 `t`，撤销减掉的计数不会被合并「取大」复活
+## 排障与历史
 
-## 版本历史
-
-用 git 管理，每个改动都有提交记录，效果不好可以回退：
-
-```bash
-git log --oneline        # 看历史
-git checkout <commit>    # 回退到某个版本
+```powershell
+git log --oneline
+git status
 ```
 
-## 发音、离线与性能
+回退代码用 `git checkout <commit>`。涉及生成物时，回退后运行 `python scripts/make_html.py`，不要手工修补 `deploy/`。
 
-- 已预加载的真人发音直接秒播；新词首次先用系统语音立即发声，同时后台缓存真人音频，之后可秒播并离线重播。
-- 网页首屏只内嵌几十个词，其余词库拆成带哈希的独立 JSON 并由 Service Worker 后台预缓存；首次打开不再等待 3364 个词全部下载。单文件版仍内嵌全部词库，双击即可完整离线使用。
-- 听过的词以及后续 3 个词会由 Service Worker 缓存发音，之后离线也能重播。
-- 首次通过 HTTPS 打开后，页面、词库与图标会进入离线缓存；之后断网仍可学习和记录进度。
-- `file://` 直接打开的单文件版本原本就支持离线学习；局域网 HTTP 无法启用 Service Worker，需要 HTTPS 才有完整离线能力。
-- 登录账号会缓存在本机，离线打开时仍使用该账号自己的进度；联网后再校验会话并同步。
-- 账号同步采用单请求快路径：本地有改动时直接 PUT，首次登录由服务端一次完成合并，轮询用 `since` 只检查版本；较大的上传会自动 gzip 压缩。
-- 词表首屏只渲染 100 条，滚动/点击“显示更多”继续加载，避免移动端一次创建上千个 DOM 节点。
-- `python scripts/make_html.py` 会同时生成完整的 `software/考研核心词.html` 和按需加载的 `deploy/index.html`，并在 `deploy/data/` 生成带内容哈希的词库分片，同时复制 `sw.js`、PWA 图标和最新 Worker，部署时不需要再手工复制。
+`scripts/archive/` 中的一次性脚本仅用于追溯历史，路径可能已失效，不要执行。

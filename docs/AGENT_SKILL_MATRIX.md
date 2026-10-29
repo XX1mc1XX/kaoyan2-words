@@ -1,7 +1,7 @@
 # Claude Code 技能路由与递归子 Agent 矩阵
 
-> 日期：2026-10-29  
-> 文档性质：工程控制面参考，不是第二份执行计划。唯一任务顺序由 [PHASES.md](./PHASES.md) 决定。  
+> 日期：2026-10-29
+> 文档性质：工程控制面参考，不是第二份执行计划。唯一任务顺序由 [PHASES.md](./PHASES.md) 决定。
 > 目的：让父 Agent 在合适的任务上主动、递归、并行地调用 Claude Code 的 skills、agents、teams 和 CLI worker，同时避免上下文污染、文件覆盖和假验收。
 
 ## 0. 本机扫描结果
@@ -111,7 +111,7 @@ contextWindow / checkpointThreshold
 2. 子 Agent 可以在 `canSpawn=true` 且预算未耗尽时继续递归；每派一层 `depth + 1`，`spawnBudgetRemaining - 1`。
 3. 子 Agent 不得绕开 wrapper 直接运行 `claude`/`codex` 子进程；所有派生都必须登记到同一任务账本。
 4. 写 Agent 只能拿到自己的 worktree 和文件租约；`depth <= write_depth_limit` 才可写，超过后只读。只读 Verifier 使用固定 SHA 的只读 checkout，不占写租约。
-5. 依赖关系强、共享契约、同一个 `software/template.html`、数据库迁移和生产部署禁止并行写。
+5. 依赖关系强、共享契约、同一前端写域（`software/src/` + 生成 `software/template.html`）、数据库迁移和生产部署禁止并行写。
 6. 递归收益不足、路径开始冲突、上下文接近硬阈值或预算耗尽时，父 Agent 必须收拢分支，不继续多开。
 
 ## 2. 首选技能路由

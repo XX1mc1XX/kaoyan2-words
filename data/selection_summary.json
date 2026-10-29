@@ -2,10 +2,10 @@
   "total": 1342,
   "papers": 15,
   "bands": {
+    "真题补充": 318,
     "中频核心": 613,
-    "高频核心": 204,
     "跨词书核心": 207,
-    "真题补充": 318
+    "高频核心": 204
   },
   "priorities": {
     "S 必背": 323,
@@ -13,10 +13,10 @@
     "B 次重点": 536
   },
   "source_tiers": {
-    "中频词": 613,
-    "高频词": 204,
     "低频词": 199,
+    "中频词": 613,
     "基础词": 40,
+    "高频词": 204,
     "偶考词": 95,
     "跨词书": 187,
     "补充词": 4
@@ -32,6 +32,16 @@
     "english_2": 1.0,
     "english_1": 0.35,
     "english_3": 0.0
+  },
+  "field_semantics": {
+    "id": "应用 words_order.json 后的 1-based 展示顺序",
+    "priority_rank": "独立于人工展示顺序的 1-based priority_score 降序名次",
+    "weight": "不写入 words.json；make_html.py 按展示顺序生成每个词唯一的展示权重",
+    "weighted_coverage": "coverage + 0.35 * en1_coverage"
+  },
+  "word_order": {
+    "path": "data/words_order.json",
+    "total": 1342
   },
   "en1_available": true,
   "notes": [

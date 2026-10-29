@@ -10,7 +10,10 @@ import json
 import re
 from pathlib import Path
 
-from nltk.corpus import wordnet as wn
+try:
+    from nltk.corpus import wordnet as wn
+except ImportError as exc:
+    raise SystemExit("缺少 nltk；无法生成 derived.json。先安装 requirements.txt") from exc
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -25,6 +28,11 @@ def is_valid(word: str) -> bool:
 
 
 def main() -> None:
+    try:
+        wn.ensure_loaded()
+    except LookupError as exc:
+        raise SystemExit("缺少 NLTK wordnet 语料；拒绝生成空 derived.json") from exc
+
     directed: set[tuple[str, str]] = set()
 
     for synset in wn.all_synsets():
@@ -39,9 +47,14 @@ def main() -> None:
                 directed.add((a, b))
                 directed.add((b, a))
 
+    if not directed:
+        raise SystemExit("WordNet 未产生派生关系；拒绝写出空 derived.json")
+
     word_map: dict[str, set[str]] = {}
     for a, b in directed:
         word_map.setdefault(a, set()).add(b)
+    if not word_map:
+        raise SystemExit("WordNet 派生词映射为空；拒绝写出空 derived.json")
 
     sorted_map = {key: sorted(values) for key, values in sorted(word_map.items())}
 

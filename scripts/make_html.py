@@ -2,6 +2,7 @@
 """Embed the generated word list into the single-file mobile web app."""
 from __future__ import annotations
 
+import atexit
 import csv
 import hashlib
 import io
@@ -11,18 +12,176 @@ import re
 import shutil
 import stat
 import subprocess
-from datetime import date, datetime, timezone
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 SOFT = ROOT / "software"
 SHARED = ROOT / "shared"
-# 先往临时目录写，构建完再整体替换：边清空边写会让目录短暂处于半成品状态
-DEPLOY = ROOT / "deploy.tmp"
+DEPLOY_TMP_ROOT = ROOT / "deploy.tmp"
+DEPLOY = None
 DEPLOY_FINAL = ROOT / "deploy"
 OUT = SOFT / "考研核心词.html"
 MERGE_MARKER = "/*__MERGE__*/"
+LOCK = ROOT / "deploy.lock"
+LOCK_FD = None
+LOCK_TOKEN = None
+_LOCK_ATEXIT_REGISTERED = False
+TERSER_VERSION = "5.51.2"
+
+
+# 单一输入清单：required=False 的缺失输入是明确允许的；source_digest=True
+# 的文件参与来源指纹（存在时才入账，保持既有 source_digest 协议不变）。
+INPUT_MANIFEST = (
+    ("template", "software/template.html", True, True, "file", "网页模板"),
+    ("sw_template", "software/sw.template.js", True, True, "file", "Service Worker 模板"),
+    ("worker_template", "backend/worker.js", True, True, "file", "Worker 模板"),
+    ("merge_source", "shared/merge.js", True, True, "file", "前后端共享合并算法"),
+    ("make_html", "scripts/make_html.py", True, True, "file", "构建脚本自身"),
+    ("words", "data/words.json", True, True, "file", "核心词库"),
+    ("words_order", "data/words_order.json", False, True, "file", "上游排序参考，仅用于来源指纹"),
+    ("derivatives", "data/derivatives.json", True, True, "file", "派生词库"),
+    ("basic", "data/basic.json", True, True, "file", "基础词库"),
+    ("insurance", "data/insurance.json", True, True, "file", "保险词库"),
+    ("ky2_freq", "data/ky2_freq.json", True, True, "file", "英语二词频"),
+    ("selection_summary", "data/selection_summary.json", True, True, "file", "选词摘要"),
+    ("ky1_freq", "data/ky1_freq.json", False, True, "file", "英语一词频；缺失时按空元数据处理"),
+    ("meanings_curated", "data/meanings_curated.json", False, True, "file", "上游释义来源，仅用于来源指纹"),
+    ("meanings_final", "data/meanings_final.json", False, True, "file", "上游释义来源，仅用于来源指纹"),
+    ("meaning_corrections", "data/meaning_corrections.json", False, True, "file", "上游释义修正，仅用于来源指纹"),
+    ("ecdict", "data/ecdict.csv", False, True, "file", "完整 ECDICT 重建源；常规构建不再依赖 66MB 原表"),
+    ("ecdict_subset", "data/ecdict_subset.json", True, True, "file", "详情生成所需的可复现 ECDICT 子集"),
+    ("lemma", "data/lemma.en.txt", False, True, "file", "上游词形还原来源，仅用于来源指纹"),
+    ("manifest", "software/manifest.webmanifest", True, False, "file", "PWA manifest"),
+    ("icon_192", "software/icon-192.png", True, False, "file", "PWA 图标 192"),
+    ("icon_512", "software/icon-512.png", True, False, "file", "PWA 图标 512"),
+    ("ky2_ref", "ref/ky2", False, False, "dir", "英语二真题原件；可选来源元数据"),
+    ("ky1_ref", "ref/ky1", False, False, "dir", "英语一真题原件；可选来源元数据"),
+)
+INPUT_BY_KEY = {entry[0]: entry for entry in INPUT_MANIFEST}
+
+
+def get_input_path(key: str):
+    """返回 manifest 中的可选/必需路径；不存在或类型不符时返回 None。"""
+    _, rel_path, _required, _digest, kind, _role = INPUT_BY_KEY[key]
+    path = ROOT / rel_path
+    if kind == "file":
+        return path if path.is_file() else None
+    return path if path.is_dir() else None
+
+
+def require_input_path(key: str):
+    path = get_input_path(key)
+    if path is None:
+        _, rel_path, _required, _digest, _kind, role = INPUT_BY_KEY[key]
+        raise RuntimeError("缺少必需构建输入：%s (%s)" % (rel_path, role))
+    return path
+
+
+def validate_input_manifest():
+    missing = []
+    for key, rel_path, required, _digest, kind, role in INPUT_MANIFEST:
+        if not required:
+            continue
+        path = ROOT / rel_path
+        valid = path.is_file() if kind == "file" else path.is_dir()
+        if not valid:
+            missing.append(f"  - {key}: {rel_path} ({role})")
+    if missing:
+        raise RuntimeError("缺少必需构建输入：\n" + "\n".join(missing))
+
+
+def release_lock():
+    """只由 token 对应的持锁者释放；显式释放后 atexit 不再重复执行。"""
+    token = globals().get("LOCK_TOKEN")
+    fd = globals().get("LOCK_FD")
+    globals()["LOCK_TOKEN"] = None
+    globals()["LOCK_FD"] = None
+    if fd is not None:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+    if token:
+        try:
+            current_token = LOCK.read_text(encoding="ascii")
+        except (FileNotFoundError, OSError):
+            current_token = None
+        if current_token == token:
+            try:
+                LOCK.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+    registered = globals().get("_LOCK_ATEXIT_REGISTERED", False)
+    globals()["_LOCK_ATEXIT_REGISTERED"] = False
+    unregister = getattr(atexit, "unregister", None)
+    if registered and unregister is not None:
+        try:
+            unregister(release_lock)
+        except Exception:
+            pass
+
+
+def acquire_lock():
+    """用 O_EXCL 建锁并写入随机 token；不自动抢占/删除任何既有锁。"""
+    if globals().get("LOCK_FD") is not None or globals().get("LOCK_TOKEN") is not None:
+        raise RuntimeError("当前进程已经持有构建锁")
+    token = os.urandom(32).hex()
+    try:
+        fd = os.open(str(LOCK), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        owner = "unknown"
+        try:
+            owner = LOCK.read_text(encoding="ascii", errors="replace")[:80]
+        except OSError:
+            pass
+        raise RuntimeError(
+            "另一个构建正在运行（deploy.lock 已存在，owner=%s）；"
+            "确认无构建进程后再手动删除该锁文件" % owner
+        )
+    payload = token.encode("ascii")
+    try:
+        offset = 0
+        while offset < len(payload):
+            written = os.write(fd, payload[offset:])
+            if written <= 0:
+                raise OSError("写入构建锁 token 失败")
+            offset += written
+        os.fsync(fd)
+    except BaseException as exc:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        # 这个文件是本进程通过 O_EXCL 刚创建的；写入/fsync 失败时立即回收，
+        # 避免留下没有完整 ownership token 的残锁。不要读取既有锁再删除。
+        try:
+            LOCK.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+        raise RuntimeError("创建构建锁失败：%s" % exc) from exc
+    globals()["LOCK_FD"] = fd
+    globals()["LOCK_TOKEN"] = token
+    try:
+        atexit.register(release_lock)
+        globals()["_LOCK_ATEXIT_REGISTERED"] = True
+    except BaseException:
+        release_lock()
+        raise
+
+acquire_lock()
+validate_input_manifest()
+
+# 唯一暂存目录；只有完整构建并写完软件产物后才替换 deploy/。
+DEPLOY_TMP_ROOT.mkdir(parents=True, exist_ok=True)
+DEPLOY = Path(tempfile.mkdtemp(prefix="build-%s-" % LOCK_TOKEN[:8], dir=DEPLOY_TMP_ROOT))
+
 
 
 def inject(source, marker, value):
@@ -44,14 +203,57 @@ def rmtree_force(path):
         func(target)
     shutil.rmtree(path, onexc=retry)
 
-rows = json.loads((DATA / "words.json").read_text(encoding="utf-8"))
-derivatives = json.loads((DATA / "derivatives.json").read_text(encoding="utf-8"))
-basic = json.loads((DATA / "basic.json").read_text(encoding="utf-8"))
-insurance = json.loads((DATA / "insurance.json").read_text(encoding="utf-8"))
-freq = json.loads((DATA / "ky2_freq.json").read_text(encoding="utf-8"))
-ky1_path = DATA / "ky1_freq.json"
-ky1 = json.loads(ky1_path.read_text(encoding="utf-8")) if ky1_path.exists() else {}
-summary = json.loads((DATA / "selection_summary.json").read_text(encoding="utf-8"))
+
+def atomic_write_text(path: Path, content: str):
+    """同目录临时文件 + os.replace，避免 software 产物只写了一半。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=".%s." % path.name, suffix=".tmp", dir=path.parent)
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def cleanup_staging():
+    """异常退出时清理本次构建的唯一暂存目录；成功的目录已改名为 deploy/。"""
+    stage = globals().get("DEPLOY")
+    if stage is None:
+        return
+    try:
+        if stage.exists():
+            rmtree_force(stage)
+    except Exception:
+        pass
+
+
+atexit.register(cleanup_staging)
+
+def load_json_input(key):
+    path = require_input_path(key) if INPUT_BY_KEY[key][2] else get_input_path(key)
+    return json.loads(path.read_text(encoding="utf-8")) if path is not None else None
+
+
+rows = load_json_input("words")
+derivatives = load_json_input("derivatives")
+basic = load_json_input("basic")
+insurance = load_json_input("insurance")
+freq = load_json_input("ky2_freq")
+ky1 = load_json_input("ky1_freq") or {}
+summary = load_json_input("selection_summary")
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -60,13 +262,40 @@ def sha256(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
+def source_digest_entries():
+    entries = []
+    for key, rel_path, required, include_digest, kind, _role in INPUT_MANIFEST:
+        if not include_digest or kind != "file":
+            continue
+        path = require_input_path(key) if required else get_input_path(key)
+        if path is not None:
+            entries.append(rel_path + ":" + sha256(path))
+    return entries
+
 source_files = []
-for exam, folder in (("english_2", "ky2"), ("english_1", "ky1")):
-    folder_path = ROOT / "ref" / folder
-    if not folder_path.exists():
+for exam, input_key in (("english_2", "ky2_ref"), ("english_1", "ky1_ref")):
+    folder_path = get_input_path(input_key)
+    if folder_path is None:
+        # 真题原件是可选的来源元数据；缺失不影响词库和网页构建。
         continue
-    for path in sorted(folder_path.rglob("*.pdf")):
-        source_files.append({"exam": exam, "name": path.name, "sha256": sha256(path)})
+    paths = sorted(folder_path.rglob("*.pdf"))
+    if exam == "english_1":
+        # 与 build_freq_ky1 的真实输入保持一致：合订本 + 2022-2024 的真题原件，
+        # 解析 PDF 只是参考资料，不能伪装成计频来源。
+        combined = [path for path in paths if "2010-2021" in path.name]
+        selected = combined[:1]
+        for year in (2022, 2023, 2024):
+            candidates = [path for path in paths if str(year) in path.name]
+            if candidates:
+                selected.append(min(candidates, key=lambda item: item.stat().st_size))
+        paths = selected
+    for path in paths:
+        source_files.append({
+            "exam": exam,
+            "name": path.relative_to(folder_path).as_posix(),
+            "sha256": sha256(path),
+        })
 
 meta = dict(freq.get("meta", {}))
 meta.update({
@@ -105,9 +334,9 @@ insurance_slim = slim_rows(insurance)
 
 
 
-template = (SOFT / "template.html").read_text(encoding="utf-8")
+template = require_input_path("template").read_text(encoding="utf-8")
 # 合并算法只有一份实现，构建时分别注入前端和 Worker
-merge_source = (SHARED / "merge.js").read_text(encoding="utf-8")
+merge_source = require_input_path("merge_source").read_text(encoding="utf-8")
 
 
 def json_block(value):
@@ -218,9 +447,14 @@ def build_detail(rows):
     只取前两组是因为词典里靠后的义项大多是生僻用法，考研不考；
     把整段塞进去反而会把「州 / 大写字母」这类非重点义摆到用户眼前。
     """
-    path = DATA / "ecdict.csv"
-    if not path.exists():
-        return {}
+    path = require_input_path("ecdict_subset")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1:
+        raise RuntimeError("ecdict subset schema_version 不受支持")
+    fields = payload.get("field_names")
+    entries = payload.get("entries")
+    if not isinstance(fields, list) or not isinstance(entries, dict):
+        raise RuntimeError("ecdict subset 结构不完整")
 
     word_forms = {}
     lookup = set()
@@ -232,11 +466,10 @@ def build_detail(rows):
         lookup.update(forms)
 
     ecdict = {}
-    with io.open(path, encoding="utf-8", errors="replace", newline="") as f:
-        for row in csv.DictReader(f):
-            word = (row.get("word") or "").lower()
-            if word in lookup and word not in ecdict:
-                ecdict[word] = row
+    for word in lookup:
+        values = entries.get(word)
+        if isinstance(values, list) and len(values) == len(fields):
+            ecdict[word] = dict(zip(fields, values))
 
     detail = {}
     for word, forms in word_forms.items():
@@ -247,7 +480,8 @@ def build_detail(rows):
         groups = []
         for line in translation.split("\n"):
             line = line.strip()
-            line = re.sub(r"^\[[^\]]+\]\s*", "", line).strip()   # 去掉 [计] [医] 等领域标签，保留实际释义
+            # 一行可能连续带多个标签（如 "[医] [疾]病"），全部剥掉但保留实际释义。
+            line = re.sub(r"^(?:\[[^\]]+\]\s*)+", "", line).strip()
             if not line:
                 continue
             groups.append(line[:46] + "…" if len(line) > 46 else line)
@@ -307,16 +541,8 @@ standalone_html = render_html(
     meta,
     detail,
 )
-OUT.write_text(standalone_html, encoding="utf-8", newline="\n")
 
-# 临时生成目录：上一次构建失败可能留下残留，先清干净再写。
-DEPLOY.mkdir(parents=True, exist_ok=True)
-for stale in DEPLOY.iterdir():
-    if stale.is_dir():
-        rmtree_force(stale)
-    else:
-        os.chmod(stale, stat.S_IWRITE)
-        stale.unlink(missing_ok=True)
+# DEPLOY 是本次构建独占的唯一目录，不需要也不应该清理其他构建的暂存目录。
 
 # 网页版只内嵌首章，其他词库拆成带内容哈希的独立资源：
 # 首屏不再下载 3364 个词，同时这些资源仍可长期缓存并供 Service Worker 离线预取。
@@ -383,18 +609,45 @@ app_match = re.search(r'<script id="ky-app">(.*?)</script>', web_html, re.S)
 if not app_match:
     raise RuntimeError("ky-app script block not found")
 app_js = app_match.group(1)
+
+
+def terser_command():
+    """优先使用项目本地 node_modules，缺失时才用精确版本的 npx 缓存。"""
+    local_package = ROOT / "node_modules" / "terser" / "package.json"
+    local_entry = ROOT / "node_modules" / "terser" / "bin" / "terser"
+    if local_package.is_file() or local_entry.is_file():
+        if not local_package.is_file() or not local_entry.is_file():
+            raise RuntimeError("本地 terser 安装不完整，请安装 terser@%s" % TERSER_VERSION)
+        try:
+            installed_version = json.loads(local_package.read_text(encoding="utf-8"))["version"]
+        except Exception as exc:
+            raise RuntimeError("无法读取本地 terser 版本：%s" % exc) from exc
+        if installed_version != TERSER_VERSION:
+            raise RuntimeError(
+                "本地 terser 版本为 %s，构建固定要求 %s" %
+                (installed_version, TERSER_VERSION))
+        node = shutil.which("node")
+        if not node:
+            raise RuntimeError("本地 terser 需要 Node：找不到 node")
+        return [node, str(local_entry)]
+    npx = shutil.which("npx")
+    if not npx:
+        raise RuntimeError(
+            "找不到本地 terser 或 npx：请安装 terser@%s，或显式 KY_NO_MINIFY=1 跳过压缩" %
+            TERSER_VERSION)
+    # 版本固定，npx 只负责缺失时安装精确版本，不会解析到“latest”而漂移。
+    return [npx, "--yes", "terser@%s" % TERSER_VERSION]
+
+
 # 网页版主程序用 Terser 压缩。压缩失败必须让构建失败：
 # 静默回退到未压缩源码会让产物体积翻倍、且没人发现，构建也不可复现。
 # 确实要跳过压缩时显式设置 KY_NO_MINIFY=1。
 if os.environ.get("KY_NO_MINIFY"):
     print("minify=skipped")
 else:
-    npx = shutil.which("npx")
-    if not npx:
-        raise RuntimeError("找不到 npx，无法压缩主程序：装好 Node，或显式 KY_NO_MINIFY=1 跳过压缩")
     try:
         minified = subprocess.run(
-            [npx, "--yes", "terser", "--compress", "--mangle", "--format", "comments=false"],
+            terser_command() + ["--compress", "--mangle", "--format", "comments=false"],
             input=app_js.encode("utf-8"), capture_output=True, timeout=180,
         )
     except Exception as exc:
@@ -402,6 +655,21 @@ else:
     if minified.returncode != 0 or not minified.stdout.strip():
         raise RuntimeError("terser 压缩失败：%s" % minified.stderr.decode("utf-8", "replace")[:300])
     app_js = minified.stdout.decode("utf-8")
+if "sourceMappingURL=" in app_js:
+    raise RuntimeError("terser 输出了 source map 指令，拒绝写入单文件版")
+
+# 单文件版复用同一份压缩主程序，只替换脚本正文；四套词库仍完整内嵌。
+standalone_app_match = re.search(r'<script id="ky-app">(.*?)</script>', standalone_html, re.S)
+if not standalone_app_match:
+    raise RuntimeError("standalone ky-app script block not found")
+standalone_html = (
+    standalone_html[:standalone_app_match.start()]
+    + '<script id="ky-app">'
+    + app_js
+    + '</script>'
+    + standalone_html[standalone_app_match.end():]
+)
+
 app_digest = hashlib.sha256(app_js.encode("utf-8")).hexdigest()[:12]
 app_asset = f"./app.{app_digest}.js"
 (DEPLOY / app_asset[2:]).write_text(app_js, encoding="utf-8", newline="\n")
@@ -420,15 +688,21 @@ web_html = (
 # 构建日期不参与哈希，否则每天都会全量重下页面。
 # Service Worker 自身和合并模块也必须进哈希：只改它们时缓存名不变，
 # 已经打开的页面就永远不会更新。
-sw_template = (SOFT / "sw.template.js").read_text(encoding="utf-8")
+sw_template = require_input_path("sw_template").read_text(encoding="utf-8")
+worker_template = require_input_path("worker_template").read_text(encoding="utf-8")
+source_digest = hashlib.sha256(
+    "\n".join(source_digest_entries()).encode("utf-8")
+).hexdigest()
 build_version = hashlib.sha256(
     "\n".join((
         re.sub(r'"generated_at":"[^"]*"', "", web_html),
         sw_template,
+        worker_template,
         merge_source,
-        sha256(SOFT / "manifest.webmanifest"),
-        sha256(SOFT / "icon-192.png"),
-        sha256(SOFT / "icon-512.png"),
+        source_digest,
+        sha256(require_input_path("manifest")),
+        sha256(require_input_path("icon_192")),
+        sha256(require_input_path("icon_512")),
     )).encode("utf-8")
 ).hexdigest()[:12]
 # 详情分片不进 SW 预缓存：它只在第一次长按时才用到，不该拖慢首次安装
@@ -439,29 +713,35 @@ sw_js = (
     .replace("__APP_ASSET__", app_asset)
     .replace("__DATA_ASSETS__", json.dumps(runtime_assets, ensure_ascii=False))
 )
-(SOFT / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
 
 (DEPLOY / "index.html").write_text(web_html, encoding="utf-8", newline="\n")
 (DEPLOY / "sw.js").write_text(sw_js, encoding="utf-8", newline="\n")
-for name in ("manifest.webmanifest", "icon-192.png", "icon-512.png"):
-    shutil.copy2(SOFT / name, DEPLOY / name)
+for input_key, name in (
+    ("manifest", "manifest.webmanifest"),
+    ("icon_192", "icon-192.png"),
+    ("icon_512", "icon-512.png"),
+):
+    shutil.copy2(require_input_path(input_key), DEPLOY / name)
 # Worker 是单文件部署（Pages 高级模式下 _worker.js 不能带外部 import），
 # 合并模块在构建时注入进来，源码里只留一个占位符。
-worker_source = inject(
-    (ROOT / "backend" / "worker.js").read_text(encoding="utf-8"), MERGE_MARKER, merge_source)
+worker_source = inject(worker_template, MERGE_MARKER, merge_source)
 (DEPLOY / "_worker.js").write_text(worker_source, encoding="utf-8", newline="\n")
+(DEPLOY / "build-meta.json").write_text(
+    json.dumps({"build": build_version, "source_digest": source_digest, "app_asset": app_asset}, ensure_ascii=False, separators=(",", ":")) + "\n",
+    encoding="utf-8", newline="\n",
+)
 (DEPLOY / "_headers").write_text(
     "/*\n"
     "  X-Content-Type-Options: nosniff\n"
     "  Referrer-Policy: same-origin\n"
-    "  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-    # media-src 必须放行有道：前端会直接把 <audio> 指向 dict.youdao.com 抢先发声，
-    # 拦掉不会报错，只会静默退化成系统 TTS。
-    "img-src 'self' data:; media-src 'self' blob: data: https://dict.youdao.com; "
-    "connect-src 'self'; manifest-src 'self'; "
-    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'\n"
+    "  Strict-Transport-Security: max-age=31536000; includeSubDomains\n"
+    "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()\n"
+    "  Cross-Origin-Opener-Policy: same-origin\n"
+    "  Cross-Origin-Resource-Policy: same-origin\n"
+    "  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob: data: https://dict.youdao.com; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; frame-src 'none'; script-src-attr 'none'; base-uri 'none'; form-action 'self'; object-src 'none'\n"
     "/index.html\n  Cache-Control: public, max-age=0, must-revalidate\n"
     "/sw.js\n  Cache-Control: no-cache\n"
+    "/build-meta.json\n  Cache-Control: no-cache\n"
     "/manifest.webmanifest\n  Cache-Control: public, max-age=3600\n"
     "/data/*\n  Cache-Control: public, max-age=31536000, immutable\n"
     "/app.*.js\n  Cache-Control: public, max-age=31536000, immutable\n",
@@ -469,45 +749,37 @@ worker_source = inject(
     newline="\n",
 )
 
-# 临时目录写完再整体替换 deploy/：一边清空一边写会让目录短暂处于半成品状态，
-# 已经打开的旧页面按需去拉旧哈希分片就会 404。
-# 发布互斥：两个构建不能同时改写相同临时目录/最终目录。
-LOCK = ROOT / "deploy.lock"
-LOCK_FD = None
-try:
-    import msvcrt
-    LOCK_FD = os.open(str(LOCK), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    os.write(LOCK_FD, str(os.getpid()).encode("ascii"))
-except FileExistsError:
-    raise RuntimeError("另一个构建正在运行（deploy.lock 已存在）")
-except ImportError:
-    LOCK_FD = None
-
-STALE = ROOT / "deploy.old"
+# 唯一暂存目录现已写完；再原子写软件产物，最后整体切换 deploy/。
+backup = DEPLOY_TMP_ROOT / ("old-%s" % LOCK_TOKEN)
+if backup.exists():
+    raise RuntimeError("构建备份目录意外存在：%s" % backup)
 moved_old = False
 try:
-    if STALE.exists():
-        rmtree_force(STALE)
+    atomic_write_text(OUT, standalone_html)
+    atomic_write_text(SOFT / "sw.js", sw_js)
     if DEPLOY_FINAL.exists():
-        os.replace(DEPLOY_FINAL, STALE)
+        os.replace(DEPLOY_FINAL, backup)
         moved_old = True
     os.replace(DEPLOY, DEPLOY_FINAL)
-except Exception:
-    # 第二次 rename 失败时恢复旧版本，不能把唯一可用目录留在 deploy.old。
-    if moved_old and not DEPLOY_FINAL.exists() and STALE.exists():
-        os.replace(STALE, DEPLOY_FINAL)
+    DEPLOY = None
+except BaseException:
+    # 第二次 rename 失败时恢复旧版本，不能把唯一可用目录留在备份路径。
+    if moved_old and not DEPLOY_FINAL.exists() and backup.exists():
+        os.replace(backup, DEPLOY_FINAL)
     raise
 finally:
-    if LOCK_FD is not None:
-        try: os.close(LOCK_FD)
-        except Exception: pass
-        try: os.unlink(LOCK)
-        except Exception: pass
-if STALE.exists():
-    try:
-        rmtree_force(STALE)
-    except Exception as exc:
-        print("warning: deploy.old cleanup failed: %s" % exc)
+    if backup.exists() and DEPLOY_FINAL.exists():
+        try:
+            rmtree_force(backup)
+        except Exception as exc:
+            print("warning: deploy backup cleanup failed: %s" % exc)
+    if DEPLOY is not None:
+        try:
+            if DEPLOY.exists():
+                rmtree_force(DEPLOY)
+        except Exception as exc:
+            print("warning: deploy staging cleanup failed: %s" % exc)
+    release_lock()
 
 print(f"output={OUT}")
 print(f"deploy={DEPLOY_FINAL / 'index.html'}")

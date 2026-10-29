@@ -201,6 +201,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .word-list li{content-visibility:auto;contain-intrinsic-size:72px}
 .offline-note{font-size:12px;line-height:1.65;color:var(--muted)}
 .offline-note.ok{color:var(--ok)}
+.offline-note.warn{color:var(--warn)}
 .modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
   padding:18px;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
 .modal-card{position:relative;width:min(100%,360px);background:var(--card);color:var(--ink);
@@ -339,7 +340,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
         <span class="priority b" id="priorityBadge">B 次重点</span>
         <button type="button" class="weight-badge hidden" id="weightBadge" title="点一下减 1 次权重"></button>
       </div>
-      <div class="word" id="word" role="button" tabindex="0">加载中</div>
+      <div class="word" id="word" role="button" tabindex="0" lang="en">加载中</div>
       <div class="family-note hidden" id="familyNote"></div>
       <div class="forms-box hidden" id="formsBox">
         <div class="forms" id="forms"></div>
@@ -372,21 +373,23 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
     </div>
   </section>
 
-  <section class="view hidden" id="viewList">
+  <section class="view hidden" id="viewList" role="tabpanel" aria-labelledby="tabList">
+    <div class="list-head">
       <label class="sr-only" for="searchInput">搜索单词或中文释义</label>
       <input class="search" id="searchInput" type="search" placeholder="搜索单词或中文释义" aria-label="搜索单词或中文释义">
-        <button class="filter active" data-priority="all">全部</button>
-        <button class="filter" data-priority="S">S</button>
-        <button class="filter" data-priority="A">A</button>
-        <button class="filter" data-priority="B">B</button>
-        <button class="filter" data-priority="C">C</button>
-        <button class="filter" data-priority="mastered">已掌握</button>
+      <div class="filters" role="group" aria-label="筛选词表">
+        <button type="button" class="filter active" data-priority="all" aria-pressed="true">全部</button>
+        <button type="button" class="filter" data-priority="S" aria-pressed="false">S</button>
+        <button type="button" class="filter" data-priority="A" aria-pressed="false">A</button>
+        <button type="button" class="filter" data-priority="B" aria-pressed="false">B</button>
+        <button type="button" class="filter" data-priority="C" aria-pressed="false">C</button>
+        <button type="button" class="filter" data-priority="mastered" aria-pressed="false">已掌握</button>
       </div>
     </div>
     <div class="list-wrap"><ol class="word-list" id="wordList"></ol></div>
   </section>
 
-  <section class="view hidden" id="viewStat">
+  <section class="view hidden" id="viewStat" role="tabpanel" aria-labelledby="tabStat">
     <div class="stats">
       <div class="stat"><b id="sTotal">0</b><span>总词数</span></div>
       <div class="stat"><b id="sLearned">0</b><span>学过</span></div>
@@ -501,7 +504,7 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 <div class="detail-mask hidden" id="detailMask">
   <div class="detail-sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="detailWord">
     <button class="detail-close" id="detailClose" type="button" aria-label="关闭">×</button>
-    <div class="detail-word" id="detailWord"></div>
+    <div class="detail-word" id="detailWord" lang="en"></div>
     <div class="detail-phonetic" id="detailPhonetic"></div>
     <div class="detail-block" id="detailStatus"></div>
     <div class="detail-block" id="detailExam"></div>
@@ -606,6 +609,7 @@ async function ensureDeckData(deckKey) {
 }
 const LS_STATE = 'ky_words_v1';
 const LS_CONF = 'ky_conf_v1';
+const LS_POS = 'ky_pos_v1';
 const LS_STAMP = 'ky_stamp_v1';
 // 自绘 logo：渐变圆 + 抽象「W」笔画
 // 品牌 Logo：极简科技感双色 W，金色节点代表一次记忆完成。
@@ -667,9 +671,17 @@ let syncTimer = null;
 let syncing = false;
 let syncInitialized = false;
 let syncDirty = false;
+let syncPaused = false;
 let localRevision = 0;
 let applyingRemote = false;
 let syncEpoch = 0;
+// 账号切换时必须真正中止在途 API，而不只是让晚到的结果失效：
+// 否则弱网请求会继续占连接，旧页面也会多跑几十秒。
+let apiEpochController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+function abortApiRequests() {
+  if (apiEpochController) { try { apiEpochController.abort(); } catch {} }
+  apiEpochController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+}
 const DAY = 864e5;
 // 极简事件总线（发布/订阅）：数据一变就广播，谁关心谁订阅，避免到处手动串调用
 const bus = (() => {
@@ -687,29 +699,186 @@ const bus = (() => {
     },
   };
 })();
-// 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的
-const SCOPED_KEYS = new Set(['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1', 'ky_stamp_v1', 'ky_daily_v1']);
+// 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的。
+// 大 state 按稳定 hash 分成 64 个分片：一次背词只重写一个约 4KB 的分片，
+// 不再同步 JSON.stringify 整个 200KB+ 状态。meta 最后切换 generation，
+// 构建中途失败时旧 generation 仍可完整读取。
+const SCOPED_KEYS = new Set(['ky_words_v1', 'ky_conf_v1', 'ky_chapter_v1', 'ky_pos_v1', 'ky_stamp_v1', 'ky_daily_v1']);
+const STATE_SHARD_COUNT = 64;
+const STATE_META_KEY = LS_STATE + '#meta';
 const accountScope = name => String(name || '').trim().toLowerCase();
-const scopedKey = key => (authUser && SCOPED_KEYS.has(key) ? key + '@' + accountScope(authUser) : key);
-const load = (key, fallback) => { try { return JSON.parse(localStorage.getItem(scopedKey(key))) ?? fallback; } catch { return fallback; } };
-let storageWarned = false;
-let masteredWordsCache = null;
-const save = (key, value) => {
-  if (key === LS_STATE) masteredWordsCache = null;
+const storageKeyFor = (key, scope) => (scope && (SCOPED_KEYS.has(key) || String(key).startsWith(LS_STATE + '#'))
+  ? key + '@' + accountScope(scope)
+  : key);
+const scopedKey = key => storageKeyFor(key, authUser);
+const stateShardIndex = name => {
+  let hash = 2166136261;
+  const text = String(name || '');
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % STATE_SHARD_COUNT;
+};
+const stateShardStorageKey = (generation, index, scope) => storageKeyFor(LS_STATE + '#' + generation + '-' + index, scope);
+function stateMetaForScope(scope) {
   try {
-    localStorage.setItem(scopedKey(key), JSON.stringify(value));
-    bus.emit('data:change', key);
-    return true;
-  } catch (e) {
-    if (!storageWarned) {
-      storageWarned = true;
-      const el = document.getElementById('storageWarn');
-      if (el) el.classList.remove('hidden');
+    const raw = String(localStorage.getItem(storageKeyFor(STATE_META_KEY, scope)) || '');
+    const match = raw.match(/^2:([a-z0-9-]+)$/);
+    return match ? match[1] : '';
+  } catch { return ''; }
+}
+function readStateStoreForScope(scope, fallback) {
+  try {
+    const generation = stateMetaForScope(scope);
+    if (generation) {
+      const out = {};
+      for (let i = 0; i < STATE_SHARD_COUNT; i += 1) {
+        const raw = localStorage.getItem(stateShardStorageKey(generation, i, scope));
+        if (!raw) continue;
+        const rows = JSON.parse(raw);
+        if (!rows || typeof rows !== 'object' || Array.isArray(rows)) continue;
+        for (const [name, rec] of Object.entries(rows)) {
+          if (name !== '__proto__') out[name] = rec;
+        }
+      }
+      // 兼容仍开着旧版本页面的标签页：它在迁移后写回的 legacy 快照不能整份丢弃。
+      try {
+        const legacy = JSON.parse(localStorage.getItem(storageKeyFor(LS_STATE, scope)));
+        if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+          for (const [name, rec] of Object.entries(legacy)) {
+            if (name === '__proto__') continue;
+            out[name] = out[name] ? mergeWordRecord(out[name], rec) : rec;
+          }
+        }
+      } catch {}
+      return out;
     }
-// 本地数据按账号隔离：未登录用公共空间，登录后各账号各存各的
-    try { bus.emit('data:change', key); } catch {}
+  } catch {}
+  try { return JSON.parse(localStorage.getItem(storageKeyFor(LS_STATE, scope))) ?? fallback; }
+  catch { return fallback; }
+}
+const load = (key, fallback) => {
+  if (key === LS_STATE) return readStateStoreForScope(authUser, fallback);
+  try { return JSON.parse(localStorage.getItem(scopedKey(key))) ?? fallback; } catch { return fallback; }
+};
+function positionStoreFromChapters(chapters) {
+  const out = {};
+  for (const [key, rec] of Object.entries(chapters || {})) {
+    if (!rec || rec.del || !Array.isArray(rec.order)) continue;
+    const pos = Math.max(0, Number(rec.pos) || 0);
+    out[key] = { pos, t: Number(rec.t) || 0 };
+    if (typeof rec.posWord === 'string') out[key].posWord = rec.posWord;
+  }
+  return out;
+}
+function loadChapterStoreWithPositions(base) {
+  const out = { ...(base && typeof base === 'object' && !Array.isArray(base) ? base : {}) };
+  const positions = load(LS_POS, {});
+  for (const [key, pos] of Object.entries(positions && typeof positions === 'object' ? positions : {})) {
+    const rec = out[key];
+    if (!rec || rec.del || !pos || typeof pos !== 'object') continue;
+    rec.pos = Math.max(0, Number(pos.pos) || 0);
+    if (typeof pos.posWord === 'string') rec.posWord = pos.posWord;
+    if (Number(pos.t)) rec.t = Number(pos.t);
+  }
+  return out;
+}
+let storageWarned = false;
+function showStorageWarning() {
+  if (storageWarned) return;
+  storageWarned = true;
+  const el = document.getElementById('storageWarn');
+  if (el) el.classList.remove('hidden');
+}
+function markStateChanged() {
+  masteredWordsCache = null;
+  stateRevision += 1;
+  listQueryCache.key = '';
+  invalidateSnapshotCache();
+}
+function writeStateStorageForScope(store, scope) {
+  const shards = Array.from({ length: STATE_SHARD_COUNT }, () => ({}));
+  for (const [name, rec] of Object.entries(store || {})) {
+    if (name === '__proto__') continue;
+    shards[stateShardIndex(name)][name] = rec;
+  }
+  const oldGeneration = stateMetaForScope(scope);
+  const generation = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  try {
+    for (let i = 0; i < STATE_SHARD_COUNT; i += 1) {
+      const key = stateShardStorageKey(generation, i, scope);
+      if (Object.keys(shards[i]).length) localStorage.setItem(key, JSON.stringify(shards[i]));
+      else localStorage.removeItem(key);
+    }
+    // meta 是原子切换点；它写入前旧 generation 始终是权威数据。
+    localStorage.setItem(storageKeyFor(STATE_META_KEY, scope), '2:' + generation);
+  } catch (e) {
+    try {
+      for (let i = 0; i < STATE_SHARD_COUNT; i += 1) {
+        localStorage.removeItem(stateShardStorageKey(generation, i, scope));
+      }
+    } catch {}
+    showStorageWarning();
     return false;
   }
+  try {
+    if (oldGeneration && oldGeneration !== generation) {
+      for (let i = 0; i < STATE_SHARD_COUNT; i += 1) {
+        localStorage.removeItem(stateShardStorageKey(oldGeneration, i, scope));
+      }
+    }
+    localStorage.removeItem(storageKeyFor(LS_STATE, scope));
+  } catch {}
+  return true;
+}
+function saveStateRecord(name) {
+  if (!name || name === '__proto__') return false;
+  // 旧格式第一次写入时先完整迁移；之后每次只更新 hash 对应的一个分片。
+  const generation = stateMetaForScope(authUser);
+  if (!generation) {
+    const ok = writeStateStorageForScope(state, authUser);
+    if (ok) markStateChanged();
+    return ok;
+  }
+  const index = stateShardIndex(name);
+  const key = stateShardStorageKey(generation, index, authUser);
+  try {
+    let shard = {};
+    try { shard = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
+    if (!shard || typeof shard !== 'object' || Array.isArray(shard)) shard = {};
+    shard[name] = state[name];
+    localStorage.setItem(key, JSON.stringify(shard));
+    markStateChanged();
+    return true;
+  } catch {
+    showStorageWarning();
+    return false;
+  }
+}
+let masteredWordsCache = null;
+let listQueryCache = { key: '', matches: [] };
+let stateRevision = 0;
+let snapshotCacheRevision = -1;
+let snapshotCacheValue = null;
+function invalidateSnapshotCache() {
+  snapshotCacheRevision = -1;
+  snapshotCacheValue = null;
+}
+const save = (key, value) => {
+  let ok = false;
+  try {
+    ok = key === LS_STATE
+      ? writeStateStorageForScope(value, authUser)
+      : (localStorage.setItem(scopedKey(key), JSON.stringify(value)), true);
+  } catch (e) {
+    showStorageWarning();
+    ok = false;
+  }
+  if (key === LS_STATE) markStateChanged();
+  else invalidateSnapshotCache();
+  try { bus.emit('data:change', key); } catch {}
+  return ok;
 };
 const todayTs = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
 const dayKey = ts => {
@@ -787,8 +956,10 @@ function trapModalFocus(event, root, close) {
   if (event.shiftKey && (active === first || !root.contains(active))) { event.preventDefault(); last.focus({ preventScroll: true }); }
   else if (!event.shiftKey && (active === last || !root.contains(active))) { event.preventDefault(); first.focus({ preventScroll: true }); }
 }
-function setPageInert(on) {
-  for (const el of [document.querySelector('header'), document.querySelector('main')].filter(Boolean)) {
+function setPageInert(on, keep) {
+  const regions = [document.querySelector('header'), document.querySelector('main'), document.getElementById('undoBar'), document.getElementById('detailMask'), document.getElementById('authModal')];
+  for (const el of regions.filter(Boolean)) {
+    if (keep && el === keep) continue;
     el.inert = on;
     if (on) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
   }
@@ -836,7 +1007,7 @@ let queue = [];
 let idx = 0;
 let revealed = null;   // null=跟随「默认显示」设置；true/false=当前词手动覆盖
 let dragging = false;
-let chapterData = load('ky_chapter_v1', {});
+let chapterData = loadChapterStoreWithPositions(load('ky_chapter_v1', {}));
 let curChapter = 0;
 let priorityFilter = 'all';
 let searchText = '';
@@ -906,7 +1077,7 @@ function chapterSlice(ch) {
   return deckWords().slice(start, start + CHAPTER_SIZE);
 }
 function chapterKey(ch) { return activeDeck + ':' + ch; }
-function savePos() {
+function savePos(touchProgress) {
   const now = Date.now();
   // 词书 / 章节 / 章内位次三件事必须同时落盘：
   // 恢复时读的是 deckChapter[activeDeck]，只写 conf.chapter 会让刷新后跳回旧章。
@@ -914,14 +1085,14 @@ function savePos() {
   conf.chapter = curChapter;
   conf.deckChapter = conf.deckChapter || {};
   conf.deckChapter[activeDeck] = curChapter;
-  conf.progressAt = now;
+  if (touchProgress !== false) conf.progressAt = now;
   const key = chapterKey(curChapter);
   const rec = chapterData[key];
   if (rec) {
     rec.pos = idx;
     rec.posWord = idx < queue.length ? queue[idx].word : null;
-    rec.t = now;
-    save('ky_chapter_v1', chapterData);
+    if (touchProgress !== false) rec.t = now;
+    save(LS_POS, positionStoreFromChapters(chapterData));
   }
   save(LS_CONF, conf);
 }
@@ -941,7 +1112,7 @@ function fillDeckInBackground(deckKey, attempt) {
   // 整本词库两百多 KB，等页面 load 完再拉：否则它会计入浏览器标签上的加载进度，
   // 首屏明明已经能用了，进度条却一直转。
   const begin = () => setTimeout(() => {
-    const targetDeck = activeDeck;
+    const targetDeck = deckKey;
     ensureDeckData(deckKey).then(() => {
       fillDeckPending = null;
       if (activeDeck !== targetDeck) { pendingSeek = null; return; }
@@ -950,15 +1121,19 @@ function fillDeckInBackground(deckKey, attempt) {
       // 目标位次要连章带书一起核对：补全期间用户可能已经跳了章，
       // 拿旧章的目标位次套到新章会直接落到错词上
       if (seek && seek.deck === activeDeck && seek.ch === curChapter) {
-        loadChapter(curChapter, undefined, seek.idx, seek.word);
+        loadChapter(curChapter, undefined, seek.idx, seek.word, 'background', true);
       } else {
-        loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null);
+        loadChapter(curChapter, undefined, undefined, queue[idx] ? queue[idx].word : null, 'background', true);
       }
     }).catch(() => {
       fillDeckPending = null;
       // 一次失败就永久停在 40 张最糟：重试一次，再失败才放弃，等下次进章节重新拉
       if (!attempt) fillDeckInBackground(deckKey, 1);
-      else pendingSeek = null;
+      else {
+        pendingSeek = null;
+        if (queue.length) { idx = Math.min(idx, queue.length - 1); renderStudy(); showSessionNotice('完整词库加载失败，继续使用已加载内容。', 8000); }
+        else showStudyLoadError();
+      }
     });
   }, 300);
   if (document.readyState === 'complete') begin();
@@ -986,12 +1161,12 @@ function showStudyLoadError() {
   showStudyLoading('词库加载失败，请检查网络后刷新页面重试。');
   $('word').textContent = '加载失败';
 }
-function loadChapter(ch, mode, idxAt, atWord) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
+function loadChapter(ch, mode, idxAt, atWord, persistPosition, preserveUndo) {   // mode: 'shuffle' 打乱 / 'natural' 原序 / 省略=沿用上次
   const targetDeck = activeDeck;
   if (!deckCanShowChapter(targetDeck, ch)) {
     showStudyLoading('正在加载这一部分词库，首次加载后会长期缓存。');
     ensureDeckData(targetDeck).then(() => {
-      if (activeDeck === targetDeck) loadChapter(ch, mode, idxAt, atWord);
+      if (activeDeck === targetDeck) loadChapter(ch, mode, idxAt, atWord, persistPosition, preserveUndo);
     }).catch(() => showStudyLoadError());
     return;
   }
@@ -1002,9 +1177,9 @@ function loadChapter(ch, mode, idxAt, atWord) {   // mode: 'shuffle' 打乱 / 'n
   // 章节数会随「已认识」库的恢复/新增变化，记住的章号可能已经越界，先夹到有效范围
   ch = Math.min(Math.max(ch, 0), Math.max(chapterCount() - 1, 0));
   curChapter = ch;
-  clearUndoBar();
+  if (!preserveUndo) clearUndoBar();
   const key = chapterKey(ch);
-  const now = todayTs();
+  const now = Date.now();
   // 未掌握的照常出现；已掌握但到了 7 天复习期的，也重新出现
   // 「已认识」库里所有词本来就是已掌握，不能再过滤，否则一章 0 词
   const pending = activeDeck === 'mastered'
@@ -1069,6 +1244,7 @@ function loadChapter(ch, mode, idxAt, atWord) {   // mode: 'shuffle' 打乱 / 'n
   }
   revealed = null;
   renderStudy();
+  if (persistPosition) savePos(persistPosition !== 'background');
 }
 // 整章应有的词数（按整本词库算，不看当前是否已经解析完）。
 // 网页版首屏只内嵌几十个词，直接拿队列长度当分母会露出「只有 40 个」。
@@ -1115,6 +1291,7 @@ function renderStudy() {
   $('done').classList.add('hidden');
   const word = queue[idx];
   $('word').textContent = word.word;
+  $('word').lang = 'en';
   if (!window.__firstCardAt) window.__firstCardAt = Math.round(performance.now());
   // 词族母词和词形变化放同一行，用「/」分隔，不再单独标「词族：」
   const family = word.family || '';
@@ -1122,6 +1299,7 @@ function renderStudy() {
   const line = (family ? [family] : []).concat(forms);
   $('familyNote').classList.add('hidden');
   $('forms').textContent = line.join(' / ');
+  $('forms').lang = 'en';
   $('formsBox').classList.toggle('hidden', line.length === 0);
   setPriority($('priorityBadge'), word.priority);
   const wt = weightOf(word);
@@ -1171,7 +1349,15 @@ function navigate(delta) {
   const next = idx + delta;
   // 到章节边界就翻到相邻章节：上一章停最后一词，下一章停第一词
   if (next < 0) { crossChapter(-1); return; }
-  if (next >= queue.length) { crossChapter(1); return; }
+  if (next >= queue.length) {
+    if (deckIncomplete() && chapterExpectedLength(curChapter) > queue.length) {
+      pendingSeek = { deck: activeDeck, ch: curChapter, idx: next };
+      showStudyLoading('正在补全本章剩余词，请稍候…');
+      fillDeckInBackground(activeDeck);
+      return;
+    }
+    crossChapter(1); return;
+  }
   idx = next;
   revealed = null;
   savePos();
@@ -1185,8 +1371,7 @@ function crossChapter(dir) {
   conf.deckChapter = conf.deckChapter || {};
   conf.deckChapter[activeDeck] = target;
   save(LS_CONF, conf);
-  loadChapter(target, undefined, dir < 0 ? -1 : 0);
-  savePos();
+  loadChapter(target, undefined, dir < 0 ? -1 : 0, undefined, true, true);
   renderChapters();
   return true;
 }
@@ -1203,53 +1388,190 @@ let activePronunciationAudio = null;
 // 必须与 sw.template.js 的 AUDIO_CACHE 版本号一致：SW 换缓存名会清空旧音频，
 // 前端这两个「已经下载过」的标记要是还留着，就会以为全都下过了、永远不再补。
 const AUDIO_CACHE_VERSION = 'v2';
+const AUDIO_CACHE_NAME = 'ky-audio-' + AUDIO_CACHE_VERSION;
 const AUDIO_WORDS_KEY = 'ky_audio_words_' + AUDIO_CACHE_VERSION;
 const AUDIO_CACHE_CONFIRMED_HEADER = 'x-ky-cache';
 const audioMarkerKey = (text, lang) => String(lang || 'en') + ':' + String(text || '');
-const AUDIO_PRELOAD_AHEAD = 6;
-// 整章 200 个词的音频都要留在内存里，否则预热完立刻被回收，等于白做
-const AUDIO_PLAYER_LIMIT = 260;
-const AUDIO_BLOB_LIMIT = 80;
+const AUDIO_PRELOAD_AHEAD = 10;
+// 只保留当前窗口附近的媒体元素；长期离线副本由 Cache Storage 承担。
+const AUDIO_PLAYER_LIMIT = 32;
+const AUDIO_BLOB_LIMIT = 24;
 const audioPlayers = new Map();
 const audioBlobUrls = new Map();
 const audioFetching = new Set();
-let audioCachedWords = (() => {
-  try { return new Set((JSON.parse(localStorage.getItem(AUDIO_WORDS_KEY)) || []).map(x => String(x).includes(':') ? String(x) : 'en:' + String(x))); }
-  catch { return new Set(); }
-})();
-// 英文走有道词典发音（浏览器直连也行）；中文释义走百度 TTS，必须经自家 worker 转一手，
-// 否则跨域和 referer 校验都过不去。file:// 单文件版没有 worker，中文只能退回系统语音。
+const AUDIO_CACHE_CONFIRMED_VALUES = new Set(['hit', 'stored']);
+const normalizeAudioMarker = value => {
+  const raw = String(value || '');
+  return raw.includes(':') ? raw : 'en:' + raw;
+};
+function parseAudioMarkers(raw) {
+  const out = new Set();
+  try {
+    const rows = raw ? JSON.parse(raw) : [];
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const marker = normalizeAudioMarker(row);
+      if (marker !== 'en:') out.add(marker);
+    }
+  } catch {}
+  return out;
+}
+let audioMarkerBase;
+try { audioMarkerBase = parseAudioMarkers(localStorage.getItem(AUDIO_WORDS_KEY)); }
+catch { audioMarkerBase = new Set(); }
+let audioMarkerAdds = new Set();
+let audioMarkerRemoves = new Set();
+let audioCachedWords = new Set(audioMarkerBase);
+// 页面和 Service Worker 必须使用同一个确认协议：普通 200 不能冒充“已离线缓存”。
+function audioCacheConfirmed(response) {
+  return !!response && response.ok
+    && AUDIO_CACHE_CONFIRMED_VALUES.has(String(response.headers.get(AUDIO_CACHE_CONFIRMED_HEADER) || '').toLowerCase());
+}
+let audioMarkerFlushTimer = null;
+function flushAudioMarkers() {
+  if (audioMarkerFlushTimer) { clearTimeout(audioMarkerFlushTimer); audioMarkerFlushTimer = null; }
+  // 先读取其他标签页的最新集合，再只重放本标签页的增量，避免旧标签页把已淘汰项写回来。
+  let latest;
+  try { latest = parseAudioMarkers(localStorage.getItem(AUDIO_WORDS_KEY)); }
+  catch { latest = new Set(audioMarkerBase); }
+  for (const marker of audioMarkerRemoves) latest.delete(marker);
+  for (const marker of audioMarkerAdds) latest.add(marker);
+  try { localStorage.setItem(AUDIO_WORDS_KEY, JSON.stringify([...latest])); } catch {}
+  audioMarkerBase = new Set(latest);
+  audioCachedWords = new Set(latest);
+  audioMarkerAdds.clear();
+  audioMarkerRemoves.clear();
+  try { updateOfflineStatus(); } catch {}
+}
+function replaceAudioMarkersFromStorage(raw) {
+  const next = parseAudioMarkers(raw);
+  for (const marker of audioMarkerRemoves) next.delete(marker);
+  for (const marker of audioMarkerAdds) next.add(marker);
+  audioMarkerBase = parseAudioMarkers(raw);
+  audioCachedWords = next;
+  updateOfflineStatus();
+}
+let audioCacheEpoch = '';
+let audioCacheRevision = -1;
+let audioCacheQuerySeq = 0;
+const pendingAudioCacheQueries = new Map();
+function acceptAudioCacheRevision(epoch, revision) {
+  const nextEpoch = String(epoch || '');
+  const nextRevision = Number(revision);
+  if (nextEpoch && nextEpoch !== audioCacheEpoch) {
+    audioCacheEpoch = nextEpoch;
+    audioCacheRevision = -1;
+  }
+  if (!Number.isFinite(nextRevision)) return true;
+  if (nextRevision < audioCacheRevision) return false;
+  audioCacheRevision = nextRevision;
+  return true;
+}
+function replaceAudioMarkerSet(next) {
+  audioMarkerBase = new Set(next);
+  audioCachedWords = new Set(next);
+  audioMarkerAdds.clear();
+  audioMarkerRemoves.clear();
+  flushAudioMarkers();
+}
+function applyAudioCacheSnapshot(message) {
+  if (!message || message.complete === false || !acceptAudioCacheRevision(message.epoch, message.revision)) return false;
+  const next = new Set();
+  for (const marker of Array.isArray(message.markers) ? message.markers : []) {
+    const normalized = normalizeAudioMarker(marker);
+    if (normalized && normalized !== 'en:') next.add(normalized);
+  }
+  const changed = next.size !== audioCachedWords.size || [...next].some(marker => !audioCachedWords.has(marker));
+  if (changed) replaceAudioMarkerSet(next);
+  const done = readAutoOfflineDone();
+  if (done && next.size < done.expected) clearAutoOfflineDone();
+  updateOfflineStatus();
+  return true;
+}
+function queryAudioCacheSnapshot(timeoutMs) {
+  const controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (!controller) return Promise.reject(new Error('Service Worker 尚未接管页面'));
+  audioCacheQuerySeq += 1;
+  const requestId = 'audio-' + Date.now().toString(36) + '-' + audioCacheQuerySeq;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingAudioCacheQueries.delete(requestId);
+      reject(new Error('音频缓存查询超时'));
+    }, timeoutMs || 5000);
+    pendingAudioCacheQueries.set(requestId, { resolve, reject, timer });
+    controller.postMessage({ type: 'ky:audio-cache-query', protocol: 1, requestId, includeEntries: false });
+  });
+}
+async function reconcileAudioCache() {
+  if (!('caches' in window)) return audioCachedWords;
+  // 优先向 SW 查询权威快照，避免每次启动都在页面主线程枚举最多 8000 个 Cache key。
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    try {
+      const snapshot = await queryAudioCacheSnapshot(5000);
+      if (applyAudioCacheSnapshot(snapshot)) return audioCachedWords;
+    } catch {}
+  }
+  try {
+    const cache = await caches.open(AUDIO_CACHE_NAME);
+    const keys = await cache.keys();
+    const actual = new Set();
+    for (const request of keys) {
+      try {
+        const url = new URL(request.url);
+        const word = url.searchParams.get('word');
+        if (!word) continue;
+        actual.add(audioMarkerKey(word, url.searchParams.get('lang') === 'zh' ? 'zh' : 'en'));
+      } catch {}
+    }
+    const changed = actual.size !== audioCachedWords.size || [...actual].some(marker => !audioCachedWords.has(marker));
+    if (changed) replaceAudioMarkerSet(actual);
+    else updateOfflineStatus();
+    const done = readAutoOfflineDone();
+    if (done && actual.size < done.expected) clearAutoOfflineDone();
+    return actual;
+  } catch {
+    return audioCachedWords;
+  }
+}
+
+window.addEventListener('storage', event => {
+  if (event.key !== AUDIO_WORDS_KEY) return;
+  replaceAudioMarkersFromStorage(event.newValue || '[]');
+});
+
+function rememberAudio(word, lang) {
+  const marker = normalizeAudioMarker(String(word || '').includes(':') ? word : audioMarkerKey(word, lang || 'en'));
+  if (!marker || marker === 'en:' || audioCachedWords.has(marker)) return;
+  audioCachedWords.add(marker);
+  audioMarkerRemoves.delete(marker);
+  audioMarkerAdds.add(marker);
+  if (!audioMarkerFlushTimer) audioMarkerFlushTimer = setTimeout(flushAudioMarkers, 1200);
+}
+function forgetAudio(marker) {
+  const key = normalizeAudioMarker(marker);
+  if (!key || key === 'en:') return false;
+  const existed = audioCachedWords.delete(key);
+  audioMarkerAdds.delete(key);
+  audioMarkerRemoves.add(key);
+  if (!audioMarkerFlushTimer) audioMarkerFlushTimer = setTimeout(flushAudioMarkers, 1200);
+  return existed;
+}
+// 英文走有道词典发音（浏览器直连也行）；中文释义走百度 TTS，必须经自家 worker 转一手。
 const AUDIO_PROXY_READY = location.protocol !== 'file:';
 function audioUrl(text, lang) {
   if (lang === 'zh') return '/api/audio?lang=zh&word=' + encodeURIComponent(text);
   return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2';
 }
 function cachedAudioUrl(text, lang) {
-  // 中文带 v=2：换语速后旧音频要靠这个版本号自然失效，否则会一直播慢的那版
+  // v 是内容版本而不是缓存键噪声；SW 与 Worker 都会规范化掉它。
   return '/api/audio?' + (lang === 'zh' ? 'lang=zh&v=2&' : '') + 'word=' + encodeURIComponent(text);
 }
-// 播放：已下载过的走 /api/audio，命中 SW 缓存几毫秒返回；
-// 没下载过的英文直连有道（0.2s），中文必须走 worker（百度带错 referer 会返回空音频）。
 function playSrcFor(text, lang) {
   if (lang === 'zh') return cachedAudioUrl(text, 'zh');
   if (AUDIO_PROXY_READY && audioCachedWords.has(audioMarkerKey(text, 'en'))) return cachedAudioUrl(text, 'en');
   return audioUrl(text, 'en');
 }
-// 离线副本一律经 worker：只有那条路能确认真的拿到音频，跨域直连看不出成败
 function offlineAudioUrl(text, lang) {
   return cachedAudioUrl(text, lang);
-}
-let audioMarkerFlushTimer = null;
-function flushAudioMarkers() {
-  if (audioMarkerFlushTimer) { clearTimeout(audioMarkerFlushTimer); audioMarkerFlushTimer = null; }
-  try { localStorage.setItem(AUDIO_WORDS_KEY, JSON.stringify([...audioCachedWords])); } catch {}
-  try { updateOfflineStatus(); } catch {}
-}
-function rememberAudio(word, lang) {
-  const marker = String(word || '').includes(':') ? String(word) : audioMarkerKey(word, lang || 'en');
-  if (audioCachedWords.has(marker)) return;
-  audioCachedWords.add(marker);
-  if (!audioMarkerFlushTimer) audioMarkerFlushTimer = setTimeout(flushAudioMarkers, 1200);
 }
 function refreshVoice() {
   try {
@@ -1381,8 +1703,7 @@ function cachePronunciationForOffline(text, lang) {
   if (audioCachedWords.has(marker) || audioFetching.has(marker)) return;
   audioFetching.add(marker);
   fetch(offlineAudioUrl(text, lang) + '&offline=1').then(response => {
-    if (!response.ok) throw new Error('audio cache failed');
-    if (response.headers.get(AUDIO_CACHE_CONFIRMED_HEADER) === 'store-failed') throw new Error('audio cache store failed');
+    if (!audioCacheConfirmed(response)) throw new Error('audio cache not confirmed');
     return response.blob();
   }).then(blob => {
     if (!blob.size || !/^audio\//i.test(blob.type || '')) throw new Error('invalid audio');
@@ -1415,24 +1736,20 @@ function prefetchAudioNearby() {
 let chapterPrefetchKey = '';
 let chapterPrefetchTimer = null;
 function prefetchChapterAudio() {
-  if (!userGestured || navigator.onLine === false) return;
+  if (!userGestured || navigator.onLine === false || !queue.length) return;
   const lang = conf.speakLang === 'zh' ? 'zh' : 'en';
-  const key = activeDeck + ':' + curChapter + ':' + lang;
+  // 只预热当前词前后的小窗口。整章下载交给显式“下载全部”，避免每章
+  // 一次生成 200 个 Audio 对象并抢占移动网络。
+  const start = Math.max(0, idx - 2);
+  const end = Math.min(queue.length, idx + AUDIO_PRELOAD_AHEAD + 1);
+  const key = activeDeck + ':' + curChapter + ':' + lang + ':' + idx + ':' + start + ':' + end;
   if (chapterPrefetchKey === key) return;
   chapterPrefetchKey = key;
   if (chapterPrefetchTimer) { clearTimeout(chapterPrefetchTimer); chapterPrefetchTimer = null; }
-  const slice = chapterSlice(curChapter);
-  let i = 0;
-  const step = () => {
-    if (chapterPrefetchKey !== key) return;
-    const end = Math.min(i + 8, slice.length);
-    for (; i < end; i += 1) {
-      const k = audioKeyOf(slice[i]);
-      if (k) preloadAudioWord(k, lang);
-    }
-    if (i < slice.length) chapterPrefetchTimer = setTimeout(step, 120);
-  };
-  step();
+  for (let i = start; i < end; i += 1) {
+    const k = audioKeyOf(queue[i]);
+    if (k) preloadAudioWord(k, lang);
+  }
 }
 function getPronunciationAudio() {
   if (!pronunciationAudio) {
@@ -1460,7 +1777,7 @@ function playAudioElement(player, word, token, notify, options, source, lang) {
     settled = true;
     clearTimeout(audioFallbackTimer);
     speakBroken = false;
-    if (source === 'cached') rememberAudio(word);
+    if (source === 'cached') rememberAudio(audioMarkerKey(word, lang === 'zh-CN' ? 'zh' : 'en'));
     cachePronunciationForOffline(word, lang === 'zh-CN' ? 'zh' : 'en');
     prefetchAudioNearby();
     if (options && options.onStatus) options.onStatus('online');
@@ -1518,7 +1835,7 @@ function speak(item, options) {
     activePronunciationAudio = null;
   }
   if (canAudio) {
-    const direct = audioPlayers.get(key);
+    const direct = audioPlayers.get(audioMarkerKey(key, tag));
     if (direct && direct.readyState >= 2 && !direct.error) {
       return playAudioElement(direct, key, token, notify, options, 'direct', lang);
     }
@@ -1554,11 +1871,16 @@ function toggleMeaning() {
 // 已认识库：左滑降权重
 function lowerWeight(word) {
   if (!word) return;
+  const before = state[word.word] && !state[word.word].del ? { ...state[word.word] } : undefined;
   const st = state[word.word];
   if (!st || st.del || !st.w) return;
   st.w = Math.max(0, st.w - 1);
   st.t = Date.now();
-  save(LS_STATE, state);
+  if (!saveStateRecord(word.word)) {
+    if (before === undefined) delete state[word.word]; else state[word.word] = before;
+    showSessionNotice('保存失败：浏览器存储空间不足，请先导出备份。', 8000);
+    return;
+  }
   bumpDaily(false, false);
   if (navigator.vibrate) navigator.vibrate(18);
   renderStudy();
@@ -1571,7 +1893,11 @@ function restoreMastered(word) {
   if (state[word.word]) {
     const st = liveEntry(word.word);
     st.mastered = false; st.due = 0; st.t = Date.now();
-    save(LS_STATE, state);
+    if (!save(LS_STATE, state)) {
+      if (before === undefined) delete state[word.word]; else state[word.word] = before;
+      showSessionNotice('保存失败：浏览器存储空间不足，请先导出备份。', 8000);
+      return;
+    }
     bumpDaily(false, false);
   }
   // 重建当前章队列：deckWords() 会因掌握数变化而重算切片，
@@ -1603,7 +1929,7 @@ function mark(word, known) {
   if (known) { st.mastered = true; st.due = todayTs() + 7 * DAY; }
   else { st.w = (st.w || 0) + 1; st.mastered = false; st.due = 0; }
   state[word.word] = st;
-  if (!save(LS_STATE, state)) {
+  if (!saveStateRecord(word.word)) {
     if (before === undefined) delete state[word.word]; else state[word.word] = before;
     showSessionNotice('保存失败：浏览器存储空间不足，请先导出备份。', 8000);
     return;
@@ -1747,23 +2073,29 @@ function renderList(reset) {
     return;
   }
   const q = searchText.trim().toLowerCase();
-  const inMasteredDeck = activeDeck === 'mastered';
-  const matches = [];
-  for (const word of deckWords()) {
-    const mastered = isMastered(word);
-    if (!inMasteredDeck) {
-      if (priorityFilter === 'mastered') {
-        if (!mastered) continue;
-      } else {
-        if (mastered) continue;
-        const p = (word.priority || 'C').charAt(0);
-        if (priorityFilter !== 'all' && p !== priorityFilter) continue;
-      }
-    }
-    if (q && !word.word.toLowerCase().includes(q) && !word.meaning.toLowerCase().includes(q) && !(word.forms || []).some(form => form.toLowerCase().includes(q)) && !(word.family || '').toLowerCase().includes(q)) continue;
-    matches.push(word);
-  }
-  const signature = activeDeck + '|' + priorityFilter + '|' + q;
+  const signature = activeDeck + '|' + priorityFilter + '|' + q + '|' + stateRevision;
+  const matches = listQueryCache.key === signature
+    ? listQueryCache.matches
+    : (() => {
+        const inMasteredDeck = activeDeck === 'mastered';
+        const rows = [];
+        for (const word of deckWords()) {
+          const mastered = isMastered(word);
+          if (!inMasteredDeck) {
+            if (priorityFilter === 'mastered') {
+              if (!mastered) continue;
+            } else {
+              if (mastered) continue;
+              const p = (word.priority || 'C').charAt(0);
+              if (priorityFilter !== 'all' && p !== priorityFilter) continue;
+            }
+          }
+          if (q && !word.word.toLowerCase().includes(q) && !word.meaning.toLowerCase().includes(q) && !(word.forms || []).some(form => form.toLowerCase().includes(q)) && !(word.family || '').toLowerCase().includes(q)) continue;
+          rows.push(word);
+        }
+        listQueryCache = { key: signature, matches: rows };
+        return rows;
+      })();
   const upto = Math.min(listLimit, matches.length);
   // 「显示更多」只追加新增的那一页：每次都重建全部已渲染条目是 O(n²)，
   // 连点十次就要重建上千个节点。签名和已渲染前缀都对得上才敢追加。
@@ -1787,7 +2119,7 @@ function renderList(reset) {
     const li = document.createElement('li');
     const no = document.createElement('span'); no.className = 'list-no'; no.textContent = '#' + word.id;
     const main = document.createElement('div');
-    const w = document.createElement('div'); w.className = 'list-word'; w.textContent = word.word;
+    const w = document.createElement('div'); w.className = 'list-word'; w.lang = 'en'; w.textContent = word.word;
     const m = document.createElement('div'); m.className = 'list-meaning'; m.textContent = word.meaning;
     main.append(w, m);
     if (word.family) {
@@ -1809,7 +2141,7 @@ function renderList(reset) {
         if (state[word.word]) {
           const st = liveEntry(word.word);
           st.mastered = false; st.due = 0; st.t = Date.now();
-          save(LS_STATE, state);
+          saveStateRecord(word.word);
         }
         if (owner) {
           const ch = Math.floor(ownerIndex(owner, word.word) / CHAPTER_SIZE);
@@ -1879,11 +2211,14 @@ async function switchDeck(value) {
     try {
       await ensureDeckData(value);
     } catch (err) {
-      activeDeck = previous;
-      conf.deck = previous;
-      save(LS_CONF, conf);
-      updateDeckMeta();
-      showStudyLoadError();
+      // 只有当前仍是这次失败的目标词库时才回滚；旧请求不能覆盖后来成功的选择。
+      if (activeDeck === value) {
+        activeDeck = previous;
+        conf.deck = previous;
+        save(LS_CONF, conf);
+        updateDeckMeta();
+        showStudyLoadError();
+      }
       return;
     }
     if (activeDeck !== value) return;
@@ -1904,6 +2239,16 @@ function switchView(name) {
   if (name === 'Stat') updateStatsNow();
 }
 const CHAPTER_SIZE = 200;
+
+// 启动阶段也清洗本地数据：损坏的 JSON、数组、旧版本时间戳不能等到联网同步才处理。
+{
+  const now = Date.now();
+  state = validateStateStore(state, now);
+  chapterData = validateChapterStore(chapterData, now);
+  daily = validateDailyStore(daily, now);
+  conf = validateConfStore(conf);
+  activeDeck = Object.prototype.hasOwnProperty.call(DECKS, conf.deck) ? conf.deck : 'core';
+}
 function chapterCount() { return Math.ceil(deckKnownLength(activeDeck) / CHAPTER_SIZE); }
 function currentChapter() { return curChapter; }
 function renderChapters() {
@@ -1956,16 +2301,33 @@ function showUndo(word, kind, delta, before, pos) {
 }
 function doUndo() {
   const word = undoWord;
-  if (!word || undoChapter !== chapterKey(curChapter)) return;
+  if (!word) return;
   const before = undoBefore, pos = undoIdx, delta = undoDelta, now = Date.now();
-  undoWord = null; undoBefore = undefined; undoDelta = null; undoChapter = null;
+  const key = undoChapter;
+  const cut = key ? key.lastIndexOf(':') : -1;
+  const undoDeck = cut > 0 ? key.slice(0, cut) : activeDeck;
+  const undoCh = cut > 0 ? Number(key.slice(cut + 1)) : curChapter;
+  // 跨章后撤销仍应有效：先回到动作发生的章节，再恢复记录。
+  const needsNavigate = key !== chapterKey(curChapter);
+  if (needsNavigate && (undoDeck !== activeDeck || !Number.isInteger(undoCh))) {
+    clearUndoBar();
+    showSessionNotice('撤销窗口已过期，请重新操作。', 5000);
+    return;
+  }
+  const previous = state[word.word];
   state[word.word] = before === undefined ? tombstone(now) : { ...before, t: now };
-  save(LS_STATE, state);
+  if (!saveStateRecord(word.word)) {
+    if (previous === undefined) delete state[word.word]; else state[word.word] = previous;
+    showSessionNotice('保存失败：浏览器存储空间不足，撤销未完成。', 8000);
+    return;
+  }
+  undoWord = null; undoBefore = undefined; undoDelta = null; undoChapter = null;
   revertDaily(delta);
   $('undoBar').classList.add('hidden');
   clearTimeout(undoTimer);
   revealed = null;
-  loadChapter(curChapter, undefined, pos);
+  // 必须重建队列并优先定位被撤销的词；直接 render 会让已移出队列的词仍然消失。
+  loadChapter(needsNavigate ? undoCh : curChapter, undefined, pos, word.word, true, true);
   savePos();
 }
 $('undoBtn').onclick = doUndo;
@@ -2128,6 +2490,12 @@ card.addEventListener('touchcancel', () => {
 // 用时间窗挡掉，手机上的手感完全不变。
 let lastCardTouchAt = 0;
 card.addEventListener('touchend', () => { lastCardTouchAt = Date.now(); }, { passive: true });
+card.addEventListener('keydown', event => {
+  if (event.key !== 'Enter' && event.key !== 'Space') return;
+  if (!queue[idx] || studyLoading) return;
+  event.preventDefault();
+  speak(queue[idx], { notify: true });
+});
 card.addEventListener('click', event => {
   if (Date.now() - lastCardTouchAt < 800) return;
   if (pressFired) { pressFired = false; return; }   // 长按刚打开详情，别顺手翻面
@@ -2195,6 +2563,7 @@ function formNote(value) {
 function renderDetail(word, info) {
   info = info || {};
   $('detailWord').textContent = word.word;
+  $('detailWord').lang = 'en';
   $('detailPhonetic').textContent = info.p ? '/' + info.p + '/' : '';
 
   const chips = [];
@@ -2234,6 +2603,7 @@ function renderDetail(word, info) {
   if (mask.classList.contains('hidden')) {
     detailFocusBack = document.activeElement;
     mask.classList.remove('hidden');
+    setPageInert(true, mask);
     const close = $('detailClose');
     if (close) { try { close.focus({ preventScroll: true }); } catch {} }
   }
@@ -2256,6 +2626,7 @@ function closeDetail() {
   const mask = $('detailMask');
   if (mask.classList.contains('hidden')) return;
   mask.classList.add('hidden');
+  setPageInert(false);
   const back = detailFocusBack;
   detailFocusBack = null;
   if (back && typeof back.focus === 'function') { try { back.focus({ preventScroll: true }); } catch {} }
@@ -2296,6 +2667,7 @@ const stopPress = () => { clearTimeout(pressTimer); pressTimer = null; };
 card.addEventListener('touchstart', startPress, { passive: true });
 card.addEventListener('touchmove', stopPress, { passive: true });
 card.addEventListener('touchcancel', stopPress, { passive: true });
+card.addEventListener('touchend', stopPress, { passive: true });
 card.addEventListener('mousedown', event => {
   // 只有左键才算长按：右键同样会触发 mousedown，会莫名弹出详情
   if (event.button !== 0) return;
@@ -2404,6 +2776,20 @@ $('doneAction').onclick = () => {
 $('tabStudy').onclick = () => switchView('Study');
 $('tabList').onclick = () => switchView('List');
 $('tabStat').onclick = () => switchView('Stat');
+// ARIA tabs 的方向键导航：只移动焦点，不改变当前面板。
+document.querySelector('.tabs').addEventListener('keydown', event => {
+  const tabs = [...document.querySelectorAll('.tab')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  let next = i;
+  if (event.key === 'ArrowRight') next = (i + 1) % tabs.length;
+  else if (event.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = tabs.length - 1;
+  else return;
+  event.preventDefault();
+  tabs[next].focus();
+});
 let searchTimer = null;
 $('searchInput').oninput = event => {
   searchText = event.target.value;
@@ -2413,7 +2799,10 @@ $('searchInput').oninput = event => {
 document.querySelectorAll('.filter').forEach(button => {
   button.onclick = () => {
     priorityFilter = button.dataset.priority;
-    document.querySelectorAll('.filter').forEach(b => b.classList.toggle('active', b === button));
+    document.querySelectorAll('.filter').forEach(b => {
+      b.classList.toggle('active', b === button);
+      b.setAttribute('aria-pressed', String(b === button));
+    });
     renderList(true);
   };
 });
@@ -2495,7 +2884,7 @@ $('exportProgress').onclick = () => {
     state,
     chapterData,
     daily,
-    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, progressAt: Number(conf.progressAt) || 0, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, speakLang: conf.speakLang === 'zh' ? 'zh' : 'en', icon: conf.icon || null, iconAt: Number(conf.iconAt) || 0 }
+    conf: { deck: conf.deck, chapter: conf.chapter || 0, deckChapter: conf.deckChapter || {}, progressAt: Number(conf.progressAt) || 0, showByDefault: !!conf.showByDefault, speak: conf.speak !== false, speakLang: conf.speakLang === 'zh' ? 'zh' : 'en', icon: conf.icon || null, iconAt: Number(conf.iconAt) || 0, resetAt: Number(conf.resetAt) || 0 }
   };
   const blob = new Blob([JSON.stringify(dump)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -2516,6 +2905,8 @@ function prepareImport(d) {
   let nextConf = { ...conf };
   // 导入是「用这份替换本机进度」。旧记录里没有的词必须写成墓碑，
   // 否则下次同步会被云端按「云端有你没有」原样拼回来。
+  if (d.v !== undefined && Number(d.v) !== 1) throw new Error('unsupported backup version');
+  if (!['state', 'chapterData', 'daily', 'conf'].some(key => Object.prototype.hasOwnProperty.call(d, key))) throw new Error('empty backup');
   if (d.state !== undefined) {
     if (!objectRecord(d.state)) throw new Error('bad state');
     const incoming = validateStateStore(d.state, now);
@@ -2550,6 +2941,11 @@ function prepareImport(d) {
   }
   // 导入是覆盖：云端多出来的词要让服务端补墓碑，否则会被合并回来。
   nextConf.overwritePending = true;
+  nextConf.overwriteMode = 'import';
+  // 导入文件的旧服务端 fence 不可信；由 Worker 为本次 import 建立新 fence。
+  nextConf.resetAt = 0;
+  delete nextConf.serverFenceAt;
+  delete nextConf.serverFenceMode;
   const deck = Object.prototype.hasOwnProperty.call(DECKS, nextConf.deck) ? nextConf.deck : 'core';
   const chapter = Math.max(0, Number(nextConf.deckChapter[deck]) || 0);
   nextConf.deck = deck;
@@ -2606,6 +3002,7 @@ $('importFile').onchange = event => {
         alert('导入失败：浏览器存储空间不足，原进度已保留。');
         return;
       }
+      syncPaused = false;
       if (authUser) scheduleCloudSync(0);
       updateStats();
       renderList();
@@ -2631,21 +3028,23 @@ $('resetAll').onclick = () => {
   // 逐词合并分不清「这台设备没学过」和「用户删掉了」，
   // 后者会被另一台设备按「云端有、本机没有」原样拼回来。
   const now = Date.now();
-  const cleared = {};
-  for (const name of Object.keys(state)) cleared[name] = tombstone(now);
-  state = cleared;
-  save(LS_STATE, state);
-  const clearedChapters = {};
-  for (const key of Object.keys(chapterData)) clearedChapters[key] = tombstone(now);
-  chapterData = clearedChapters;
-  save('ky_chapter_v1', chapterData);
-  const clearedDaily = {};
-  for (const key of Object.keys(daily)) clearedDaily[key] = tombstone(now);
-  daily = clearedDaily;
-  save(LS_DAILY, daily);
-  // 本机只知道自己有哪些词，云端独有的得让服务端补墓碑
-  conf.overwritePending = true;
-  save(LS_CONF, conf);
+  const nextState = {};
+  for (const name of Object.keys(state)) nextState[name] = tombstone(now);
+  const nextChapters = {};
+  for (const key of Object.keys(chapterData)) nextChapters[key] = tombstone(now);
+  const nextDaily = {};
+  for (const key of Object.keys(daily)) nextDaily[key] = tombstone(now);
+  const nextConf = { ...conf, overwritePending: true, overwriteMode: 'clear', resetAt: now };
+  // 四块数据必须一次提交；任何一块配额失败都要保留清空前状态。
+  if (!commitStores({ state: nextState, chapterData: nextChapters, daily: nextDaily, conf: nextConf })) {
+    alert('清空失败：浏览器存储空间不足，原进度已保留。');
+    return;
+  }
+  state = nextState;
+  chapterData = nextChapters;
+  daily = nextDaily;
+  conf = nextConf;
+  syncPaused = false;
   if (authUser) scheduleCloudSync(0);
   loadChapter(curChapter, 'natural');
   savePos();
@@ -2791,13 +3190,44 @@ function showSessionNotice(text, ms) {
   showSessionNotice.timer = setTimeout(() => el.classList.add('hidden'), ms || 6000);
 }
 
+// 把一个或多个 AbortSignal 合成为一个信号；旧浏览器没有 AbortSignal.any 时手动桥接。
+function combinedAbortSignal(signals) {
+  const list = (signals || []).filter(Boolean);
+  if (!list.length) return { signal: undefined, cleanup() {} };
+  if (typeof AbortSignal !== 'undefined' && AbortSignal.any) {
+    return { signal: AbortSignal.any(list), cleanup() {} };
+  }
+  const merged = new AbortController();
+  const relays = [];
+  const cleanup = () => {
+    for (const [signal, relay] of relays) signal.removeEventListener('abort', relay);
+    relays.length = 0;
+  };
+  const abortMerged = () => {
+    cleanup();
+    try { merged.abort(); } catch {}
+  };
+  for (const signal of list) {
+    if (signal.aborted) { abortMerged(); break; }
+    const relay = () => abortMerged();
+    relays.push([signal, relay]);
+    signal.addEventListener('abort', relay, { once: true });
+  }
+  return { signal: merged.signal, cleanup };
+}
+
 async function api(path, options) {
   if (location.protocol === 'file:') throw new Error('离线版不支持登录同步');
   if (navigator.onLine === false) throw new Error('当前处于离线状态');
   const opt = options || {};
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  // 同步请求可能经过慢速国际链路；短超时会把已经成功的写入误报成失败，造成反复重传。
-  const timer = controller ? setTimeout(() => controller.abort(), opt.timeout || 30000) : null;
+  const timeoutController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  // 超时必须覆盖响应体和 JSON 解析，不能只覆盖收到响应头的阶段。
+  const timer = timeoutController ? setTimeout(() => {
+    try { timeoutController.abort(); } catch {}
+  }, opt.timeout || 30000) : null;
+  const epochController = apiEpochController;
+  const epochSignal = epochController && epochController.signal;
+  const abortBundle = combinedAbortSignal([opt.signal, timeoutController && timeoutController.signal, epochSignal]);
   let body;
   let headers = {};
   if (opt.body !== undefined) {
@@ -2813,72 +3243,110 @@ async function api(path, options) {
       } catch {}
     }
   }
-  let res;
   try {
-    res = await fetch('/api' + path, {
-      method: opt.method || (opt.body !== undefined ? 'POST' : 'GET'),
-      credentials: 'same-origin',
-      headers,
-      body,
-      keepalive: opt.keepalive === true,
-      signal: controller ? controller.signal : undefined,
-    });
-  } catch (e) {
-    throw new Error(navigator.onLine === false ? '当前处于离线状态' : '网络请求超时，请稍后重试');
+    let res;
+    try {
+      res = await fetch('/api' + path, {
+        method: opt.method || (opt.body !== undefined ? 'POST' : 'GET'),
+        credentials: 'same-origin',
+        headers,
+        body,
+        keepalive: opt.keepalive === true,
+        signal: abortBundle.signal,
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError' && opt.signal && opt.signal.aborted) throw e;
+      if (e && e.name === 'AbortError' && epochSignal && epochSignal.aborted) throw e;
+      if (e && e.name === 'AbortError' && timeoutController && timeoutController.signal.aborted) {
+        throw new Error('网络请求超时，请稍后重试');
+      }
+      throw new Error(navigator.onLine === false ? '当前处于离线状态' : '网络请求超时，请稍后重试');
+    }
+
+    let text = '';
+    try {
+      text = await res.text();
+    } catch (e) {
+      if (e && e.name === 'AbortError' && opt.signal && opt.signal.aborted) throw e;
+      if (e && e.name === 'AbortError' && epochSignal && epochSignal.aborted) throw e;
+      if (e && e.name === 'AbortError' && timeoutController && timeoutController.signal.aborted) {
+        throw new Error('网络请求超时，请稍后重试');
+      }
+      throw new Error('读取服务器响应失败，请稍后重试');
+    }
+
+    let data = null;
+    let parseError = null;
+    if (text) {
+      try { data = JSON.parse(text); }
+      catch (e) { parseError = e; }
+    }
+    if (res.status === 401 && path !== '/login' && path !== '/register') handleSessionExpired();
+    if (res.status === 409 && data && data.code === 'ACCOUNT_MISMATCH') { refreshAuth(); }
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ('请求失败 ' + res.status));
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    if (res.status === 204) return {};
+    if (parseError) {
+      const err = new Error('服务器响应格式错误');
+      err.status = res.status;
+      throw err;
+    }
+    if (!text) throw new Error('服务器返回空响应');
+    return data || {};
   } finally {
     if (timer) clearTimeout(timer);
+    abortBundle.cleanup();
   }
-  let data = null;
-  try { data = await res.json(); } catch {}
-  // 登录/注册接口自己回 401 表示账号密码不对，不能当成会话过期
-  if (res.status === 401 && path !== '/login' && path !== '/register') handleSessionExpired();
-  if (!res.ok) {
-    const err = new Error((data && data.error) || ('请求失败 ' + res.status));
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data || {};
 }
+
 
 // 本地四块进度必须一起成功或一起失败。localStorage 没有多键事务：
 // 逐键调用 save() 时，第二块写失败会留下「新 state + 旧 chapter/conf」的半导入状态。
 // 这里保留每个键的原始文本，任意一次写入失败就按原文本回滚。
 function commitStores(next) {
-  const pairs = [
-    [LS_STATE, next.state],
-    ['ky_chapter_v1', next.chapterData],
+  const nextChapters = next.chapterData === undefined ? chapterData : next.chapterData;
+  const restPairs = [
+    ['ky_chapter_v1', nextChapters],
+    [LS_POS, positionStoreFromChapters(nextChapters)],
     [LS_DAILY, next.daily],
     [LS_CONF, next.conf],
   ];
   let texts;
-  try {
-    texts = pairs.map(([, value]) => JSON.stringify(value));
-  } catch {
-    return false;
-  }
-  const storageKeys = pairs.map(([key]) => scopedKey(key));
+  try { texts = restPairs.map(([, value]) => JSON.stringify(value)); }
+  catch { return false; }
+  const storageKeys = restPairs.map(([key]) => scopedKey(key));
   const before = storageKeys.map(key => {
     try { return localStorage.getItem(key); } catch { return null; }
   });
   try {
-    for (let i = 0; i < storageKeys.length; i++) localStorage.setItem(storageKeys[i], texts[i]);
-  } catch (e) {
-    for (let i = 0; i < storageKeys.length; i++) {
+    for (let i = 0; i < storageKeys.length; i += 1) localStorage.setItem(storageKeys[i], texts[i]);
+  } catch {
+    for (let i = 0; i < storageKeys.length; i += 1) {
       try {
         if (before[i] === null) localStorage.removeItem(storageKeys[i]);
         else localStorage.setItem(storageKeys[i], before[i]);
       } catch {}
     }
-    if (!storageWarned) {
-      storageWarned = true;
-      const el = document.getElementById('storageWarn');
-      if (el) el.classList.remove('hidden');
+    showStorageWarning();
+    return false;
+  }
+  // state 用 generation 分片原子切换；它失败时旧 generation 仍完整，回滚其余三块即可。
+  if (next.state !== undefined && !writeStateStorageForScope(next.state, authUser)) {
+    for (let i = 0; i < storageKeys.length; i += 1) {
+      try {
+        if (before[i] === null) localStorage.removeItem(storageKeys[i]);
+        else localStorage.setItem(storageKeys[i], before[i]);
+      } catch {}
     }
     return false;
   }
-  if (next.state !== undefined) masteredWordsCache = null;
-  for (const [key] of pairs) {
+  if (next.state !== undefined) markStateChanged();
+  else invalidateSnapshotCache();
+  for (const key of [LS_STATE, ...restPairs.map(([key]) => key)]) {
     try { bus.emit('data:change', key); } catch {}
   }
   return true;
@@ -3014,7 +3482,14 @@ function validateConfStore(store) {
     icon: cleanIcon(store.icon),
     iconAt: safeTimestamp(store.iconAt, now, 0),
   };
+  out.resetAt = safeTimestamp(store.resetAt, now, 0);
+  const serverFenceAt = safeTimestamp(store.serverFenceAt, now, 0);
+  if (serverFenceAt) {
+    out.serverFenceAt = serverFenceAt;
+    out.serverFenceMode = store.serverFenceMode === 'import' ? 'import' : 'clear';
+  }
   if (store.overwritePending === true) out.overwritePending = true;
+  if (store.overwriteMode === 'import' || store.overwriteMode === 'clear') out.overwriteMode = store.overwriteMode;
   return out;
 }
 // 只把和默认值不同的字段写进 payload。全量写 w:0 / mastered:false / due:0
@@ -3034,6 +3509,7 @@ function slimRecord(rec) {
 }
 
 function snapshot() {
+  if (snapshotCacheRevision === localRevision && snapshotCacheValue) return snapshotCacheValue;
   const slimState = {};
   for (const [name, rec] of Object.entries(state)) {
     if (name === '__proto__') continue;
@@ -3041,7 +3517,7 @@ function snapshot() {
   }
   // 只上传能通过校验的图标：坏数据不该被同步到别的设备，也不该撑大 payload
   const iconOk = !!configuredIcon();
-  return {
+  const value = {
     state: slimState,
     chapterData,
     daily,
@@ -3058,8 +3534,14 @@ function snapshot() {
       // 服务端会判定「本机这次没动过图标」，云端旧图标永远删不掉，另一台设备也变不回默认。
       icon: iconOk ? conf.icon : null,
       iconAt: Number(conf.iconAt) || 0,
+      resetAt: Number(conf.resetAt) || 0,
+      serverFenceAt: Number(conf.serverFenceAt) || 0,
+      serverFenceMode: conf.serverFenceMode === 'import' ? 'import' : (conf.serverFenceMode === 'clear' ? 'clear' : ''),
     },
   };
+  snapshotCacheRevision = localRevision;
+  snapshotCacheValue = value;
+  return value;
 }
 
 function applySnapshot(d) {
@@ -3084,6 +3566,7 @@ function applySnapshot(d) {
   daily = nextDaily;
   conf = nextConf;
   activeDeck = nextDeck;
+  invalidateSnapshotCache();
   const deckSelect = $('deckSelect');
   if (deckSelect) deckSelect.value = activeDeck;
   updateDeckMeta();
@@ -3107,6 +3590,20 @@ function authSay(msg, kind) {
 function reloadSpace() {
   if (authUser) {
     const canonical = accountScope(authUser);
+    const legacySuffix = '@' + authUser;
+    const targetSuffix = '@' + canonical;
+    if (legacySuffix !== targetSuffix) {
+      const shardKeys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i) || '';
+        if (key.startsWith(LS_STATE + '#') && key.endsWith(legacySuffix)) shardKeys.push(key);
+      }
+      for (const oldKey of shardKeys) {
+        const newKey = oldKey.slice(0, -legacySuffix.length) + targetSuffix;
+        if (!localStorage.getItem(newKey)) localStorage.setItem(newKey, localStorage.getItem(oldKey));
+        localStorage.removeItem(oldKey);
+      }
+    }
     for (const base of SCOPED_KEYS) {
       if (base === LS_STAMP) continue;
       const legacy = base + '@' + authUser;
@@ -3151,6 +3648,7 @@ function reloadSpace() {
   renderIconSettings();
   syncFavicon(currentIcon());
   // 账号切换后开启一轮全新的会话；旧请求即使晚回来也不能影响新账号。
+  abortApiRequests();
   clearTimeout(syncTimer);
   syncEpoch += 1;
   syncing = false;
@@ -3158,6 +3656,7 @@ function reloadSpace() {
   syncInitialized = false;
   lastSyncAt = 0;
   syncDirty = !!authUser;
+  syncPaused = false;
   localRevision += 1;
 }
 function parseStore(raw) {
@@ -3180,25 +3679,23 @@ function withoutTombstones(store) {
 function adoptGuestProgress(username) {
   try {
     const scope = accountScope(username);
-    const stateKey = LS_STATE + '@' + scope;
     const chapterStoreKey = 'ky_chapter_v1@' + scope;
     const confKey = LS_CONF + '@' + scope;
     const dailyKey = LS_DAILY + '@' + scope;
-    const guestStateStore = parseStore(localStorage.getItem(LS_STATE));
+    const guestStateStore = readStateStoreForScope(null, {});
     const guestChapterStore = parseStore(localStorage.getItem('ky_chapter_v1'));
     const guestDailyStore = parseStore(localStorage.getItem(LS_DAILY));
-    const accountStateStore = parseStore(localStorage.getItem(stateKey));
+    const accountStateStore = readStateStoreForScope(username, {});
     const accountChapterStore = parseStore(localStorage.getItem(chapterStoreKey));
     const accountDailyStore = parseStore(localStorage.getItem(dailyKey));
 
     const mergedState = mergeState(accountStateStore, withoutTombstones(guestStateStore));
-    if (Object.keys(mergedState).length) {
-      localStorage.setItem(stateKey, JSON.stringify(mergedState));
-    }
+    if (Object.keys(mergedState).length) writeStateStorageForScope(mergedState, username);
 
     const mergedChapters = mergeChapters(accountChapterStore, withoutTombstones(guestChapterStore));
     if (Object.keys(mergedChapters).length) {
       localStorage.setItem(chapterStoreKey, JSON.stringify(mergedChapters));
+      localStorage.setItem(LS_POS + '@' + scope, JSON.stringify(positionStoreFromChapters(mergedChapters)));
     }
 
     // 每日学习节奏也并进账号空间：同一天取新（带 t 时）或取大（老数据），不同天取并集
@@ -3222,7 +3719,10 @@ function adoptGuestProgress(username) {
     // 登录进来不该顺手清掉账号的云端进度。账号自己攒下的标志要保留，
     // 所以按「账号这一侧是否真的待同步」判断值，而不是判断键存不存在
     // （账号清过一次时会留着 overwritePending: false，按键判断会把它误认成待同步）。
-    if (!accountConf.overwritePending) delete mergedConf.overwritePending;
+    if (!accountConf.overwritePending) { delete mergedConf.overwritePending; delete mergedConf.overwriteMode; }
+    // 游客的 reset/import fence 不能带入账号；账号自己的服务端 fence 必须保留。
+    if (!Number(accountConf.resetAt)) delete mergedConf.resetAt;
+    if (!Number(accountConf.serverFenceAt)) { delete mergedConf.serverFenceAt; delete mergedConf.serverFenceMode; }
     localStorage.setItem(confKey, JSON.stringify(mergedConf));
   } catch {}
 }
@@ -3364,7 +3864,7 @@ function renderAuth() {
 }
 
 function scheduleCloudSync(delay) {
-  if (!authUser || navigator.onLine === false) return;
+  if (!authUser || syncPaused || navigator.onLine === false) return;
   clearTimeout(syncTimer);
   const wait = typeof delay === 'number' ? delay : 6000;
   syncTimer = setTimeout(() => {
@@ -3398,6 +3898,7 @@ function noteLocalChange() {
   if (applyingRemote) return;
   syncDirty = true;
   localRevision += 1;
+  invalidateSnapshotCache();
 }
 
 /*__MERGE__*/
@@ -3412,30 +3913,33 @@ async function putState(payload, baseUpdatedAt, force, keepalive) {
   const body = {
     payload,
     baseUpdatedAt: Math.max(0, Number(baseUpdatedAt) || 0),
+    expectedUsername: authUser,
   };
   if (force) body.force = true;
-  const r = await api('/state', { method: 'PUT', body, compress: true, timeout: 45000, keepalive });
-  lastSyncAt = r.updatedAt || Date.now();
-  return r;
+  return api('/state', { method: 'PUT', body, compress: true, timeout: 45000, keepalive });
 }
 
 // 只取「进度位置」相关的字段：合并后的 conf 还带着图标等设置，
 // 全量比较会把每次同步都判成有变化，然后把用户拉到旧位置。
 function progressKey(c) {
   const x = c || {};
-  return [x.deck || '', Number(x.chapter) || 0, x.deckChapter || {}, Number(x.progressAt) || 0];
+  // 账号级设置也要进入比较；只比较位置会让“只换图标/朗读设置”的云端变化永远不落地。
+  return [x.deck || '', Number(x.chapter) || 0, x.deckChapter || {}, Number(x.progressAt) || 0,
+    x.showByDefault === true, x.speak !== false, x.speakLang === 'zh' ? 'zh' : 'en',
+    x.icon || null, Number(x.iconAt) || 0, Number(x.resetAt) || 0,
+    Number(x.serverFenceAt) || 0, x.serverFenceMode || ''];
 }
 function applyMergedSnapshot(merged, local) {
-  // 一次比完四块内容：拆成四次比较等于把整份 payload 序列化八遍，
-  // 手机上这几百毫秒是实打实的。
   const changedLocally = !sameJson(
     { s: merged.state, c: merged.chapterData, d: merged.daily, p: progressKey(merged.conf) },
     { s: local.state, c: local.chapterData, d: local.daily, p: progressKey(local.conf) },
   );
   if (changedLocally) {
     applyingRemote = true;
-    try { if (!applySnapshot(merged)) return false; }
-    finally { applyingRemote = false; }
+    try {
+      // 应用失败不能被当成“没有变化”，否则调用方会推进 lastSyncAt 并清掉 dirty。
+      if (!applySnapshot(merged)) throw new Error('本地存储空间不足，云端进度未能应用');
+    } finally { applyingRemote = false; }
   }
   return changedLocally;
 }
@@ -3443,14 +3947,15 @@ function applyMergedSnapshot(merged, local) {
 async function syncWithServer(local, guard, reset) {
   // 位置/顺序参与合并，主程序更新后必须重新走服务端合并，不能沿用旧的增量版本。
   lastSyncAt = 0;
-  const body = { payload: local };
+  const body = { payload: local, expectedUsername: authUser };
   // reset 让服务端在云端快照上补全墓碑：客户端只知道本机有哪些词，
   // 只在别的设备上出现过的词必须由服务端来删，否则下次合并又活过来。
   if (reset) {
     body.reset = true;
     // 带上本机的重置时刻，墓碑时间取它与服务端 now 的较早者；
     // 否则客户端时钟慢几秒时，「清空之后马上又背的词」会被判成旧记录删掉。
-    body.resetAt = Date.now();
+    body.resetAt = Number(conf.resetAt) || Date.now();
+    body.mode = conf.overwriteMode === 'import' ? 'import' : 'clear';
   }
   const result = await api('/state/sync', {
     method: 'POST',
@@ -3467,8 +3972,8 @@ async function syncWithServer(local, guard, reset) {
     lastSyncAt = 0;
     return { result, changedLocally: false, skipped: true };
   }
-  lastSyncAt = result.updatedAt || Date.now();
   const changedLocally = applyMergedSnapshot(result.payload, local);
+  lastSyncAt = result.updatedAt || Date.now();
   return { result, changedLocally };
 }
 
@@ -3477,6 +3982,8 @@ async function syncWithServer(local, guard, reset) {
 // 三百多 KB 的数据重复序列化几次，还多一套可能和服务端跑偏的逻辑。
 async function syncNow(quiet) {
   if (!authUser) return;
+  if (syncPaused && quiet) return;
+  if (!quiet) syncPaused = false;
   if (syncing) { pendingSync = true; return; }
   syncing = true;
   const epoch = syncEpoch;
@@ -3505,6 +4012,7 @@ async function syncNow(quiet) {
         // 直接落盘而不走 save()：这个标志不是学习进度，不该触发 data:change。
         // 用 delete 而不是置 false：留着 false 会让「按值判断」的地方以为它存在过。
         delete conf.overwritePending;
+        delete conf.overwriteMode;
         try { localStorage.setItem(scopedKey(LS_CONF), JSON.stringify(conf)); } catch {}
       }
       result = synced.skipped ? 'unchanged' : (synced.changedLocally ? 'merged' : 'pushed');
@@ -3515,7 +4023,9 @@ async function syncNow(quiet) {
     } else if (syncDirty) {
       const local = snapshot();
       try {
-        await putState(local, lastSyncAt);
+        const saved = await putState(local, lastSyncAt);
+        if (stale()) return;
+        lastSyncAt = saved.updatedAt || Date.now();
         result = 'pushed';
       } catch (e) {
         if (e.status !== 409) throw e;
@@ -3523,7 +4033,8 @@ async function syncNow(quiet) {
         result = synced.skipped ? 'unchanged' : (synced.changedLocally ? 'merged' : 'pushed');
       }
     } else {
-      const path = lastSyncAt ? '/state?since=' + encodeURIComponent(lastSyncAt) : '/state';
+      const expected = encodeURIComponent(authUser || '');
+      const path = lastSyncAt ? '/state?since=' + encodeURIComponent(lastSyncAt) + '&expectedUsername=' + expected : '/state?expectedUsername=' + expected;
       const remote = await api(path);
       if (stale()) return;
       if (remote.unchanged) {
@@ -3544,7 +4055,11 @@ async function syncNow(quiet) {
         : '进度已同步', 'ok');
     }
   } catch (e) {
-    if (!stale() && !quiet) authSay('同步失败：' + e.message, 'err');
+    if (e && e.status === 413) {
+      syncPaused = true;
+      authSay('云端进度超过 512KB，请导出备份后清理旧记录再同步。', 'err');
+      showSessionNotice('云端进度过大，自动同步已暂停。', 8000);
+    } else if (!stale() && !quiet) authSay('同步失败：' + e.message, 'err');
   } finally {
     // 按钮复位移到 epoch 判断外面：会话过期会重置 syncEpoch，
     // 之前那样会让「立即同步」一直停在 disabled 直到刷新页面。
@@ -3570,6 +4085,7 @@ async function refreshAuth() {
     if (authUser !== before) return;
     const next = r.user ? r.user.username : null;
     if (next !== authUser) {
+      if (!authUser && next) adoptGuestProgress(next);
       authUser = next;
       try {
         if (next) localStorage.setItem(LS_AUTH, next);
@@ -3578,8 +4094,7 @@ async function refreshAuth() {
       reloadSpace();
     }
   } catch {
-    // 离线时保留上次账号，让该账号的本地进度继续可用。
-    authUser = before;
+    // 离线时保留上次账号；若账号已在请求期间切换，不能把内存身份写回旧值。
   }
   renderAuth();
   if (authUser && !syncInitialized) scheduleCloudSync(200);
@@ -3593,8 +4108,8 @@ async function afterLogin(username) {
   try { localStorage.setItem(LS_AUTH, username); } catch {}
   reloadSpace();
   renderAuth();
-  // 登录成功后把弹窗收起来，改用顶部提示条说明结果，别让人对着表单发愣
-  $('authModal').classList.add('hidden');
+  // 登录成功后关闭弹窗并恢复页面可交互状态。
+  closeAuthModal();
   showSessionNotice('已登录：' + username + '，正在同步进度…', 5000);
   setTimeout(() => syncNow(false), 0);
 }
@@ -3603,7 +4118,7 @@ let authReturnFocus = null;
 function openAuthModal() {
   authReturnFocus = document.activeElement;
   $('authModal').classList.remove('hidden');
-  setPageInert(true);
+  setPageInert(true, $('authModal'));
   const target = authUser ? focusablesIn($('authModal'))[0] : $('authUser');
   (target || $('authModal')).focus({ preventScroll: true });
 }
@@ -3654,7 +4169,7 @@ $('authLogout').onclick = async () => {
   const btn = $('authLogout');
   btn.disabled = true;
   try {
-    await api('/logout', { method: 'POST' });
+    await api('/logout', { method: 'POST', body: { expectedUsername: authUser } });
   } catch (e) {
     // 离线时服务端 session 还活着。这时假装退出，下次刷新会被自动登回去，
     // 用户会以为退出没生效。宁可报错也不要装作成功。
@@ -3667,7 +4182,7 @@ $('authLogout').onclick = async () => {
   try { localStorage.removeItem(LS_AUTH); } catch {}
   reloadSpace();
   renderAuth();
-  $('authModal').classList.add('hidden');
+  closeAuthModal();
   showSessionNotice('已退出登录，进度仍保存在本机', 5000);
 };
 $('pairClaimToggle').onclick = () => {
@@ -3705,7 +4220,7 @@ setInterval(() => {
   syncNow(true);
 }, 30000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && authUser && navigator.onLine !== false) syncNow(true);
+  if (document.visibilityState === 'visible' && authUser && navigator.onLine !== false) refreshAuth().finally(() => { if (authUser) syncNow(true); });
 });
 window.addEventListener('online', () => {
   if (authUser) scheduleCloudSync(500);
@@ -3776,6 +4291,8 @@ window.addEventListener('unhandledrejection', event => {
 });
 
 // ---- PWA / 离线可用 ----
+let offlinePrefetchState = 'unknown';
+let offlinePrefetchFailed = 0;
 function updateOfflineStatus() {
   const el = $('offlineDiag');
   if (!el) return;
@@ -3791,6 +4308,12 @@ function updateOfflineStatus() {
   }
   const swReady = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
   const cachedCount = audioCachedWords.size;
+  const assetsIncomplete = offlinePrefetchState === 'partial' || offlinePrefetchFailed > 0;
+  if (assetsIncomplete && navigator.onLine !== false) {
+    el.textContent = '离线词库缓存不完整（失败 ' + offlinePrefetchFailed + ' 项），正在等待联网补缓存。';
+    el.className = 'offline-note warn';
+    return;
+  }
   if (navigator.onLine === false) {
     el.textContent = swReady
       ? '离线模式：词库和学习功能可用；已缓存 ' + cachedCount + ' 个发音。'
@@ -3800,8 +4323,9 @@ function updateOfflineStatus() {
       ? '离线缓存已就绪，已缓存 ' + cachedCount + ' 个发音。'
       : '正在准备离线缓存；联网打开一次后即可离线使用。';
   }
-  el.className = 'offline-note' + (swReady ? ' ok' : '');
+  el.className = 'offline-note' + (swReady && !assetsIncomplete ? ' ok' : '');
 }
+
 // ---------- 全量离线缓存 ----------
 // 缓存写入交给 Service Worker：页面只发请求，持久化和淘汰策略都在 sw.js 里。
 // 页面壳和四本词库在 SW 安装时就已存好，这里补的是全部真人发音 + 词典详情分片。
@@ -3813,7 +4337,7 @@ let offlinePermanent = (() => { try { return new Set(JSON.parse(localStorage.get
 let offlineJob = null;
 
 async function offlineWordList() {
-  try { await Promise.all(DECK_KEYS.map(loadWebDeck)); } catch {}
+  await Promise.all(DECK_KEYS.map(loadWebDeck));
   const seen = new Set();
   const out = [];
   for (const key of DECK_KEYS) {
@@ -3829,7 +4353,7 @@ async function offlineWordList() {
 
 // 中文释义也要能离线：百度 TTS 每个文本一个音频，按文本去重后数量比词数少
 async function offlineZhTexts() {
-  try { await Promise.all(DECK_KEYS.map(loadWebDeck)); } catch {}
+  await Promise.all(DECK_KEYS.map(loadWebDeck));
   const seen = new Set();
   const out = [];
   for (const key of DECK_KEYS) {
@@ -3848,8 +4372,12 @@ function renderOfflineJob() {
   if (!job) return;
   const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
   $('offlineFill').style.width = pct + '%';
-  const tail = job.failed ? '，失败 ' + job.failed : '';
-  // 用最近几秒的滑动速度，别用全程平均：跳过已缓存那一段会把速度算得虚高
+  const problems = [];
+  if (job.failed) problems.push('失败 ' + job.failed);
+  if (job.skipped) problems.push('跳过 ' + job.skipped);
+  if (job.detailsFailed) problems.push('详情失败 ' + job.detailsFailed);
+  const tail = problems.length ? '，' + problems.join('，') : '';
+  // 用最近几秒的滑动速度；跳过已缓存那段不会把全程平均速度算得虚高。
   const now = Date.now();
   if (job.sampleT && now - job.sampleT >= 3000) {
     job.rate = (job.done - job.sampleDone) / ((now - job.sampleT) / 1000);
@@ -3861,8 +4389,10 @@ function renderOfflineJob() {
   }
   const rate = job.rate > 0 ? ' · ' + job.rate.toFixed(0) + '/秒' : '';
   if (job.cancelled) $('offlineStat').textContent = '已停止：缓存了 ' + job.done + ' / ' + job.total + ' 个' + tail;
-  else if (job.done >= job.total) $('offlineStat').textContent = '完成：' + job.total + ' 条发音和词典都存好了' + tail;
-  else $('offlineStat').textContent = job.phase + ' ' + job.done + ' / ' + job.total + '（' + pct + '%）' + rate + tail;
+  else if (job.done >= job.total) {
+    $('offlineStat').textContent = (problems.length ? '完成但有缺失：' : '完成：')
+      + job.total + ' 条发音和词典已处理' + tail;
+  } else $('offlineStat').textContent = job.phase + ' ' + job.done + ' / ' + job.total + '（' + pct + '%）' + rate + tail;
 }
 
 // 中文现在走百度 TTS，是可缓存的音频；单文件版没有 worker，才退回系统语音
@@ -3905,32 +4435,86 @@ function responseIsPermanentAudioFailure(err) {
   const status = Number((m.match(/audio (\d{3})/) || [])[1]);
   return status >= 400 && status < 500 && status !== 408 && status !== 425 && status !== 429;
 }
+function cancelledError() {
+  return Object.assign(new Error('cancelled'), { name: 'AbortError' });
+}
+async function waitWithAbort(ms, signal) {
+  if (signal && signal.aborted) throw cancelledError();
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(done, ms);
+    function done() {
+      if (signal) signal.removeEventListener('abort', onAbort);
+      resolve();
+    }
+    function onAbort() {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onAbort);
+      reject(cancelledError());
+    }
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 async function fetchOfflineAudio(text, lang, externalSignal) {
   const waits = [2000, 6000, 15000];
-  const makeTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
-    ? AbortSignal.timeout(OFFLINE_FETCH_TIMEOUT) : null;
   for (let attempt = 0; attempt <= waits.length; attempt += 1) {
+    if (externalSignal && externalSignal.aborted) throw cancelledError();
+    const timeoutController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const abort = () => { try { timeoutController.abort(); } catch {} };
+    if (externalSignal) externalSignal.addEventListener('abort', abort, { once: true });
+    const timer = timeoutController ? setTimeout(abort, OFFLINE_FETCH_TIMEOUT) : null;
     let response;
-    const timeout = makeTimeout();
     try {
-      const signal = externalSignal || timeout;
-      response = await fetch(offlineAudioUrl(text, lang) + '&offline=1', signal ? { signal } : {});
+      response = await fetch(offlineAudioUrl(text, lang) + '&offline=1', timeoutController ? { signal: timeoutController.signal } : {});
     } catch (err) {
-      // 超时或断连：按普通失败退避重试，别让整批卡在这一条上
+      if (externalSignal && externalSignal.aborted) throw cancelledError();
       if (attempt === waits.length) throw err;
-      await new Promise(resolve => setTimeout(resolve, waits[attempt]));
+      await waitWithAbort(waits[attempt], externalSignal);
+      continue;
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (externalSignal) externalSignal.removeEventListener('abort', abort);
+    }
+    // 408/425/429/5xx 都可重试；其余 4xx 是确定性失败。
+    const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+    if (retryable && attempt < waits.length) {
+      try { await response.body?.cancel(); } catch {}
+      const retryAfter = Number(response.headers.get('retry-after') || 0) * 1000;
+      const fallbackWait = response.status === 429 ? waits[attempt] : [500, 2000, 6000][attempt];
+      const wait = Math.min(30000, Math.max(retryAfter || 0, fallbackWait));
+      await waitWithAbort(wait, externalSignal);
       continue;
     }
-    // 4xx 是词条本身有问题，重试没意义；429 和 5xx 是临时状态，值得再试。
-    // 429 说明被限流，退避要长；5xx 只是这一跳抖动，等一下马上就能好。
-    if (response.status !== 429 && response.status < 500) {
-      // 下载一律走自家的 /api/audio，同源响应，ok 能如实反映成败
-      if (!response.ok) throw new Error('audio ' + response.status);
-      return response;
-    }
-    if (attempt === waits.length) throw new Error('audio ' + response.status);
-    await new Promise(resolve => setTimeout(resolve, response.status === 429 ? waits[attempt] : 500));
+    if (!response.ok) throw new Error('audio ' + response.status);
+    return response;
   }
+}
+async function waitForServiceWorkerReady(signal, timeoutMs) {
+  if (!('serviceWorker' in navigator)) throw new Error('浏览器不支持离线缓存');
+  if (navigator.serviceWorker.controller) return navigator.serviceWorker.ready;
+  if (signal && signal.aborted) throw cancelledError();
+  const registration = await navigator.serviceWorker.ready;
+  if (signal && signal.aborted) throw cancelledError();
+  if (navigator.serviceWorker.controller) return registration;
+  // ready 只说明有活动 worker，不保证当前页面已经被它接管；离线写入必须在 controller 下进行。
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+      if (signal) signal.removeEventListener('abort', onAbort);
+      fn(value);
+    };
+    const onChange = () => {
+      if (navigator.serviceWorker.controller) finish(resolve, registration);
+    };
+    const onAbort = () => finish(reject, cancelledError());
+    const timer = setTimeout(() => finish(reject, new Error('Service Worker 接管超时')), timeoutMs || 15000);
+    navigator.serviceWorker.addEventListener('controllerchange', onChange);
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+    onChange();
+  });
 }
 
 async function runOfflineDownload(opts) {
@@ -3946,8 +4530,24 @@ async function runOfflineDownload(opts) {
   const zhEl = $('zhVoiceStat');
   if (zhEl) zhEl.textContent = zhVoiceStatus();
   $('offlineStat').textContent = '正在准备词库…';
-  const words = await offlineWordList();
+  let words = [];
+  try {
+    words = await offlineWordList();
+  } catch {
+    offlineJob = null;
+    startBtn.disabled = false;
+    $('offlineStat').textContent = '词库加载失败，请检查网络后重试。';
+    return;
+  }
+  // 准备阶段不持有 controller；用户若已点停止，或词库为空，必须清掉占位任务，
+  // 否则 offlineJob 永远非空，之后手动下载和自动下载都进不来。
+  if (!offlineJob || offlineJob.cancelled) {
+    offlineJob = null;
+    startBtn.disabled = false;
+    return;
+  }
   if (!words.length) {
+    offlineJob = null;
     $('offlineStat').textContent = '词库还没加载完，稍后再试。';
     startBtn.disabled = false;
     return;
@@ -3971,15 +4571,17 @@ async function runOfflineDownload(opts) {
   const pending = targets.filter(t => !audioCachedWords.has(audioMarkerKey(t.key, t.lang)) && !offlinePermanent.has(audioMarkerKey(t.key, t.lang)));
   // 自动模式分批：一次最多 800 条，跑完就收工，下次打开接着来。
   // 否则每次打开都在后台拖几分钟，页面和朗读都被它拖慢。
+  const allTargets = targets;
   targets = auto ? pending.slice(0, 800) : pending;
   if (!targets.length) {
-    if (auto) { try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {} }
+    offlineJob = null;
+    if (auto) markAutoOfflineDone(targets.length - offlinePermanent.size);
     $('offlineStat').textContent = '全部发音都已经存在本机了。';
     startBtn.disabled = false;
     return;
   }
   offlineJob = {
-    total: targets.length, done: 0, failed: 0, cancelled: false,
+    total: targets.length, done: 0, failed: 0, skipped: 0, detailsFailed: 0, cancelled: false,
     startedAt: Date.now(),
     phase: auto ? '后台自动缓存（每次最多 800 条）' : '正在下载发音',
     stopReason: '',
@@ -3988,13 +4590,21 @@ async function runOfflineDownload(opts) {
   stopBtn.classList.remove('hidden');
   renderOfflineJob();
   try {
-    await navigator.serviceWorker.ready;
+    await waitForServiceWorkerReady(offlineJob.controller && offlineJob.controller.signal);
     // 词典详情的分片按首字母拆过，26 个小文件，先拿完离线也能长按看详情
     const details = (DATA_META && DATA_META.assets && DATA_META.assets.details) || {};
     // 词典详情分片是附加内容，拉不到不该算进发音失败：它会让 finished.failed 永远
     // 为真，后台自动缓存就再也标不成「已完成」，每次打开都要重来一遍。
     for (const url of Object.values(details)) {
-      try { await fetch(url, { cache: 'force-cache' }); } catch {}
+      try {
+        const response = await fetch(url, { cache: 'force-cache' });
+        if (!response.ok) throw new Error('detail ' + response.status);
+        if (!audioCacheConfirmed(response)) throw new Error('detail cache not confirmed');
+        await response.text();
+      } catch {
+        const job = offlineJob;
+        if (job && !job.cancelled) job.detailsFailed += 1;
+      }
     }
     let cursor = 0;
     let consecutiveFailures = 0;
@@ -4009,13 +4619,16 @@ async function runOfflineDownload(opts) {
         const marker = audioMarkerKey(target.key, target.lang);
         try {
           const response = await fetchOfflineAudio(target.key, target.lang, job.controller && job.controller.signal);
-          if (response.headers.get(AUDIO_CACHE_CONFIRMED_HEADER) === 'store-failed') throw new Error('audio cache store failed');
+          if (!audioCacheConfirmed(response)) throw new Error('audio cache store failed');
+          await response.arrayBuffer();
           rememberAudio(marker);
           consecutiveFailures = 0;
         } catch (err) {
           if (err && err.name === 'AbortError') return;
-          if (responseIsPermanentAudioFailure(err)) offlinePermanent.add(marker);
-          else {
+          if (responseIsPermanentAudioFailure(err)) {
+            offlinePermanent.add(marker);
+            job.skipped += 1;
+          } else {
             job.failed += 1;
             consecutiveFailures += 1;
             if (consecutiveFailures >= 40) {
@@ -4031,6 +4644,8 @@ async function runOfflineDownload(opts) {
       }
     };
     await Promise.all(Array.from({ length: OFFLINE_CONCURRENCY }, worker));
+  } catch (err) {
+    if (err && err.name !== 'AbortError') $('offlineStat').textContent = '离线缓存失败：' + (err.message || '请稍后重试');
   } finally {
     const finished = offlineJob;
     renderOfflineJob();
@@ -4041,18 +4656,39 @@ async function runOfflineDownload(opts) {
     stopBtn.classList.add('hidden');
     updateOfflineStatus();
     // 只有这一批就把剩下的全下完了，才算彻底完成；分批模式下留着下次继续
-    if (auto && finished && !finished.cancelled && !finished.failed) {
-      const stillPending = targets.some(t => !audioCachedWords.has(audioMarkerKey(t.key, t.lang)) && !offlinePermanent.has(audioMarkerKey(t.key, t.lang)));
-      if (!stillPending) { try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {} }
+    if (auto && finished && !finished.cancelled && !finished.failed && !finished.skipped && !finished.detailsFailed) {
+      // 必须检查全量目标而不是当前这 800 条；否则首批完成就会把 done 写死。
+      const stillPending = allTargets.some(t => !audioCachedWords.has(audioMarkerKey(t.key, t.lang)) && !offlinePermanent.has(audioMarkerKey(t.key, t.lang)));
+      if (!stillPending) markAutoOfflineDone(allTargets.length - offlinePermanent.size);
     }
   }
 }
 
 // 后台自动缓存：首屏稳定后自己跑全量，用户不用点任何按钮
 const AUTO_OFFLINE_KEY = 'ky_auto_offline_' + AUDIO_CACHE_VERSION;
+const AUTO_OFFLINE_DONE_PREFIX = 'done:';
 let autoOfflineStarted = false;
+function readAutoOfflineDone() {
+  try {
+    const raw = String(localStorage.getItem(AUTO_OFFLINE_KEY) || '');
+    const match = raw.match(/^done:(\d+)$/);
+    if (!match) return null;
+    return { expected: Math.max(0, Number(match[1]) || 0) };
+  } catch { return null; }
+}
+function markAutoOfflineDone(expected) {
+  try { localStorage.setItem(AUTO_OFFLINE_KEY, AUTO_OFFLINE_DONE_PREFIX + Math.max(0, Number(expected) || 0)); } catch {}
+}
+function clearAutoOfflineDone() {
+  try {
+    const raw = String(localStorage.getItem(AUTO_OFFLINE_KEY) || '');
+    if (raw.startsWith(AUTO_OFFLINE_DONE_PREFIX) || raw === 'done') localStorage.removeItem(AUTO_OFFLINE_KEY);
+  } catch {}
+}
 function autoOfflineAllowed() {
-  try { if (localStorage.getItem(AUTO_OFFLINE_KEY) === 'done') return false; } catch { return false; }
+  const done = readAutoOfflineDone();
+  if (done && audioCachedWords.size >= done.expected) return false;
+  if (done) clearAutoOfflineDone();
   const conn = navigator.connection;
   if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return false;
   return true;
@@ -4061,7 +4697,7 @@ function scheduleAutoOffline() {
   if (autoOfflineStarted || !autoOfflineAllowed()) return;
   if (!('serviceWorker' in navigator) || !window.isSecureContext || location.protocol === 'file:') return;
   autoOfflineStarted = true;
-  // 等首屏、首词朗读都稳住之后再开始，别抢前台带宽
+  // 等首屏、缓存对账和首词朗读都稳定之后，再占用后台带宽。
   const start = () => runOfflineDownload({ auto: true });
   const idle = () => {
     if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 20000 });
@@ -4070,7 +4706,6 @@ function scheduleAutoOffline() {
   if (document.readyState === 'complete') idle();
   else window.addEventListener('load', idle, { once: true });
 }
-
 $('offlineStart').onclick = () => {
   if (offlineJob) { $('offlineStat').textContent = '正在后台缓存中，进度见上方。'; return; }
   runOfflineDownload();
@@ -4104,67 +4739,155 @@ $('installApp').onclick = async () => {
   stat.textContent = choice && choice.outcome === 'accepted' ? '已安装，去桌面找图标。' : '已取消。' + installHint();
   installPrompt = null;
 };
+let updateCheckBusy = false;
 $('checkUpdate').onclick = async () => {
   const stat = $('appStat');
+  if (updateCheckBusy) return;
+  updateCheckBusy = true;
   stat.textContent = '正在检查…';
   try {
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) { stat.textContent = '当前不是离线版本，直接刷新页面即可。'; return; }
+    const before = navigator.serviceWorker.controller;
     await reg.update();
-    setTimeout(() => {
-      if (reg.waiting || reg.installing) {
-        stat.textContent = '发现新版本，正在应用…';
-        setTimeout(() => location.reload(), 900);
-      } else {
-        stat.textContent = '已是最新版本。';
-      }
-    }, 1500);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const installing = reg.installing;
+    const changed = navigator.serviceWorker.controller !== before || !!installing || !!reg.waiting;
+    if (!changed) {
+      stat.textContent = '已是最新版本。';
+      return;
+    }
+    stat.textContent = '发现新版本，正在应用…';
+    if (reg.waiting) reg.waiting.postMessage({ type: 'ky:skip-waiting' });
+    if (navigator.serviceWorker.controller === before && installing) {
+      await new Promise(resolve => {
+        const timer = setTimeout(resolve, 10000);
+        const done = () => {
+          if (installing.state === 'installed' || installing.state === 'activated' || installing.state === 'redundant') {
+            clearTimeout(timer);
+            installing.removeEventListener('statechange', done);
+            resolve();
+          }
+        };
+        installing.addEventListener('statechange', done);
+        done();
+      });
+      if (reg.waiting) reg.waiting.postMessage({ type: 'ky:skip-waiting' });
+    }
+    if (navigator.serviceWorker.controller !== before) {
+      stat.textContent = '新版本已就绪，正在刷新…';
+      setTimeout(() => location.reload(), 700);
+    } else {
+      stat.textContent = '新版本已下载，关闭并重新打开应用后生效。';
+    }
   } catch {
     stat.textContent = '检查失败，请确认网络后重试。';
+  } finally {
+    updateCheckBusy = false;
   }
 };
 
-scheduleAutoOffline();
 window.addEventListener('online', updateOfflineStatus);
 window.addEventListener('offline', updateOfflineStatus);
 updateOfflineStatus();
 if ('serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
+    const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+    let reloadScheduled = false;
+    const scheduleUpdateReload = () => {
+      if (reloadScheduled) return;
+      reloadScheduled = true;
+      showSessionNotice('离线内容已更新，正在刷新页面…', 3000);
+      setTimeout(() => location.reload(), 1200);
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      updateOfflineStatus();
+      // 首次安装的 clients.claim 不应导致一次无意义刷新；已有控制器后的更换才刷新。
+      if (hadControllerAtLoad || reloadScheduled) scheduleUpdateReload();
+    });
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(async registration => {
-      // 每次打开都查更新要拉一次 sw.js，还可能触发整壳重装；一天查一次足够，
-      // 想要最新版时点头像里的「检查更新」。
+      // 每次打开都查更新要拉一次 sw.js，还可能触发整壳重装；一天查一次足够。
       const KEY = 'ky_update_check_v1';
       let last = 0;
       try { last = Number(localStorage.getItem(KEY)) || 0; } catch {}
       if (Date.now() - last > 86400000) {
-        try { localStorage.setItem(KEY, String(Date.now())); } catch {}
-        registration.update().catch(() => {});
+        registration.update().then(() => {
+          try { localStorage.setItem(KEY, String(Date.now())); } catch {}
+        }).catch(() => {});
       }
       await navigator.serviceWorker.ready;
+      const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+      idle(async () => {
+        await reconcileAudioCache();
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'ky:prefetch-diagnostics-query', protocol: 1, requestId: 'startup',
+          });
+        }
+        updateOfflineStatus();
+        scheduleAutoOffline();
+      }, { timeout: 5000 });
       updateOfflineStatus();
     }).catch(() => updateOfflineStatus());
-    navigator.serviceWorker.addEventListener('controllerchange', updateOfflineStatus);
     navigator.serviceWorker.addEventListener('message', event => {
       const msg = event.data || {};
+      if (msg.type === 'ky:audio-cache-snapshot') {
+        const pending = pendingAudioCacheQueries.get(msg.requestId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingAudioCacheQueries.delete(msg.requestId);
+          pending.resolve(msg);
+        }
+        applyAudioCacheSnapshot(msg);
+        return;
+      }
       if (msg.type === 'ky:audio-evicted' && Array.isArray(msg.urls)) {
+        if (!acceptAudioCacheRevision(msg.epoch, msg.revision)) return;
         let changed = false;
         for (const raw of msg.urls) {
           try {
             const u = new URL(raw, location.href);
             const word = u.searchParams.get('word') || '';
             const lang = u.searchParams.get('lang') === 'zh' ? 'zh' : 'en';
-            const marker = audioMarkerKey(word, lang);
-            if (audioCachedWords.delete(marker)) changed = true;
+            if (forgetAudio(audioMarkerKey(word, lang))) changed = true;
           } catch {}
         }
         if (changed) flushAudioMarkers();
+      } else if (msg.type === 'ky:prefetch-priority-request') {
+        const id = DECK_IDS[activeDeck];
+        const asset = id && DATA_META.assets && DATA_META.assets[id];
+        if (asset && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'ky:prefetch-priority',
+            protocol: 1,
+            assets: [asset],
+            deck: activeDeck,
+          });
+        }
+      } else if (msg.type === 'ky:prefetch-diagnostics') {
+        const latest = Array.isArray(msg.runs) ? msg.runs[0] : null;
+        if (latest && latest.state) {
+          offlinePrefetchState = latest.state === 'complete' ? 'complete' : 'partial';
+          offlinePrefetchFailed = Math.max(0, Number(latest.failed) || 0);
+          updateOfflineStatus();
+        }
+      } else if (msg.type === 'ky:prefetch-status') {
+        offlinePrefetchState = msg.state === 'complete' ? 'complete' : 'partial';
+        offlinePrefetchFailed = Math.max(0, Number(msg.failed) || 0);
+        if (offlinePrefetchState === 'complete') {
+          try { localStorage.removeItem('ky_prefetch_diag_v1'); } catch {}
+        }
+        updateOfflineStatus();
       } else if (msg.type === 'ky:prefetch-failed') {
-        showSessionNotice('离线缓存未完整下载，请联网后重试。', 8000);
+        offlinePrefetchState = 'partial';
+        offlinePrefetchFailed = Math.max(0, Number(msg.count) || 0);
+        try { localStorage.setItem('ky_prefetch_diag_v1', JSON.stringify(msg.diagnostic || msg)); } catch {}
+        showSessionNotice('离线缓存未完整下载，联网后会自动重试。', 8000);
+        updateOfflineStatus();
       } else if (msg.type === 'ky:sw-updated') {
-        showSessionNotice('离线内容已更新，刷新页面即可使用最新版。', 8000);
+        updateOfflineStatus();
       }
     });
-
   });
 }
 </script>

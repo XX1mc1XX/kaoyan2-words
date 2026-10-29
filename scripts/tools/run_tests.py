@@ -8,8 +8,10 @@
 """
 from __future__ import annotations
 
+import ast
 import csv
 import gzip
+import hashlib
 import io
 import json
 import os
@@ -19,10 +21,37 @@ import socket
 import subprocess
 import sys
 import tempfile
+import textwrap
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BUILT = os.path.join(ROOT, "software", "考研核心词.html")
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def expected_source_digest():
+    paths = [
+        "software/template.html", "software/sw.template.js", "backend/worker.js",
+        "shared/merge.js", "scripts/make_html.py", "data/words.json", "data/words_order.json",
+        "data/derivatives.json", "data/basic.json", "data/insurance.json",
+        "data/ky2_freq.json", "data/selection_summary.json", "data/ky1_freq.json",
+        "data/meanings_curated.json", "data/meanings_final.json",
+        "data/meaning_corrections.json", "data/ecdict.csv", "data/ecdict_subset.json", "data/lemma.en.txt",
+    ]
+    parts = []
+    for rel in paths:
+        path = os.path.join(ROOT, rel)
+        if os.path.exists(path):
+            parts.append(rel + ":" + file_sha256(path))
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 results = []
 
@@ -32,11 +61,56 @@ def check(name, cond, detail=""):
 
 
 # ---------- 静态检查（不需要浏览器）----------
+def run_node_harness(script, files=None, timeout=180):
+    """Run real JS in a temporary directory under scripts/tools."""
+    harness_dir = tempfile.mkdtemp(prefix=".node-harness-", dir=os.path.join(ROOT, "scripts", "tools"))
+    try:
+        for name, content in (files or {}).items():
+            path = os.path.join(harness_dir, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with io.open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
+        harness = os.path.join(harness_dir, "harness.mjs")
+        with io.open(harness, "w", encoding="utf-8", newline="\n") as f:
+            f.write(script)
+        env = dict(os.environ)
+        env["KY_HARNESS_DIR"] = harness_dir
+        proc = subprocess.run(
+            ["node", harness], cwd=ROOT, env=env, capture_output=True,
+            encoding="utf-8", errors="replace", timeout=timeout,
+        )
+        data = None
+        for line in proc.stdout.splitlines():
+            if line.startswith("RESULT:"):
+                try:
+                    data = json.loads(line[7:])
+                except json.JSONDecodeError:
+                    data = None
+        return data, proc
+    finally:
+        shutil.rmtree(harness_dir, ignore_errors=True)
+
+
+def harness_detail(proc):
+    text = (proc.stderr or proc.stdout or "").strip().replace("\n", " ")
+    return text[:500]
+
+
+def materialized_worker_source():
+    worker = io.open(os.path.join(ROOT, "backend", "worker.js"), encoding="utf-8").read()
+    merge = io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read()
+    marker = "/*__MERGE__*/"
+    if marker not in worker:
+        raise RuntimeError("backend/worker.js merge marker missing")
+    return worker.replace(marker, merge, 1)
+
+
 def static_checks():
     if not os.path.exists(BUILT):
         check("产物存在", False, "先跑 make_html.py")
         return
     t = io.open(BUILT, encoding="utf-8").read()
+    source_html = io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read()
 
     # 单文件版内联了长按详情（约 416KB），上限相应放宽；网页版首包不受影响
     check("产物大小 < 1.2MB", os.path.getsize(BUILT) < 1200 * 1024,
@@ -62,26 +136,25 @@ def static_checks():
     check("共享模块未被复制回源码",
           "__MERGE__" in io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read()
           and "__MERGE__" in io.open(os.path.join(ROOT, "backend", "worker.js"), encoding="utf-8").read())
-    check("清空用墓碑而非 forceAt", "tombstone(now)" in t and "conf.forceAt =" not in t)
+    check("清空用墓碑而非 forceAt", "tombstone(now)" in source_html and "conf.forceAt =" not in source_html)
     check("清空/导入请求服务端补墓碑", "overwritePending" in t)
-    check("导入保留备份里的墓碑", "const incoming = validateStateStore(d.state, now);" in t and "if (rec.del === 1)" in t)
+    check("导入保留备份里的墓碑", "const incoming = validateStateStore(d.state, now);" in source_html and "if (rec.del === 1)" in source_html)
     check("竞态跳过不推进同步版本",
-          t.index("return { result, changedLocally: false, skipped: true };")
-          < t.index("lastSyncAt = result.updatedAt || Date.now();"),
+          source_html.index("return { result, changedLocally: false, skipped: true };")          < source_html.index("lastSyncAt = result.updatedAt || Date.now();"),
           "guard 必须挡在推进 lastSyncAt 之前，否则下一轮会用旧快照 PUT 覆盖")
     check("含恢复原序按钮", "restoreOrder" in t)
     check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
-    check("含鼠标滚轮翻词", "wheelLockedUntil" in t and "addEventListener('wheel'" in t)
+    check("含鼠标滚轮翻词", "wheelLockedUntil" in source_html and "addEventListener('wheel'" in source_html)
     check("含发音代理", "/api/audio?" in t)
     check("朗读可切中英文", all(x in t for x in ("speakLang", "zhVoice", "toggleSpeakLang", "meaningForSpeech")))
     check("朗读键长按切换语言", "speakLongFired" in t and "pointerdown" in t and "pointercancel" in t)
     check("中文语音状态如实展示", "zhVoiceStat" in t and "zhVoiceStatus" in t and "AUDIO_PROXY_READY" in t)
     check("中文朗读走百度可缓存音频", all(x in t for x in ("lang=zh", "offlineZhTexts", "AUDIO_PROXY_READY")))
     check("卡片顶部锚定不随释义跳动", "justify-content:flex-start" in t and "clamp(34px,10vh,88px)" in t)
-    check("发音预加载可秒播", all(x in t for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
-    check("发音 Blob 内存缓存", "audioBlobUrls" in t and "URL.createObjectURL(blob)" in t)
-    check("新词发音不等待网络", "新词不等待网络" in t and "1800" not in t)
-    check("含 Service Worker 注册", "navigator.serviceWorker.register('./sw.js'" in t)
+    check("发音预加载可秒播", all(x in source_html for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
+    check("发音 Blob 内存缓存", "audioBlobUrls" in source_html and "URL.createObjectURL(blob)" in source_html)
+    check("新词发音不等待网络", "新词不等待网络" in source_html and "1800" not in source_html)
+    check("含 Service Worker 注册", "navigator.serviceWorker.register('./sw.js'" in source_html)
     check("含离线缓存资源", os.path.exists(os.path.join(ROOT, "software", "sw.js"))
           and os.path.exists(os.path.join(ROOT, "software", "manifest.webmanifest")))
     check("离线账号可恢复", "LS_AUTH" in t and "savedAuthUser" in t)
@@ -93,22 +166,25 @@ def static_checks():
     check("含长按详情面板", all(x in t for x in ("detailMask", "detailSheet", "pressTimer")))
     check("长按详情数据块", 'id="ky-deck-detail"' in t)
     check("详情带音标与真题次数", '"p":' in t and '"freq":' in t)
-    check("详情词典默认展开", "$('detailDictBox').open = true" in t)
-    check("等级只用单字母上卡片", "PRIORITY_LABELS" in t and "el.textContent = level;" in t)
-    check("图标有体积上限", "ICON_DATA_MAX" in t and "icon.data.length <= ICON_DATA_MAX" in t)
+    check("详情词典默认展开", "$('detailDictBox').open = true" in source_html)
+    check("等级只用单字母上卡片", "PRIORITY_LABELS" in source_html and "el.textContent = level;" in source_html)
+    check("图标有体积上限", "ICON_DATA_MAX" in source_html and "icon.data.length <= ICON_DATA_MAX" in source_html)
     check("头像不等网络就先渲染",
-          "renderAuth();" in t.split("let authMode = 'login';")[1][:160])
-    check("头像读屏标签随登录态变", "btn.setAttribute('aria-label'" in t)
+          "renderAuth();" in source_html.split("let authMode = 'login';")[1][:160])
+    check("头像读屏标签随登录态变", "btn.setAttribute('aria-label'" in source_html)
 
     # --- 首屏：词库走 JSON 数据块，按需解析 ---
     check("词库改用 JSON 数据块", t.count('type="application/json"') == 6)
     check("无内联词表字面量", "const WORDS =" not in t)
     first_screen = json_block_bytes(t, "words")
     check("首屏解析数据量 < 250KB", 0 < first_screen < 250 * 1024, "%.0fKB" % (first_screen / 1024))
-    check("全量表惰性构建", "const allWords =" in t and "allWordsCache" in t)
+    check("全量表惰性构建", "const allWords =" in source_html and "allWordsCache" in source_html)
     check("词位索引惰性构建", "wordLocationCache" in t)
     check("首卡渲染打点", "__firstCardAt" in t)
-    check("source text is clean", not any(ch in t for ch in ("\ufffd", chr(0xfffd))) and not any(ch in io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read() for ch in ("\ufffd", chr(0xfffd))))
+    check("启动校验不触发章节常量 TDZ", t.find("const CHAPTER_SIZE") >= 0 and t.find("const CHAPTER_SIZE") < t.find("validateStateStore(state"))
+    source_paths = [os.path.join(ROOT, "software", "template.html"), os.path.join(ROOT, "software", "sw.template.js"), os.path.join(ROOT, "backend", "worker.js"), os.path.join(ROOT, "shared", "merge.js"), os.path.join(ROOT, "scripts", "make_html.py"), os.path.join(ROOT, "scripts", "deploy.py")]
+    dirty_sources = [os.path.relpath(p, ROOT) for p in source_paths if os.path.exists(p) and chr(0xfffd) in io.open(p, encoding="utf-8").read()]
+    check("source text is clean", not dirty_sources, str(dirty_sources[:5]))
     check("模板占位符完整", io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read().count("/*__MERGE__*/") == 1)
     check("交互元素无重复ID", len(re.findall(r'\bid="([^"]+)"', t)) == len(set(re.findall(r'\bid="([^"]+)"', t))))
 
@@ -119,24 +195,29 @@ def static_checks():
     check("SW 导航离线回退", "离线缓存尚未完成" in sw)
     check("SW 发音优先缓存", "cacheFirstAudio" in sw)
     check("SW 不拦接口请求", "url.pathname.includes('/api/')" in sw)
-    check("SW 注册禁缓存", "updateViaCache: 'none'" in t and "registration.update()" in t)
+    check("SW 注册禁缓存", "updateViaCache: 'none'" in source_html and "registration.update()" in source_html)
     check("头像弹窗带全量下载入口",
           all(x in t for x in ("offlineStart", "offlineStop", "runOfflineDownload")))
     check("SW 音频缓存放得下全量", "AUDIO_CACHE_MAX = 8000" in sw)
     # SW 换音频缓存名会清空已下好的音频；前端那两个「已下载」标记必须跟着换版本，
     # 否则会以为全都下过了，后台补下载永远不再启动，用户就一直走慢路径
     check("前端音频标记与 SW 缓存版本对齐",
-          "AUDIO_CACHE_VERSION = 'v2'" in t and "AUDIO_CACHE = 'ky-audio-v2'" in sw
-          and "'ky_audio_words_v1'" not in t and "'ky_auto_offline_v1'" not in t)
-    check("SW 音频缓存只存成功响应", "if (!response.ok) return response;" in sw)
+          "AUDIO_CACHE_VERSION = 'v2'" in source_html and "AUDIO_CACHE = 'ky-audio-v2'" in sw
+          and "'ky_audio_words_v1'" not in source_html and "'ky_auto_offline_v1'" not in source_html)
+    check("SW 音频缓存只存成功响应", "if (!network.ok)" in sw and "storeAudioResponse(cache, key, network)" in sw)
     check("SW缓存写入反馈协议", "x-ky-cache" in sw and "store-failed" in sw and "AUDIO_CACHE_CONFIRMED_HEADER" in t)
     check("SW淘汰通知页面", "ky:audio-evicted" in sw and "ky:audio-evicted" in t)
-    check("离线下载有取消控制器", "new AbortController()" in t and "offlineJob.controller" in t)
+    check("离线下载有取消控制器", "new AbortController()" in source_html and "offlineJob.controller" in source_html)
+    check("离线准备失败释放任务槽", "words = await offlineWordList();" in source_html and "offlineJob = null;" in source_html)
+    check("离线自动批次检查全量目标", "const allTargets = targets;" in source_html and "allTargets.some(t =>" in source_html)
+    check("离线请求超时可独立取消", "externalSignal.removeEventListener" in source_html and "OFFLINE_FETCH_TIMEOUT" in source_html)
     check("详情失败不缓存网络空分片", "delete detailShards[key]; throw new Error(\x27detail load failed\x27)" in io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read())
     check("章节音频定时器可取消", "chapterPrefetchTimer" in t and "clearTimeout(chapterPrefetchTimer)" in t)
-    check("清空只删除旧记录保留并发新学习", "stamp > t ? rec : tombstone(t)" in io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read() or "isTombstone(rec) || stamp > t ? rec : tombstone(t)" in io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read())
+    merge_source = io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read()
+    check("清空只删除旧记录保留并发新学习",
+          "stamp > t ? rec" in merge_source and "keepRecord ? rec : tombstone(t)" in merge_source)
     # 页面把下载成功记成「已缓存」，SW 要是因配额紧张就跳过存储，两边状态会分叉
-    check("SW 配额紧张时淘汰而不是拒存", "Math.floor(AUDIO_CACHE_MAX * 0.9)" in sw)
+    check("SW 配额紧张时淘汰而不是拒存", "storeAudioResponse" in sw and "evictAudioEntries(" in sw)
     check("SW 新版本通知刷新", "ky:sw-updated" in sw and "client.navigate(client.url)" not in sw)
     mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
     mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""
@@ -147,8 +228,12 @@ def static_checks():
 
     # --- 构建产物 ---
     deploy = os.path.join(ROOT, "deploy")
+    meta_path = os.path.join(deploy, "build-meta.json")
+    meta = json.load(io.open(meta_path, encoding="utf-8")) if os.path.exists(meta_path) else {}
+    check("构建产物带来源指纹", meta.get("source_digest") == expected_source_digest(),
+          "rerun make_html.py" if meta else "build-meta.json 缺失")
     allowed = {"index.html", "sw.js", "_worker.js", "_headers", "manifest.webmanifest",
-               "icon-192.png", "icon-512.png", "data"}
+               "icon-192.png", "icon-512.png", "data", "build-meta.json"}
     if os.path.isdir(deploy):
         extra = sorted(x for x in set(os.listdir(deploy)) - allowed if not re.fullmatch(r"app\.[0-9a-f]{12}\.js", x))
         check("部署目录无多余文件", not extra, str(extra[:5]))
@@ -279,12 +364,21 @@ def data_checks():
             check("%s CSV 与 JSON 同源" % deck, False, "CSV 缺失")
             continue
         with io.open(csv_path, encoding="utf-8-sig", newline="") as f:
-            csv_rows = list(csv.reader(f))[1:]
+            csv_all = list(csv.reader(f))
+            csv_header = csv_all[0] if csv_all else []
+            csv_rows = csv_all[1:]
         # 不依赖中文表头：固定第二列就是单词；CSV 只用于人工查看，JSON 是权威来源。
         csv_words = [(r[1] or "").strip().lower() for r in csv_rows if len(r) > 1]
         json_words = [r["word"].strip().lower() for r in rows]
         check("%s CSV 与 JSON 同源" % deck, len(csv_words) == len(json_words) and set(csv_words) == set(json_words),
               "CSV=%d JSON=%d" % (len(csv_words), len(json_words)))
+        expected_header = {
+            "words": ["序号", "单词", "核心释义", "考查形式", "背诵优先级"],
+            "insurance": ["序号", "单词", "核心释义", "考查形式", "补漏优先级", "覆盖", "英一覆盖", "加权覆盖", "优先级分数"],
+        }[deck]
+        header = csv_header
+        check("%s CSV 表头完整" % deck, header == expected_header, str(header))
+
         if deck == "insurance":
             missing_score = [r["word"] for r in rows if "priority_score" not in r]
             bad_weight = [r["word"] for r in rows if r.get("en1_coverage", 0) > 0 and r.get("weighted_coverage", 0) == 0]
@@ -548,17 +642,24 @@ setTimeout(function () {
           out.merge_tombstone_pruned = !('beta' in pruneTombstones(
             { beta: tombstone(nowMs - 500 * 864e5) }, nowMs));
           // 清空全部：云端独有的键只有服务端知道，必须由服务端补墓碑
+          const resetAt = nowMs - 2000;
           const covered = tombstoneAll(
             { state: { aa: { t: 1 }, bb: { t: 1 } }, chapterData: { 'core:0': { t: 1 } }, daily: {}, conf: {} },
-            nowMs);
+            resetAt);
           out.tombstone_all_covers_cloud = covered.state.aa.del === 1 && covered.state.bb.del === 1
             && covered.chapterData['core:0'].del === 1;
-          // 清空之后马上又背的词：客户端时钟落后服务端几秒也不能被墓碑吃掉
+          // 清空之后马上又背的词：比 reset fence 新的客户端记录必须优先。
           const resetPayload = {
-            state: { aa: { mastered: true, t: nowMs - 5000 } }, chapterData: {}, daily: {}, conf: {},
+            state: { aa: { mastered: true, t: nowMs - 1000 } }, chapterData: {}, daily: {}, conf: {},
           };
           const resetMerge = preferPayload(mergeSnapshots(resetPayload, covered), resetPayload);
           out.reset_prefers_client = resetMerge.state.aa.mastered === true && resetMerge.state.bb.del === 1;
+          // 反向时间线：客户端旧墓碑不能覆盖另一台设备在 reset 后写下的 live 记录。
+          const protectedMerge = preferPayload(
+            mergeSnapshots({ state: { aa: tombstone(nowMs - 3000) }, chapterData: {}, daily: {}, conf: {} },
+              { state: { aa: { mastered: true, t: nowMs } }, chapterData: {}, daily: {}, conf: {} }),
+            { state: { aa: tombstone(nowMs - 3000) }, chapterData: {}, daily: {}, conf: {} });
+          out.merge_preserves_post_reset_live = protectedMerge.state.aa.mastered === true;
           // __proto__ 键不能改掉结果对象的原型
           const polluted = mergeState(JSON.parse('{"__proto__":{"ghost":1},"alpha":{"t":1}}'), {});
           out.merge_no_proto_pollution = !('ghost' in polluted)
@@ -831,13 +932,19 @@ setTimeout(async function(){
     out.merge_deck_chapter = m.deckChapter.core;
     // 登录：游客进度按时间并进账号，不能因为账号里有旧数据就整体丢弃
     localStorage.setItem('ky_words_v1@probe', JSON.stringify({ apple: { w: 3, t: 100, mastered: false } }));
-    localStorage.setItem('ky_words_v1', JSON.stringify({
+    const guestProbe = {
       apple: { w: 3, t: 500, mastered: true }, banana: { w: 1, t: 400 },
-    }));
+    };
+    if (typeof writeStateStorageForScope === 'function') writeStateStorageForScope(guestProbe, null);
+    else localStorage.setItem('ky_words_v1', JSON.stringify(guestProbe));
     adoptGuestProgress('probe');
-    const adopted = JSON.parse(localStorage.getItem('ky_words_v1@probe') || '{}');
+    const adopted = typeof readStateStoreForScope === 'function'
+      ? readStateStoreForScope('probe', {})
+      : JSON.parse(localStorage.getItem('ky_words_v1@probe') || '{}');
     out.adopt_apple_mastered = !!(adopted.apple && adopted.apple.mastered);
     out.adopt_banana = !!adopted.banana;
+    out.adopt_generation_sharded = /^2:[a-z0-9-]+$/.test(localStorage.getItem('ky_words_v1#meta@probe') || '')
+      && !localStorage.getItem('ky_words_v1@probe');
 
     // —— 学习节奏（每日统计） ——
     out.web_daily_scoped = SCOPED_KEYS.has('ky_daily_v1');
@@ -891,11 +998,17 @@ setTimeout(async function(){
 
     // 游客空间「清空过」留下的墓碑，登录时不能把账号里同样的词一起删掉
     localStorage.setItem('ky_words_v1@probe2', JSON.stringify({ cherry: { mastered: true, t: 900 } }));
-    localStorage.setItem('ky_words_v1', JSON.stringify({ cherry: { del: 1, t: 1000 }, date: { w: 1, t: 800 } }));
+    const guestProbe2 = { cherry: { del: 1, t: 1000 }, date: { w: 1, t: 800 } };
+    if (typeof writeStateStorageForScope === 'function') writeStateStorageForScope(guestProbe2, null);
+    else localStorage.setItem('ky_words_v1', JSON.stringify(guestProbe2));
     adoptGuestProgress('probe2');
-    const adopted2 = JSON.parse(localStorage.getItem('ky_words_v1@probe2') || '{}');
+    const adopted2 = typeof readStateStoreForScope === 'function'
+      ? readStateStoreForScope('probe2', {})
+      : JSON.parse(localStorage.getItem('ky_words_v1@probe2') || '{}');
     out.adopt_keeps_account_word = !!(adopted2.cherry && adopted2.cherry.mastered);
     out.adopt_still_merges_live = !!adopted2.date;
+    out.adopt2_generation_sharded = /^2:[a-z0-9-]+$/.test(localStorage.getItem('ky_words_v1#meta@probe2') || '')
+      && !localStorage.getItem('ky_words_v1@probe2');
     // 游客的「清空后待同步」标志也不能带进账号，否则登录会顺手清掉云端进度
     localStorage.setItem('ky_conf_v1', JSON.stringify({ deck: 'core', overwritePending: true, progressAt: 1 }));
     adoptGuestProgress('probe3');
@@ -962,6 +1075,8 @@ setTimeout(async function(){
               "章=%s deckChapter=%s" % (data.get("merge_chapter"), data.get("merge_deck_chapter")))
         check("登录采纳游客进度", data.get("adopt_apple_mastered") is True and data.get("adopt_banana") is True,
               "apple=%s banana=%s" % (data.get("adopt_apple_mastered"), data.get("adopt_banana")))
+        check("登录采纳游客进度写入 shard generation", data.get("adopt_generation_sharded") is True,
+              "实际=%s" % data.get("adopt_generation_sharded"))
         check("每日节奏按账号隔离", data.get("web_daily_scoped") is True)
         check("每日节奏进入同步快照", data.get("web_snapshot_daily") is True)
         check("登录采纳游客每日节奏", data.get("web_daily_adopt") is True)
@@ -969,6 +1084,8 @@ setTimeout(async function(){
         check("游客墓碑不删账号的词", data.get("adopt_keeps_account_word") is True,
               "实际=%s" % data.get("adopt_keeps_account_word"))
         check("游客有效进度仍然并入", data.get("adopt_still_merges_live") is True)
+        check("旧账号进度迁移到 shard generation", data.get("adopt2_generation_sharded") is True,
+              "实际=%s" % data.get("adopt2_generation_sharded"))
         check("游客清空标志不串账号", data.get("adopt_drops_guest_reset") is True)
         check("云端快照校验生效", data.get("validate_state") is True)
         check("应用云端快照不报未定义函数", data.get("apply_snapshot") is True, "error=%s" % data.get("error"))
@@ -983,6 +1100,810 @@ setTimeout(async function(){
         if os.path.exists(probe_path):
             os.remove(probe_path)
         shutil.rmtree(profile, ignore_errors=True)
+
+
+def state_shard_behavior_checks():
+    template = io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read()
+    storage_start = template.find("const SCOPED_KEYS")
+    storage_end = template.find("const todayTs", storage_start)
+    commit_start = template.find("function commitStores", storage_end)
+    commit_end = template.find("function objectRecord", commit_start)
+    savepos_start = template.find("function savePos", storage_end)
+    savepos_end = template.find("function resumePosition", savepos_start)
+    if min(storage_start, storage_end, commit_start, commit_end, savepos_start, savepos_end) < 0:
+        check("state 分片行为测试可准备", False, "未找到 state 存储函数边界")
+        return
+    setup = r"""
+const LS_STATE = 'ky_words_v1';
+const LS_DAILY = 'ky_daily_v1';
+const LS_CONF = 'ky_conf_v1';
+const LS_POS = 'ky_pos_v1';
+let authUser = null;
+let state = {};
+let conf = {};
+let activeDeck = 'core';
+let curChapter = 0;
+let chapterData = {};
+let idx = 0;
+let queue = [];
+function chapterKey(ch) { return activeDeck + ':' + ch; }
+const emitted = [];
+const bus = { emit(type) { emitted.push(type); } };
+const storage = new Map();
+const writeLog = [];
+let failSet = null;
+const localStorage = {
+  getItem(key) { return storage.has(String(key)) ? storage.get(String(key)) : null; },
+  setItem(key, value) {
+    if (failSet && failSet(String(key))) {
+      failSet = null;
+      throw new Error('quota');
+    }
+    writeLog.push(String(key));
+    storage.set(String(key), String(value));
+  },
+  removeItem(key) { storage.delete(String(key)); },
+};
+const warningEl = { classList: { remove() {} } };
+const document = { getElementById() { return warningEl; } };
+"""
+    tail = r"""
+function snapshotStorage() {
+  return new Map([...storage.entries()].filter(([key]) => key.startsWith('ky_words_v1#')));
+}
+function changedStorageKeys(before, after) {
+  const keys = new Set([...before.keys(), ...after.keys()]);
+  return [...keys].filter(key => before.get(key) !== after.get(key)).sort();
+}
+const out = {};
+out.shardCount = STATE_SHARD_COUNT;
+
+const legacyGuest = {
+  legacy: { mastered: true, t: 10 },
+  apple: { w: 1, t: 11 },
+};
+localStorage.setItem('ky_words_v1', JSON.stringify(legacyGuest));
+out.legacyFallback = readStateStoreForScope(null, {}).legacy && readStateStoreForScope(null, {}).legacy.mastered === true;
+state = {
+  legacy: legacyGuest.legacy,
+  apple: legacyGuest.apple,
+  banana: { mastered: true, t: 12 },
+};
+out.migrationWrite = saveStateRecord('banana');
+const guestGeneration = stateMetaForScope(null);
+out.generationCreated = /^[a-z0-9-]+$/.test(guestGeneration);
+out.migratedRead = readStateStoreForScope(null, {}).banana && readStateStoreForScope(null, {}).banana.mastered === true;
+out.legacyRemoved = localStorage.getItem('ky_words_v1') === null;
+out.shardKeyExists = localStorage.getItem('ky_words_v1#' + guestGeneration + '-' + stateShardIndex('banana')) !== null;
+
+const beforeSingle = snapshotStorage();
+state.apple = { w: 9, t: 99, mastered: true };
+out.singleWrite = saveStateRecord('apple');
+const afterSingle = snapshotStorage();
+const singleChanged = changedStorageKeys(beforeSingle, afterSingle);
+out.singleChangedKeys = singleChanged.length;
+out.singleChangedExpected = singleChanged.length === 1 && singleChanged[0] === ('ky_words_v1#' + guestGeneration + '-' + stateShardIndex('apple'));
+out.singleReadBack = readStateStoreForScope(null, {}).apple && readStateStoreForScope(null, {}).apple.w === 9;
+
+const beforeFailed = readStateStoreForScope(null, {});
+failSet = key => key.startsWith('ky_words_v1#') && !key.includes('#meta') && !beforeSingle.has(key);
+out.failedCommit = commitStores({ state: { shouldNotLand: { t: 1 } }, chapterData: {}, daily: {}, conf: {} });
+out.failedMetaStable = stateMetaForScope(null) === guestGeneration;
+out.failedReadStable = !readStateStoreForScope(null, {}).shouldNotLand && readStateStoreForScope(null, {}).apple.w === 9;
+
+const imported = { imported: { mastered: true, t: 200 } };
+const importedChapters = { 'core:0': { order: ['alpha', 'beta'], pos: 1, posWord: 'beta', t: 201 } };
+out.importCommit = commitStores({ state: imported, chapterData: importedChapters, daily: {}, conf: {} });
+const importGeneration = stateMetaForScope(null);
+out.importGenerationSwitched = !!importGeneration && importGeneration !== guestGeneration;
+out.importRead = readStateStoreForScope(null, {}).imported && !readStateStoreForScope(null, {}).apple;
+out.oldGenerationCleaned = ![...storage.keys()].some(key => key.startsWith('ky_words_v1#' + guestGeneration + '-'));
+const importedPos = JSON.parse(localStorage.getItem(LS_POS) || '{}');
+out.importPosSynced = importedPos['core:0'] && importedPos['core:0'].pos === 1
+  && importedPos['core:0'].posWord === 'beta' && !('order' in importedPos['core:0']);
+
+out.clearCommit = commitStores({ state: {}, chapterData: {}, daily: {}, conf: {} });
+const clearGeneration = stateMetaForScope(null);
+out.clearGenerationSwitched = !!clearGeneration && clearGeneration !== importGeneration;
+out.clearReadEmpty = Object.keys(readStateStoreForScope(null, {})).length === 0;
+out.importGenerationCleaned = ![...storage.keys()].some(key => key.startsWith('ky_words_v1#' + importGeneration + '-'));
+out.clearPosSynced = Object.keys(JSON.parse(localStorage.getItem(LS_POS) || '{}')).length === 0;
+
+localStorage.setItem('ky_words_v1@alice', JSON.stringify({ legacyAlice: { mastered: true, t: 300 } }));
+out.accountLegacyRead = readStateStoreForScope('alice', {}).legacyAlice && readStateStoreForScope('alice', {}).legacyAlice.mastered === true;
+authUser = 'alice';
+state = { aliceOnly: { mastered: true, t: 301 } };
+out.aliceWrite = saveStateRecord('aliceOnly');
+const aliceGeneration = stateMetaForScope('alice');
+authUser = 'bob';
+state = { bobOnly: { mastered: true, t: 302 } };
+out.bobWrite = saveStateRecord('bobOnly');
+const bobGeneration = stateMetaForScope('bob');
+out.accountIsolation = !readStateStoreForScope('alice', {}).bobOnly
+  && !readStateStoreForScope('bob', {}).aliceOnly
+  && !!readStateStoreForScope('bob', {}).bobOnly;
+out.accountKeysSeparated = !!aliceGeneration && !!bobGeneration
+  && storage.has('ky_words_v1#meta@alice') && storage.has('ky_words_v1#meta@bob')
+  && storage.has('ky_words_v1#' + aliceGeneration + '-' + stateShardIndex('aliceOnly') + '@alice')
+  && storage.has('ky_words_v1#' + bobGeneration + '-' + stateShardIndex('bobOnly') + '@bob');
+
+authUser = null;
+activeDeck = 'core';
+curChapter = 0;
+chapterData = {
+  'core:0': { order: ['alpha', 'beta', 'gamma'], pos: 0, posWord: 'alpha', t: 10 },
+  'core:1': { order: ['delta', 'epsilon'], pos: 0, posWord: 'delta', t: 11 },
+};
+conf = { deck: 'core', chapter: 0, deckChapter: { core: 0 }, progressAt: 1 };
+queue = [{ word: 'alpha' }, { word: 'beta' }, { word: 'gamma' }];
+idx = 1;
+const chapterBefore = JSON.stringify(chapterData);
+localStorage.setItem('ky_chapter_v1', chapterBefore);
+writeLog.length = 0;
+savePos(true);
+out.posWriteKeys = writeLog.slice();
+out.chapterDataNotRewritten = localStorage.getItem('ky_chapter_v1') === chapterBefore;
+const posStore = JSON.parse(localStorage.getItem(LS_POS) || '{}');
+out.posSmallRecord = posStore['core:0'] && posStore['core:0'].pos === 1
+  && posStore['core:0'].posWord === 'beta' && !('order' in posStore['core:0'])
+  && posStore['core:1'] && !('order' in posStore['core:1']);
+
+const refreshBase = { 'core:0': { order: ['alpha', 'beta', 'gamma'], pos: 0, posWord: 'alpha', t: 1 } };
+localStorage.setItem('ky_chapter_v1', JSON.stringify(refreshBase));
+localStorage.setItem(LS_POS, JSON.stringify({ 'core:0': { pos: 2, posWord: 'gamma', t: 99 } }));
+const refreshed = loadChapterStoreWithPositions(refreshBase);
+out.refreshRestoresPosition = refreshed['core:0'].pos === 2
+  && refreshed['core:0'].posWord === 'gamma' && refreshed['core:0'].t === 99
+  && refreshed['core:0'].order.join(',') === 'alpha,beta,gamma';
+
+storage.delete(LS_POS);
+authUser = 'alice';
+activeDeck = 'core';
+curChapter = 0;
+chapterData = { 'core:0': { order: ['alice'], pos: 0, posWord: 'alice', t: 1 } };
+queue = [{ word: 'alice' }];
+idx = 0;
+savePos(false);
+const alicePos = JSON.parse(localStorage.getItem(LS_POS + '@alice') || '{}');
+authUser = 'bob';
+chapterData = { 'core:0': { order: ['bob'], pos: 0, posWord: 'bob', t: 2 } };
+queue = [{ word: 'bob' }];
+idx = 0;
+savePos(false);
+const bobPos = JSON.parse(localStorage.getItem(LS_POS + '@bob') || '{}');
+out.posAccountIsolation = alicePos['core:0'] && alicePos['core:0'].posWord === 'alice'
+  && bobPos['core:0'] && bobPos['core:0'].posWord === 'bob'
+  && !storage.has('ky_pos_v1');
+console.log('RESULT:' + JSON.stringify(out));
+"""
+    source = setup + "\n" + template[storage_start:storage_end] + "\n" + template[commit_start:commit_end] + "\n" + template[savepos_start:savepos_end] + "\n" + tail
+    data, proc = run_node_harness(source, timeout=120)
+    if data is None:
+        detail = harness_detail(proc)
+        for name in ("旧 ky_words_v1 迁移到 generation shard", "单次 saveStateRecord 只改一个 shard", "导入/清空 generation 原子切换", "失败写入不切换 generation", "state 分片账号隔离", "翻词只写 ky_pos_v1 小键", "刷新从 ky_pos_v1 恢复位置", "导入/清空同步 positions", "positions 账号隔离"):
+            check(name, False, detail)
+        return
+    check("旧 ky_words_v1 迁移到 generation shard",
+          data.get("shardCount") == 64
+          and data.get("legacyFallback") is True and data.get("migrationWrite") is True
+          and data.get("generationCreated") is True and data.get("migratedRead") is True
+          and data.get("legacyRemoved") is True and data.get("shardKeyExists") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("单次 saveStateRecord 只改一个 shard",
+          data.get("singleWrite") is True and data.get("singleChangedKeys") == 1
+          and data.get("singleChangedExpected") is True and data.get("singleReadBack") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("导入/清空 generation 原子切换",
+          data.get("importCommit") is True and data.get("importGenerationSwitched") is True
+          and data.get("importRead") is True and data.get("oldGenerationCleaned") is True
+          and data.get("clearCommit") is True and data.get("clearGenerationSwitched") is True
+          and data.get("clearReadEmpty") is True and data.get("importGenerationCleaned") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("失败写入不切换 generation",
+          data.get("failedCommit") is False and data.get("failedMetaStable") is True
+          and data.get("failedReadStable") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("state 分片账号隔离",
+          data.get("accountLegacyRead") is True and data.get("aliceWrite") is True
+          and data.get("bobWrite") is True and data.get("accountIsolation") is True
+          and data.get("accountKeysSeparated") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("翻词只写 ky_pos_v1 小键",
+          data.get("posWriteKeys") == ["ky_pos_v1", "ky_conf_v1"]
+          and data.get("chapterDataNotRewritten") is True
+          and data.get("posSmallRecord") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("刷新从 ky_pos_v1 恢复位置", data.get("refreshRestoresPosition") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("导入/清空同步 positions",
+          data.get("importPosSynced") is True and data.get("clearPosSynced") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+    check("positions 账号隔离", data.get("posAccountIsolation") is True,
+          json.dumps(data, ensure_ascii=False)[:700])
+
+
+def worker_audio_behavior_checks():
+    try:
+        worker_source = materialized_worker_source()
+    except Exception as exc:
+        check("Worker 音频行为测试可准备", False, str(exc))
+        return
+    script = r"""
+import { pathToFileURL } from 'node:url';
+globalThis.caches = { default: { match: async () => null, put: async () => {} } };
+const { default: worker } = await import(pathToFileURL(process.env.KY_HARNESS_DIR + '/worker.mjs').href);
+const makeFixed = () => new Response(new Uint8Array([73, 68, 51]), {
+  status: 200,
+  headers: { 'content-type': 'audio/mpeg', 'content-length': '3' },
+});
+const makeChunked = () => {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array([73, 68, 51]));
+      controller.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { 'content-type': 'audio/mpeg' } });
+};
+globalThis.fetch = async target => String(target).includes('fanyi.baidu.com') ? makeFixed() : makeChunked();
+const env = { ASSETS: { fetch: async () => new Response('') } };
+async function audio(url) {
+  const response = await worker.fetch(new Request(url), env, { waitUntil() {} });
+  const body = await response.arrayBuffer();
+  return {
+    status: response.status,
+    bytes: body.byteLength,
+    type: response.headers.get('content-type') || '',
+    text: response.ok ? '' : new TextDecoder().decode(body),
+  };
+}
+const out = {
+  zhV2: await audio('https://example.com/api/audio?lang=zh&v=2&word=hello'),
+  chunked: await audio('https://example.com/api/audio?word=hello'),
+};
+console.log('RESULT:' + JSON.stringify(out));
+"""
+    data, proc = run_node_harness(script, {"worker.mjs": worker_source})
+    if data is None:
+        detail = harness_detail(proc)
+        check("Worker 接受 zh v=2", False, detail)
+        check("Worker 接受无 Content-Length 的 chunked 音频", False, detail)
+        return
+    zh = data.get("zhV2") or {}
+    chunked = data.get("chunked") or {}
+    check("Worker 接受 zh v=2",
+          zh.get("status") == 200 and zh.get("bytes") == 3 and zh.get("type") == "audio/mpeg",
+          json.dumps(zh, ensure_ascii=False))
+    check("Worker 接受无 Content-Length 的 chunked 音频",
+          chunked.get("status") == 200 and chunked.get("bytes") == 3 and chunked.get("type") == "audio/mpeg",
+          json.dumps(chunked, ensure_ascii=False))
+
+
+def frontend_api_behavior_checks():
+    template = io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read()
+    start = template.find("function combinedAbortSignal")
+    end = template.find("function commitStores", start)
+    if start < 0 or end < 0:
+        check("前端 API 行为测试可准备", False, "未找到 api 函数边界")
+        return
+    script = r"""
+import fs from 'node:fs';
+import vm from 'node:vm';
+const template = fs.readFileSync('software/template.html', 'utf8');
+const start = template.indexOf('function combinedAbortSignal');
+const end = template.indexOf('function commitStores', start);
+if (start < 0 || end < 0) throw new Error('api source missing');
+const snippet = template.slice(start, end);
+const context = {
+  location: { protocol: 'https:' },
+  navigator: { onLine: true },
+  AbortController, AbortSignal, DOMException, Response, Headers, URL,
+  setTimeout, clearTimeout, console,
+  fetch: null,
+};
+vm.createContext(context);
+vm.runInContext('let apiEpochController = null; function handleSessionExpired() {};\n' + snippet + '\nglobalThis.__api = api;', context);
+const out = {};
+context.fetch = async () => new Response('{"ok":true}', { status: 200 });
+try {
+  const value = await context.__api('/valid');
+  out.valid = value && value.ok === true;
+} catch (err) {
+  out.valid = false;
+  out.validError = String(err && err.message || err);
+}
+context.fetch = async () => new Response('{broken-json', { status: 200 });
+try {
+  const value = await context.__api('/bad-json');
+  out.badJsonRejected = false;
+  out.badJsonValue = value;
+} catch (err) {
+  out.badJsonRejected = true;
+  out.badJsonError = String(err && err.message || err);
+}
+context.fetch = (_url, options) => new Promise((_resolve, reject) => {
+  const signal = options && options.signal;
+  const abort = () => reject(new DOMException('aborted', 'AbortError'));
+  if (!signal) return;
+  if (signal.aborted) abort();
+  else signal.addEventListener('abort', abort, { once: true });
+});
+try {
+  await context.__api('/slow', { timeout: 25 });
+  out.timeoutRejected = false;
+} catch (err) {
+  out.timeoutRejected = true;
+  out.timeoutError = String(err && err.message || err);
+}
+console.log('RESULT:' + JSON.stringify(out));
+"""
+    data, proc = run_node_harness(script)
+    if data is None:
+        detail = harness_detail(proc)
+        check("前端 API 坏 JSON 必须失败", False, detail)
+        check("前端 API 超时必须失败", False, detail)
+        return
+    check("前端 API 正常 JSON 可返回", data.get("valid") is True,
+          json.dumps(data, ensure_ascii=False)[:500])
+    check("前端 API 坏 JSON 必须失败", data.get("badJsonRejected") is True,
+          json.dumps(data, ensure_ascii=False)[:500])
+    check("前端 API 超时必须失败",
+          data.get("timeoutRejected") is True and "超时" in str(data.get("timeoutError", "")),
+          json.dumps(data, ensure_ascii=False)[:500])
+
+
+def sw_cache_status_checks():
+    source = io.open(os.path.join(ROOT, "software", "sw.template.js"), encoding="utf-8").read()
+    source = source.replace("__BUILD_VERSION__", "test-build", 1)
+    source = source.replace("__APP_ASSET__", "./app.test.js", 1)
+    source = source.replace("__DATA_ASSETS__", "[]", 1)
+    script = r"""
+import { pathToFileURL } from 'node:url';
+let listeners = {};
+let failPut = false;
+let networkCalls = 0;
+const store = new Map();
+const cache = {
+  async match(request) {
+    const hit = store.get(String(request.url));
+    return hit ? hit.clone() : undefined;
+  },
+  async put(request, response) {
+    if (failPut) throw new Error('quota');
+    store.set(String(request.url), response.clone());
+  },
+  async delete(request) { return store.delete(String(request.url)); },
+  async keys() { return [...store.keys()].map(url => new Request(url)); },
+  async add(request) {
+    const response = await fetch(request);
+    if (!response.ok) throw new Error('add failed');
+    store.set(String(request.url), response.clone());
+  },
+};
+globalThis.self = {
+  location: { origin: 'https://example.com' },
+  addEventListener(type, fn) { listeners[type] = fn; },
+  clients: { matchAll: async () => [], claim: async () => {} },
+  skipWaiting: async () => {},
+};
+globalThis.caches = {
+  open: async () => cache,
+  keys: async () => [],
+  delete: async () => true,
+};
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { storage: { estimate: async () => ({ usage: 0, quota: 1024 * 1024 * 1024 }) } } });
+globalThis.fetch = async () => {
+  networkCalls += 1;
+  return new Response(new Uint8Array([73, 68, 51]), {
+    status: 200,
+    headers: { 'content-type': 'audio/mpeg', 'content-length': '3' },
+  });
+};
+await import(pathToFileURL(process.env.KY_HARNESS_DIR + '/sw.mjs').href);
+async function dispatch(url) {
+  let responsePromise;
+  const event = {
+    request: new Request(url),
+    respondWith(value) { responsePromise = Promise.resolve(value); },
+    waitUntil() {},
+  };
+  listeners.fetch(event);
+  if (!responsePromise) throw new Error('fetch listener did not respond');
+  const response = await responsePromise;
+  return {
+    status: response.status,
+    cache: response.headers.get('x-ky-cache'),
+    type: response.headers.get('content-type'),
+  };
+}
+const out = {};
+out.stored = await dispatch('https://example.com/api/audio?word=alpha&offline=1');
+out.hit = await dispatch('https://example.com/api/audio?word=alpha');
+failPut = true;
+out.storeFailed = await dispatch('https://example.com/api/audio?word=beta&offline=1');
+out.networkCalls = networkCalls;
+
+store.clear();
+store.set('https://example.com/api/audio?word=zeta', new Response('zeta'));
+store.set('https://example.com/api/audio?lang=zh&v=2&word=greeting', new Response('greeting'));
+const sourceMessages = [];
+const source = { postMessage(message) { sourceMessages.push(message); } };
+async function query(data) {
+  sourceMessages.length = 0;
+  let task = Promise.resolve();
+  listeners.message({
+    data,
+    source,
+    waitUntil(value) { task = Promise.resolve(value); },
+  });
+  await task;
+  if (!sourceMessages.length) throw new Error('snapshot response missing');
+  return sourceMessages[0];
+}
+out.snapshot = await query({ type: 'ky:audio-cache-query', protocol: 1, requestId: 'q1', includeEntries: false });
+out.snapshotWithEntries = await query({ type: 'ky:audio-cache-query', protocol: 1, requestId: 'q2', includeEntries: true });
+console.log('RESULT:' + JSON.stringify(out));
+"""
+    data, proc = run_node_harness(script, {"sw.mjs": source})
+    if data is None:
+        detail = harness_detail(proc)
+        for name in ("SW 缓存写入状态头", "SW 缓存命中状态头", "SW 缓存失败状态头"):
+            check(name, False, detail)
+        return
+    check("SW 缓存写入状态头",
+          (data.get("stored") or {}).get("cache") == "stored",
+          json.dumps(data.get("stored"), ensure_ascii=False))
+    check("SW 缓存命中状态头",
+          (data.get("hit") or {}).get("cache") == "hit",
+          json.dumps(data.get("hit"), ensure_ascii=False))
+    check("SW 缓存失败状态头",
+          (data.get("storeFailed") or {}).get("cache") == "store-failed",
+          json.dumps(data.get("storeFailed"), ensure_ascii=False))
+    snapshot = data.get("snapshot") or {}
+    detailed = data.get("snapshotWithEntries") or {}
+    check("SW snapshot query 返回完整快照",
+          snapshot.get("type") == "ky:audio-cache-snapshot"
+          and snapshot.get("protocol") == 1
+          and snapshot.get("requestId") == "q1"
+          and snapshot.get("complete") is True
+          and snapshot.get("count") == 2
+          and snapshot.get("markers") == ["en:zeta", "zh:greeting"]
+          and "entries" not in snapshot
+          and detailed.get("requestId") == "q2"
+          and isinstance(detailed.get("entries"), list)
+          and len(detailed.get("entries")) == 2,
+          json.dumps({"snapshot": snapshot, "detailed": detailed}, ensure_ascii=False)[:800])
+
+
+def page_offline_cache_checks():
+    template = io.open(os.path.join(ROOT, "software", "template.html"), encoding="utf-8").read()
+    audio_start = template.find("const AUDIO_CACHE_VERSION")
+    audio_end = template.find("function refreshVoice", audio_start)
+    run_start = template.find("async function runOfflineDownload", audio_end)
+    auto_start = template.find("const AUTO_OFFLINE_KEY =", run_start)
+    auto_end = template.find("function scheduleAutoOffline", auto_start)
+    if min(audio_start, audio_end, run_start, auto_start, auto_end) < 0:
+        check("离线缓存行为测试可准备", False, "未找到音频标记或自动下载函数边界")
+        return
+    run_end = auto_start
+    setup = r"""
+const storage = new Map();
+const localStorage = {
+  getItem(key) { return storage.has(String(key)) ? storage.get(String(key)) : null; },
+  setItem(key, value) { storage.set(String(key), String(value)); },
+  removeItem(key) { storage.delete(String(key)); },
+};
+const windowListeners = {};
+const location = { protocol: 'file:' };
+const window = {
+  isSecureContext: true,
+  addEventListener(type, fn) { windowListeners[type] = fn; },
+};
+let cacheKeys = [];
+const fakeCache = {
+  async match() { return undefined; },
+  async put() {},
+  async delete() { return true; },
+  async keys() { return cacheKeys.slice(); },
+  async add() {},
+};
+const caches = {
+  async open() { return fakeCache; },
+  async keys() { return []; },
+  async delete() { return true; },
+};
+window.caches = caches;
+function updateOfflineStatus() {}
+let fakeTimer = 0;
+function setTimeout() { return ++fakeTimer; }
+function clearTimeout() {}
+"""
+    stubs = r"""
+let offlineJob = null;
+const offlinePermanent = new Set();
+const OFFLINE_CONCURRENCY = 16;
+const OFFLINE_PERMANENT_KEY = 'ky_audio_permanent_fail_v2';
+const queue = [];
+const DATA_META = { assets: { details: {} } };
+let offlineWords = [];
+const nodes = {
+  offlineStart: { disabled: false },
+  offlineStop: { classList: { add() {}, remove() {} } },
+  offlineStat: { textContent: '' },
+  zhVoiceStat: { textContent: '' },
+};
+function $(id) { return nodes[id] || (nodes[id] = { textContent: '', classList: { add() {}, remove() {} } }); }
+async function offlineWordList() { return offlineWords; }
+async function offlineZhTexts() { return []; }
+function meaningForSpeech() { return ''; }
+function warmChineseVoice() {}
+function zhVoiceStatus() { return ''; }
+function renderOfflineJob() {}
+function responseIsPermanentAudioFailure() { return false; }
+async function waitForServiceWorkerReady() {}
+async function fetchOfflineAudio() {
+  return new Response('audio', { status: 200, headers: { 'x-ky-cache': 'stored' } });
+}
+globalThis.fetch = async () => new Response('{}');
+"""
+    tests = r"""
+const out = {};
+replaceAudioMarkersFromStorage('["en:a","en:b"]');
+localStorage.setItem(AUDIO_WORDS_KEY, '["en:a","en:b"]');
+forgetAudio('en:b');
+rememberAudio('en:c');
+const externalMarkers = '["en:a","en:z"]';
+localStorage.setItem(AUDIO_WORDS_KEY, externalMarkers);
+replaceAudioMarkersFromStorage(externalMarkers);
+flushAudioMarkers();
+out.multiTab = [...audioCachedWords].sort().join(',');
+
+replaceAudioMarkersFromStorage('["en:a","en:b","zh:gone"]');
+localStorage.setItem(AUDIO_WORDS_KEY, '["en:a","en:b","zh:gone"]');
+cacheKeys = [
+  new Request('https://example.com/api/audio?word=a'),
+  new Request('https://example.com/api/audio?lang=zh&word=greeting'),
+];
+markAutoOfflineDone(3);
+const reconciled = await reconcileAudioCache();
+out.reconciled = [...reconciled].sort().join(',');
+out.reconcileClearsDone = readAutoOfflineDone() === null;
+
+audioCachedWords = new Set();
+audioMarkerBase = new Set();
+audioMarkerAdds.clear();
+audioMarkerRemoves.clear();
+flushAudioMarkers();
+localStorage.removeItem(AUTO_OFFLINE_KEY);
+offlineWords = Array.from({ length: 801 }, (_, index) => 'word' + index);
+await runOfflineDownload({ auto: true });
+out.partialDone = localStorage.getItem(AUTO_OFFLINE_KEY);
+await runOfflineDownload({ auto: true });
+const done = readAutoOfflineDone();
+out.finalDone = done && done.expected;
+out.finalDisablesAuto = autoOfflineAllowed() === false;
+console.log('RESULT:' + JSON.stringify(out));
+"""
+    source = setup + "\n" + template[audio_start:audio_end] + "\n" + template[auto_start:auto_end] + "\n" + stubs + "\n" + template[run_start:run_end] + "\n" + tests
+    data, proc = run_node_harness(source, timeout=300)
+    if data is None:
+        detail = harness_detail(proc)
+        for name in ("多标签音频 marker 同步", "缓存 reconcile 清理失效 marker", "auto-offline 分批未完成不写 done", "auto-offline 全部完成后写 done"):
+            check(name, False, detail)
+        return
+    check("多标签音频 marker 同步", data.get("multiTab") == "en:a,en:c,en:z",
+          "实际=%s" % data.get("multiTab"))
+    check("缓存 reconcile 清理失效 marker", data.get("reconciled") == "en:a,zh:greeting",
+          "实际=%s" % data.get("reconciled"))
+    check("auto-offline 分批未完成不写 done", data.get("partialDone") is None,
+          "实际=%s" % data.get("partialDone"))
+    check("auto-offline 全部完成后写 done",
+          data.get("finalDone") == 801 and data.get("finalDisablesAuto") is True,
+          "done=%s allowed=%s" % (data.get("finalDone"), data.get("finalDisablesAuto")))
+
+
+def worker_reset_import_checks():
+    try:
+        worker_source = materialized_worker_source()
+    except Exception as exc:
+        check("同步栅栏行为测试可准备", False, str(exc))
+        return
+    script = r"""
+import { pathToFileURL } from 'node:url';
+const { default: worker } = await import(pathToFileURL(process.env.KY_HARNESS_DIR + '/worker.mjs').href);
+let remoteText = '{}';
+let updatedAt = 100;
+const db = {
+  prepare(sql) {
+    return {
+      bind(...args) {
+        return {
+          async first() {
+            if (sql.includes('p.payload') && sql.includes('FROM sessions')) {
+              return {
+                user_id: 1,
+                expires_at: Date.now() + 3600000,
+                username: 'u',
+                payload: remoteText,
+                updated_at: updatedAt,
+              };
+            }
+            if (sql.includes('UPDATE progress SET payload')) {
+              remoteText = String(args[0]);
+              updatedAt = Math.max(updatedAt + 1, Date.now());
+              return { updated_at: updatedAt };
+            }
+            if (sql.includes('INSERT INTO progress')) {
+              if (sql.includes('ON CONFLICT(user_id) DO NOTHING')) return null;
+              remoteText = String(args[1] || args[0]);
+              updatedAt = Math.max(updatedAt + 1, Date.now());
+              return { updated_at: updatedAt };
+            }
+            if (sql.includes('DELETE FROM sessions')) return null;
+            return null;
+          },
+          async run() { return {}; },
+          async all() { return { results: [] }; },
+        };
+      },
+    };
+  },
+  async batch() { return []; },
+};
+const env = { DB: db, ASSETS: { fetch: async () => new Response('') } };
+async function sync(body) {
+  const response = await worker.fetch(new Request('https://example.com/api/state/sync', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'cookie': 'ky_sid=test-token' },
+    body: JSON.stringify({ expectedUsername: 'u', ...body }),
+  }), env, {});
+  const text = await response.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  return { status: response.status, data };
+}
+function emptyPayload() {
+  return { state: {}, chapterData: {}, daily: {}, conf: {} };
+}
+const now = Date.now();
+const out = {};
+
+const resetAt = now - 3 * 86400000;
+remoteText = JSON.stringify({
+  state: {
+    old: { t: resetAt - 3600000, mastered: true },
+    after: { t: resetAt + 3600000, mastered: true },
+    recent: { t: now - 3600000, mastered: true },
+  },
+  chapterData: {}, daily: {}, conf: {},
+});
+const reset = await sync({ payload: emptyPayload(), reset: true, mode: 'clear', resetAt });
+out.resetStatus = reset.status;
+out.resetOldDeleted = !!(reset.data.payload && reset.data.payload.state.old && reset.data.payload.state.old.del === 1);
+out.resetAfterPreserved = !!(reset.data.payload && reset.data.payload.state.after && reset.data.payload.state.after.mastered === true && !reset.data.payload.state.after.del);
+
+const clearAt = now - 2 * 86400000;
+remoteText = JSON.stringify({
+  state: {
+    alpha: { del: 1, t: clearAt },
+    beta: { del: 1, t: clearAt },
+  },
+  chapterData: {}, daily: {},
+  conf: { resetAt: clearAt, serverFenceAt: clearAt, serverFenceMode: 'clear' },
+});
+const imported = await sync({
+  payload: {
+    state: {
+      alpha: { t: clearAt - 3 * 86400000, mastered: true },
+      gamma: { t: now - 60000, mastered: true },
+    },
+    chapterData: {}, daily: {}, conf: {},
+  },
+  reset: true, mode: 'import', resetAt: now,
+});
+const importedPayload = imported.data.payload || {};
+out.importStatus = imported.status;
+out.importSelectedLive = !!(importedPayload.state && importedPayload.state.alpha && importedPayload.state.alpha.mastered === true && !importedPayload.state.alpha.del);
+out.importMode = importedPayload.conf && importedPayload.conf.serverFenceMode === 'import' && Number(importedPayload.conf.resetAt || 0) === 0;
+const follow = await sync({
+  payload: {
+    state: { delta: { t: clearAt - 3600000, mastered: true } },
+    chapterData: {}, daily: {}, conf: {},
+  },
+});
+out.importFenceBlocksOld = !!(follow.data.payload && follow.data.payload.state.delta && follow.data.payload.state.delta.del === 1);
+console.log('RESULT:' + JSON.stringify(out));
+"""
+    data, proc = run_node_harness(script, {"worker.mjs": worker_source}, timeout=120)
+    if data is None:
+        detail = harness_detail(proc)
+        for name in ("reset 超 24h 不误删", "import 命中备份旧记录", "import 不留下长期 clear 栅栏", "import fence 拦截旧设备复活"):
+            check(name, False, detail)
+        return
+    check("reset 超 24h 不误删",
+          data.get("resetStatus") == 200 and data.get("resetOldDeleted") is True and data.get("resetAfterPreserved") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("import 命中备份旧记录",
+          data.get("importStatus") == 200 and data.get("importSelectedLive") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("import 不留下长期 clear 栅栏", data.get("importMode") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("import fence 拦截旧设备复活", data.get("importFenceBlocksOld") is True,
+          json.dumps(data, ensure_ascii=False))
+
+
+def build_lock_ownership_checks():
+    source_path = os.path.join(ROOT, "scripts", "make_html.py")
+    source = io.open(source_path, encoding="utf-8").read()
+    try:
+        tree = ast.parse(source, filename=source_path)
+        nodes = [
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name in ("acquire_lock", "release_lock")
+        ]
+        if {node.name for node in nodes} != {"acquire_lock", "release_lock"}:
+            raise RuntimeError("构建锁函数不完整")
+        module = ast.Module(body=nodes, type_ignores=[])
+        lock_path = os.path.join(tempfile.mkdtemp(prefix=".lock-test-", dir=os.path.join(ROOT, "scripts", "tools")), "deploy.lock")
+        from pathlib import Path as LockPath
+        class NoAtExit:
+            def register(self, _fn):
+                return None
+        namespace = {
+            "os": os,
+            "time": time,
+            "atexit": NoAtExit(),
+            "LOCK": LockPath(lock_path),
+            "LOCK_FD": None,
+        }
+        exec(compile(module, source_path, "exec"), namespace)
+    except Exception as exc:
+        check("构建锁 ownership", False, str(exc))
+        return
+    try:
+        namespace["acquire_lock"]()
+        namespace["release_lock"]()
+        own_removed = not os.path.exists(lock_path)
+
+        namespace["acquire_lock"]()
+        old_fd = namespace["LOCK_FD"]
+        os.close(old_fd)
+        namespace["LOCK_FD"] = old_fd
+        os.unlink(lock_path)
+        with io.open(lock_path, "w", encoding="ascii") as f:
+            f.write("other-owner")
+        namespace["release_lock"]()
+        owner_after = ""
+        if os.path.exists(lock_path):
+            with io.open(lock_path, encoding="ascii") as f:
+                owner_after = f.read()
+    except Exception as exc:
+        check("构建锁 ownership", False, str(exc))
+        return
+    finally:
+        try:
+            if namespace.get("LOCK_FD") is not None:
+                os.close(namespace["LOCK_FD"])
+                namespace["LOCK_FD"] = None
+        except Exception:
+            pass
+        try:
+            os.unlink(lock_path)
+        except OSError:
+            pass
+        shutil.rmtree(os.path.dirname(lock_path), ignore_errors=True)
+    check("构建锁 ownership", own_removed and owner_after == "other-owner",
+          "own_removed=%s owner_after=%s" % (own_removed, owner_after))
+
+
+def behavior_checks():
+    state_shard_behavior_checks()
+    worker_audio_behavior_checks()
+    frontend_api_behavior_checks()
+    sw_cache_status_checks()
+    page_offline_cache_checks()
+    worker_reset_import_checks()
+    build_lock_ownership_checks()
 
 
 def runtime_checks():
@@ -1019,11 +1940,11 @@ def runtime_checks():
     worker_text = io.open(worker, encoding="utf-8").read() if os.path.exists(worker) else ""
     check("同步写入合并为单次 D1", "RETURNING updated_at" in worker_text and "ON CONFLICT(user_id) DO UPDATE" in worker_text)
     check("同步支持增量拉取", "unchanged: true" in worker_text and "searchParams.get('since')" in worker_text)
-    check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(body.payload, base)" in worker_text)
+    check("同步支持服务端合并", "/state/sync" in worker_text and "mergeSnapshots(incoming, base)" in worker_text)
     check("服务端合并每日节奏", "function mergeDaily(" in worker_text and "daily: mergeDaily(" in worker_text)
     check("删除用墓碑表达", "function isTombstone(" in worker_text and "del: 1" in worker_text)
-    check("服务端补全清空墓碑", "body.reset === true" in worker_text and "tombstoneAll(remote, tombTime)" in worker_text)
-    check("reset 以客户端快照为准", "preferPayload(merged, body.payload)" in worker_text)
+    check("服务端补全清空墓碑", "mergeDestructiveSnapshot(local, remote, mergeOptions)" in worker_text)
+    check("reset 以客户端快照为准", "mergeDestructiveSnapshot(local, remote, mergeOptions)" in worker_text and "function mergeDestructiveSnapshot" in io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read())
     check("合并键序规范化后比较", "const mergedText = stableJson(merged);" in worker_text
           and "mergedText === row.payload" in worker_text)
     check("版本号严格单调", "MAX(?, updated_at + 1)" in worker_text)
@@ -1103,6 +2024,7 @@ def browser_checks():
             "merge_tombstone_wins": True, "merge_delete_beats_older": True,
             "merge_relearn_beats_delete": True, "merge_tombstone_pruned": True,
             "tombstone_all_covers_cloud": True, "reset_prefers_client": True,
+            "merge_preserves_post_reset_live": True,
             "merge_no_proto_pollution": True, "snapshot_slim": True, "live_entry_revives": True,
             "merge_position_latest": True,
             "daily_bump": True, "daily_master_bump": True,
@@ -1175,6 +2097,10 @@ def main():
     print("运行时资源")
     print("=" * 56)
     runtime_checks()
+    print("=" * 56)
+    print("关键行为回归")
+    print("=" * 56)
+    behavior_checks()
     print("=" * 56)
     print("浏览器行为")
     print("=" * 56)

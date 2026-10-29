@@ -1,4 +1,4 @@
-﻿??,??,????,????,?????,??,????,????,?????
+﻿序号,单词,核心释义,考查形式,补漏优先级,覆盖,英一覆盖,加权覆盖,优先级分数
 1,accord,协议；一致,according / accorded / accords,S 必背,0,15,5.25,18.944
 2,study,学习,studies / studying / studied,S 必背,0,14,4.9,18.376
 3,activity,活动,activities,S 必背,0,8,2.8,11.757
@@ -15,12 +15,12 @@
 14,plastic,塑料,plastics,A 重点,0,2,0.7,7.196
 15,corporate,公司的,corporates,A 重点,0,5,1.75,8.733
 16,area,区域,areas,A 重点,0,8,2.8,11.822
-17,guilt,内疚,guilts,A 重点,0,0,0,2.312
+17,guilt,内疚,guilts,A 重点,0,0,0.0,2.312
 18,simply,仅仅,,A 重点,0,8,2.8,11.162
 19,although,虽然,,A 重点,0,10,3.5,12.594
 20,gene,基因,genes,A 重点,0,1,0.35,5.302
 21,recently,最近,,A 重点,0,8,2.8,10.744
-22,extracurricular,课外的,,A 重点,0,0,0,2.218
+22,extracurricular,课外的,,A 重点,0,0,0.0,2.218
 23,generally,通常,,A 重点,0,8,2.8,10.696
 24,race,赛跑,races / racing / raced,A 重点,0,2,0.7,4.936
 25,teenager,青少年,teenagers,A 重点,0,1,0.35,4.236
@@ -32,14 +32,14 @@
 31,record,记录,records / recorded / recording,A 重点,0,13,4.55,14.915
 32,formation,形成,formations,A 重点,0,1,0.35,3.52
 33,workplace,工作场所,workplaces,A 重点,0,1,0.35,3.52
-34,zone,地带,zones / zoning / zoned,A 重点,0,0,0,1.988
+34,zone,地带,zones / zoning / zoned,A 重点,0,0,0.0,1.988
 35,giant,巨大的,giants,A 重点,0,4,1.4,7.596
 36,prepare,使做好准备,prepared / preparing / prepares,A 重点,0,4,1.4,7.053
 37,weigh,有...重,weighing / weighed / weighs,A 重点,0,2,0.7,4.637
 38,summarize,总结,summary,A 重点,4,0,4.0,10.788
 39,endeavor,努力,,A 重点,3,2,3.7,11.327
 40,ethic,伦理,,B 次重点,0,5,1.75,7.837
-41,first-generation,第一代的,,B 次重点,0,0,0,1.842
+41,first-generation,第一代的,,B 次重点,0,0,0.0,1.842
 42,gender,性别,genders / gendered,B 次重点,0,3,1.05,6.705
 43,highly,非常,,B 次重点,0,5,1.75,8.105
 44,immigration,移民,,B 次重点,0,2,0.7,6.32
@@ -51,7 +51,7 @@
 50,scale,规模,scales / scaled / scaling,B 次重点,0,6,2.1,8.679
 51,serious,严重的,,B 次重点,0,4,1.4,6.792
 52,timber,木材,timbers / timbered,B 次重点,0,1,0.35,3.374
-53,adolescence,青春期,adolescences,B 次重点,0,0,0,1.758
+53,adolescence,青春期,adolescences,B 次重点,0,0,0.0,1.758
 54,corporation,公司,corporations,B 次重点,0,3,1.05,6.008
 55,curiosity,好奇心,curiosities,B 次重点,0,4,1.4,6.489
 56,finding,研究结果,findings,B 次重点,0,4,1.4,7.194
@@ -67,12 +67,12 @@
 66,mainly,主要地,,B 次重点,0,7,2.45,9.2
 67,manufacturer,制造业者,manufacturers,B 次重点,0,1,0.35,3.195
 68,official,官员,officials,B 次重点,0,7,2.45,10.377
-69,slice,薄片,slices / slicing / sliced,B 次重点,0,0,0,1.664
+69,slice,薄片,slices / slicing / sliced,B 次重点,0,0,0.0,1.664
 70,snap,断裂,snapped / snapping / snaps,B 次重点,0,1,0.35,3.195
 71,trap,陷阱,trapped / traps / trapping,B 次重点,0,2,0.7,4.382
-72,visa,签证,visas / visaing / visaed,B 次重点,0,0,0,1.664
+72,visa,签证,visas / visaing / visaed,B 次重点,0,0,0.0,1.664
 73,willing,乐意的,,B 次重点,0,8,2.8,9.9
-74,acre,英亩,acres,B 次重点,0,0,0,1.557
+74,acre,英亩,acres,B 次重点,0,0,0.0,1.557
 75,article,文章,articles / articled / articling,B 次重点,0,6,2.1,9.29
 76,clothe,给...穿衣,clothed / clothes / cloathing,B 次重点,0,2,0.7,5.107
 77,cooperation,合作,cooperations,B 次重点,0,2,0.7,4.62
@@ -80,44 +80,44 @@
 79,favor,好意,favors / favoring / favored,B 次重点,0,8,2.8,9.793
 80,historical,历史的,,B 次重点,0,4,1.4,6.507
 81,passage,段落,passages,B 次重点,0,1,0.35,3.089
-82,prairie,大草原,,B 次重点,0,0,0,1.557
+82,prairie,大草原,,B 次重点,0,0,0.0,1.557
 83,producer,生产者,producers,B 次重点,0,2,0.7,4.888
 84,protection,保护,protections,B 次重点,0,10,3.5,12.419
 85,quota,限额,quotas,B 次重点,0,1,0.35,4.407
 86,rapidly,飞快地,,B 次重点,0,4,1.4,6.507
 87,reaction,反应,reactions,B 次重点,0,4,1.4,6.852
-88,regenerative,再生的,,B 次重点,0,0,0,1.557
+88,regenerative,再生的,,B 次重点,0,0,0.0,1.557
 89,representative,代表,representatives,B 次重点,0,4,1.4,6.692
 90,stuff,东西,stuffed / stuffing / stuffs,B 次重点,0,1,0.35,3.089
 91,temporarily,暂时,,B 次重点,0,3,1.05,5.32
 92,wealth,财富,,B 次重点,0,4,1.4,6.993
 93,widely,广泛地,,B 次重点,0,6,2.1,8.252
-94,wildfire,野火,wildfires,B 次重点,0,0,0,1.557
+94,wildfire,野火,wildfires,B 次重点,0,0,0.0,1.557
 95,juror,陪审员,,B 次重点,1,0,1.0,6.433
 96,active,活跃的,actives,B 次重点,0,4,1.4,6.165
 97,being,存在,beings,B 次重点,0,2,0.7,4.152
-98,biodiversity,生物多样性,,B 次重点,0,0,0,1.433
-99,conceptual,概念的,,B 次重点,0,0,0,1.433
-100,coworker,共同工作的人,coworkers,B 次重点,0,0,0,1.433
+98,biodiversity,生物多样性,,B 次重点,0,0,0.0,1.433
+99,conceptual,概念的,,B 次重点,0,0,0.0,1.433
+100,coworker,共同工作的人,coworkers,B 次重点,0,0,0.0,1.433
 101,favorite,喜欢的事物,favorites,B 次重点,0,2,0.7,4.152
 102,fitness,健康,fitnesses,B 次重点,0,1,0.35,2.965
 103,frequently,频繁,,B 次重点,0,5,1.75,7.57
 104,genetic,遗传的,,B 次重点,0,1,0.35,2.965
 105,governance,治理,governances,B 次重点,0,2,0.7,4.497
 106,grind,磨碎,ground / grinding / grinds,B 次重点,0,3,1.05,6.029
-107,lawn,草坪,lawns,B 次重点,0,0,0,1.433
+107,lawn,草坪,lawns,B 次重点,0,0,0.0,1.433
 108,long-term,长期的,,B 次重点,0,4,1.4,6.997
 109,middle-class,中产阶级的,,B 次重点,0,1,0.35,3.797
 110,motivate,激励,motivated / motivates / motivating,B 次重点,0,2,0.7,4.497
-111,occasionally,有时候,,B 次重点,0,0,0,1.433
-112,pack,收拾,packed / packs / packing,B 次重点,0,0,0,1.433
-113,part-time,兼职的,,B 次重点,0,0,0,1.433
+111,occasionally,有时候,,B 次重点,0,0,0.0,1.433
+112,pack,收拾,packed / packs / packing,B 次重点,0,0,0.0,1.433
+113,part-time,兼职的,,B 次重点,0,0,0.0,1.433
 114,passenger,乘客,passengers,B 次重点,0,3,1.05,6.297
 115,poll,民意调查,polls / polled / polling,B 次重点,0,2,0.7,4.765
 116,prevent,防止,preventing / prevented / prevents,B 次重点,0,11,3.85,12.602
-117,prosocial,亲社会的,,B 次重点,0,0,0,1.433
+117,prosocial,亲社会的,,B 次重点,0,0,0.0,1.433
 118,rapid,快速的,rapids,B 次重点,0,2,0.7,4.497
-119,rebellious,叛逆的,,B 次重点,0,0,0,1.433
+119,rebellious,叛逆的,,B 次重点,0,0,0.0,1.433
 120,recall,记起,recalled / recalls / recalling,B 次重点,0,5,1.75,7.084
 121,roughly,概略地,,B 次重点,0,3,1.05,5.197
 122,satisfy,使满意,satisfies / satisfied / satisfying,B 次重点,0,5,1.75,7.084

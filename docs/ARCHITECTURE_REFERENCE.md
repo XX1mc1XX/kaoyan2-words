@@ -261,6 +261,15 @@ ky_words_v1#<generation>-<0..63>[@account]        -> { word: record, ... }
 
 ### 9.3 发布验收
 
+`deploy.py` 同时检查两个 URL，但它们不是两套产品：
+
+- **public URL**：`https://kaoyan2-words.pages.dev/`，Cloudflare Pages 项目的稳定生产入口，普通用户只使用这个地址。
+- **deployment URL**：每次部署生成的 `https://<deployment-id>.kaoyan2-words.pages.dev/`，用于访问本次精确 deployment。它是验收和排障地址，不作为长期用户入口。
+
+生产 deployment 完成后，public URL 会指向同一份产物，所以两个网站打开看起来完全一样。同时验收的作用是分别证明“这份精确产物正常”和“生产别名确实已经切过去”。
+
+两个 URL 是不同的浏览器 origin，localStorage、Cache Storage 和 Service Worker 作用域彼此隔离；不能用 deployment URL 推断真实用户在 public URL 下的本地进度或缓存。两者使用同一 Pages 项目和同一套生产 Worker/D1 绑定，不是两个数据库。
+
 `deploy.py` 部署到 `kaoyan2-words` 后必须同时通过：
 
 1. deployment URL 和 `https://kaoyan2-words.pages.dev/` 的 HTTP 检查：`build-meta` 一致、SW build/app 一致、HTML 引用一致、主程序字节/hash 一致。

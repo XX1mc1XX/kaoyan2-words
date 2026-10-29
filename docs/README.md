@@ -17,7 +17,7 @@
 | 文档 | 唯一职责 | 是否定义任务 |
 |---|---|---|
 | [AI_EXECUTION_PLAN.md](./AI_EXECUTION_PLAN.md) | 方向、性能目标、不可破坏的产品语义 | 否 |
-| [PHASES.md](./PHASES.md) | 阶段状态、证据、剩余发布动作、验收入口 | **是** |
+| [PHASES.md](./PHASES.md) | 阶段状态、证据、双域名说明、生产化剩余任务、验收入口 | **是** |
 | [ARCHITECTURE_REFERENCE.md](./ARCHITECTURE_REFERENCE.md) | 当前架构、数据/缓存/同步协议、模块边界 | 否 |
 | [AGENT_PROTOCOL.md](./AGENT_PROTOCOL.md) | 多 Agent 调度、租约、worktree、独立验收 | 否 |
 | [AGENT_SKILL_MATRIX.md](./AGENT_SKILL_MATRIX.md) | Agent/skill 路由和递归预算 | 否 |
@@ -39,6 +39,7 @@
 | 性能 | 首屏 HTML gzip 11,813 B、主程序 gzip 37,131 B；首卡 p50/p95 120/154.8 ms；详见根 README |
 | CI | `.github/workflows/ci.yml` 已定义 Windows 构建、数据测试、回归、离线、性能测量；仓库无远程，尚无托管 CI 运行记录 |
 | 发布 | 已上线 build `c18904c08771` / app `app.4defd52cb022.js`；public URL 与 deployment URL 均通过 HTTP + fresh Edge + health 验收 |
+| 剩余 | 远程 CI、tag/产物归档、D1 恢复、双设备同步、旧 SW 升级、真机矩阵、音频 soak、规模压测、监控和回滚演练未完成；详见 `PHASES.md` |
 
 ## 开工硬门禁
 

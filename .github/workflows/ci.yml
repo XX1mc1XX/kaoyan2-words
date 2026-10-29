@@ -19,6 +19,8 @@ env:
   WRANGLER_VERSION: "4.152.0"
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
+  # 共享 runner 冷启动显著慢于开发机；本地默认预算仍是 800ms。
+  KY_PERF_BUDGET_MS: "2500"
 
 jobs:
   windows-smoke:

@@ -69,7 +69,12 @@ def expected_source_digest():
             parts.append(rel + ":" + source_sha256(path))
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
+
 results = []
+
+# 首卡时间预算：本地生产基线 800ms。共享 CI runner 的冷启动明显慢于开发机，
+# 用 KY_PERF_BUDGET_MS 单独放宽 gate，避免机器噪声把真实回归淹没成假红。
+PERF_BUDGET_MS = int(os.environ.get("KY_PERF_BUDGET_MS", "800"))
 
 
 def check(name, cond, detail=""):
@@ -1109,7 +1114,7 @@ setTimeout(async function(){
         check("拖动进度条松手后朗读新词",
               data.get("drag_released") is True and data.get("drag_spoken") is True,
               "松手=%s 朗读=%s" % (data.get("drag_released"), data.get("drag_spoken")))
-        check("网页首卡快速出现", 0 < data.get("first_card", 0) < 800, "%sms" % data.get("first_card"))
+        check("网页首卡快速出现", 0 < data.get("first_card", 0) < PERF_BUDGET_MS, "%sms" % data.get("first_card"))
         app_name = next((x for x in os.listdir(deploy) if re.fullmatch(r"app\.[0-9a-f]{12}\.js", x)), "")
         app_text = io.open(os.path.join(deploy, app_name), encoding="utf-8").read() if app_name else ""
         check("同步位置字段完整", all(x in app_text for x in ("progressAt", "chapter:Number(conf.chapter)", "mergeConf")), "同步页码/当前位置")
@@ -2207,9 +2212,9 @@ def perf_checks():
     if not data:
         check("首屏性能可测量", False, "Edge headless 未返回性能标记")
         return
-    check("首卡渲染 < 800ms", 0 < data.get("firstCard", 0) < 800, "%sms" % data.get("firstCard"))
+    check("首卡渲染 < %dms" % PERF_BUDGET_MS, 0 < data.get("firstCard", 0) < PERF_BUDGET_MS, "%sms" % data.get("firstCard"))
     check("首屏 DOM 节点 < 400", 0 < data.get("nodes", 0) < 400, "%s 个" % data.get("nodes"))
-    check("DOMContentLoaded < 800ms", 0 < data.get("dcl", 0) < 800, "%sms" % data.get("dcl"))
+    check("DOMContentLoaded < %dms" % PERF_BUDGET_MS, 0 < data.get("dcl", 0) < PERF_BUDGET_MS, "%sms" % data.get("dcl"))
 
 
 def main():

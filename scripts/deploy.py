@@ -89,7 +89,10 @@ def release_lock(fd):
 
 
 def migration_sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # checkout 的 autocrlf 会把迁移脚本改成 CRLF，哈希必须与换行符无关，
+    # 否则干净 checkout 会把已执行的迁移误判成待执行。
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def applied_migration_hashes():

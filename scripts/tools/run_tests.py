@@ -871,6 +871,16 @@ def web_browser_checks():
 setTimeout(async function(){
   const out = {};
   try {
+    // 首屏只内联 40 词，固定延时在慢机器上会读到半截词库，
+    // 后面 resumeFull[80] 就会踩到 undefined。等就绪再断言。
+    const readyDeadline = Date.now() + 6000;
+    while (((_deckCache && _deckCache.words) || []).length <= 80 && Date.now() < readyDeadline) {
+      if (typeof ensureDeckData === 'function') {
+        try { await ensureDeckData('core'); } catch (e) { /* 稍后重试 */ }
+      }
+      await new Promise(function(r){ setTimeout(r, 100); });
+    }
+    out.words_ready_len = ((_deckCache && _deckCache.words) || []).length;
     out.web_mode = WEB_MODE;
     out.first_card = Math.round(window.__firstCardAt || 0);
     out.boot_word = document.getElementById('word').textContent;

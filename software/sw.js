@@ -1,4 +1,4 @@
-const BUILD_VERSION = '5b335eceac60';
+const BUILD_VERSION = '4e120f40cd87';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v2';
 // 页面只有在收到这个响应头后才允许写本地「已缓存」标记。

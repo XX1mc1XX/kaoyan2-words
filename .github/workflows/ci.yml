@@ -17,6 +17,8 @@ env:
   NODE_VERSION: "22.23.3"
   TERSER_VERSION: "5.51.2"
   WRANGLER_VERSION: "4.152.0"
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
 
 jobs:
   windows-smoke:

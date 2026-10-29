@@ -78,7 +78,13 @@ function savePos(touchProgress) {
     rec.pos = idx;
     rec.posWord = idx < queue.length ? queue[idx].word : null;
     if (touchProgress !== false) rec.t = now;
-    save(LS_POS, positionStoreFromChapters(chapterData));
+    // 只更新当前章节的位置。整表由本标签页内存重建会覆盖另一标签页
+    // 顺序保存的其他章节位置，这是无并发也能触发的数据丢失。
+    const positions = load(LS_POS, {});
+    positions[key] = { pos: rec.pos, t: Number(rec.t) || 0 };
+    if (typeof rec.posWord === 'string') positions[key].posWord = rec.posWord;
+    else delete positions[key].posWord;
+    save(LS_POS, positions);
   }
   save(LS_CONF, conf);
 }

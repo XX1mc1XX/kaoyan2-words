@@ -400,7 +400,6 @@ function playAudioElement(player, word, token, notify, options, source, lang) {
     settled = true;
     clearTimeout(audioFallbackTimer);
     speakBroken = false;
-    if (source === 'cached') rememberAudio(audioMarkerKey(word, lang === 'zh-CN' ? 'zh' : 'en'));
     cachePronunciationForOffline(word, lang === 'zh-CN' ? 'zh' : 'en');
     prefetchAudioNearby();
     if (options && options.onStatus) options.onStatus('online');

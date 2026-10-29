@@ -1,4 +1,10 @@
 const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+function newImportOperationId() {
+  try {
+    if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {}
+  return 'import-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 14);
+}
 function prepareImport(d) {
   if (!objectRecord(d)) throw new Error('bad file');
   const now = Date.now();
@@ -45,10 +51,13 @@ function prepareImport(d) {
   // 导入是覆盖：云端多出来的词要让服务端补墓碑，否则会被合并回来。
   nextConf.overwritePending = true;
   nextConf.overwriteMode = 'import';
+  nextConf.importStartedAt = now;
+  nextConf.importOperationId = newImportOperationId();
   // 导入文件的旧服务端 fence 不可信；由 Worker 为本次 import 建立新 fence。
   nextConf.resetAt = 0;
   delete nextConf.serverFenceAt;
   delete nextConf.serverFenceMode;
+  delete nextConf.serverFenceOperationId;
   const deck = Object.prototype.hasOwnProperty.call(DECKS, nextConf.deck) ? nextConf.deck : 'core';
   const chapter = Math.max(0, Number(nextConf.deckChapter[deck]) || 0);
   nextConf.deck = deck;
@@ -138,6 +147,9 @@ $('resetAll').onclick = () => {
   const nextDaily = {};
   for (const key of Object.keys(daily)) nextDaily[key] = tombstone(now);
   const nextConf = { ...conf, overwritePending: true, overwriteMode: 'clear', resetAt: now };
+  delete nextConf.importStartedAt;
+  delete nextConf.importOperationId;
+  delete nextConf.serverFenceOperationId;
   // 四块数据必须一次提交；任何一块配额失败都要保留清空前状态。
   if (!commitStores({ state: nextState, chapterData: nextChapters, daily: nextDaily, conf: nextConf })) {
     alert('清空失败：浏览器存储空间不足，原进度已保留。');

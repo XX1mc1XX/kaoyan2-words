@@ -1,4 +1,4 @@
-const BUILD_VERSION = '76e36c52bd77';
+const BUILD_VERSION = '76060d85d857';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
 const AUDIO_CACHE = 'ky-audio-v2';
 const AUDIO_PROTOCOL_VERSION = 1;
@@ -21,7 +21,7 @@ const NAV_TIMEOUT_MS = 3000;
 const AUDIO_BUDGET_RATIO = 0.8;
 const AUDIO_BUDGET_MIN_FREE = 8 * 1024 * 1024;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const APP_ASSET = './app.cdd6c0a3ced4.js';
+const APP_ASSET = './app.4defd52cb022.js';
 const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json"];
 const PREFETCH_DIAGNOSTIC_CACHE = 'ky-prefetch-diagnostics-v1';
 const PREFETCH_DIAGNOSTIC_URL = self.location.origin + '/__ky-internal/prefetch-diagnostics';

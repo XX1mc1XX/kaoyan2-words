@@ -38,6 +38,14 @@ def file_sha256(path):
     return h.hexdigest()
 
 
+def source_sha256(path):
+    suffix = Path(path).suffix.lower()
+    if suffix in {".css", ".csv", ".html", ".js", ".json", ".md", ".py", ".sql", ".txt", ".webmanifest"}:
+        data = Path(path).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        return hashlib.sha256(data).hexdigest()
+    return file_sha256(path)
+
+
 def expected_source_digest():
     paths = [
         "software/template.html", "software/sw.template.js", "backend/worker.js",
@@ -45,7 +53,7 @@ def expected_source_digest():
         "data/derivatives.json", "data/basic.json", "data/insurance.json",
         "data/ky2_freq.json", "data/selection_summary.json", "data/ky1_freq.json",
         "data/meanings_curated.json", "data/meanings_final.json",
-        "data/meaning_corrections.json", "data/ecdict.csv", "data/ecdict_subset.json", "data/lemma.en.txt",
+        "data/meaning_corrections.json", "data/ecdict_subset.json",
     ]
     parts = []
     for rel in paths:
@@ -56,9 +64,9 @@ def expected_source_digest():
             for child in sorted((Path(path).rglob("*")), key=lambda item: item.as_posix()):
                 if child.is_file():
                     child_rel = child.relative_to(ROOT).as_posix()
-                    parts.append(child_rel + ":" + file_sha256(child))
+                    parts.append(child_rel + ":" + source_sha256(child))
         else:
-            parts.append(rel + ":" + file_sha256(path))
+            parts.append(rel + ":" + source_sha256(path))
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 results = []
@@ -1002,6 +1010,9 @@ setTimeout(async function(){
     out.import_atomic = prepared.state.imported && prepared.state.valid
       && prepared.state.valid.del === 1 && prepared.chapterData['core:0'].posWord === 'imported'
       && prepared.conf.speak === false && prepared.conf.overwritePending === true;
+    out.import_operation = prepared.conf.overwriteMode === 'import'
+      && Number(prepared.conf.importStartedAt) > 0
+      && /^[A-Za-z0-9._:-]{8,96}$/.test(prepared.conf.importOperationId || '');
     let importRejected = false;
     try { prepareImport({ state: [], chapterData: {}, daily: {}, conf: {} }); }
     catch { importRejected = true; }
@@ -1024,10 +1035,44 @@ setTimeout(async function(){
     out.adopt2_generation_sharded = /^2:[a-z0-9-]+$/.test(localStorage.getItem('ky_words_v1#meta@probe2') || '')
       && !localStorage.getItem('ky_words_v1@probe2');
     // 游客的「清空后待同步」标志也不能带进账号，否则登录会顺手清掉云端进度
-    localStorage.setItem('ky_conf_v1', JSON.stringify({ deck: 'core', overwritePending: true, progressAt: 1 }));
+    localStorage.setItem('ky_conf_v1', JSON.stringify({
+      deck: 'core', overwritePending: true, overwriteMode: 'clear', resetAt: 1,
+      serverFenceAt: 1, serverFenceMode: 'clear', serverFenceOperationId: 'guest-op',
+      importStartedAt: 1, importOperationId: 'guest-import-op', progressAt: 999,
+    }));
     adoptGuestProgress('probe3');
     const conf3 = JSON.parse(localStorage.getItem('ky_conf_v1@probe3') || '{}');
-    out.adopt_drops_guest_reset = !conf3.overwritePending;
+    out.adopt_drops_guest_reset = !conf3.overwritePending && !conf3.overwriteMode
+      && !conf3.resetAt && !conf3.serverFenceAt && !conf3.serverFenceMode
+      && !conf3.serverFenceOperationId && !conf3.importStartedAt && !conf3.importOperationId;
+    const accountFence = {
+      deck: 'core', progressAt: 5, overwritePending: true, overwriteMode: 'import',
+      resetAt: 0, serverFenceAt: 123, serverFenceMode: 'import',
+      serverFenceOperationId: 'account-op-123', importStartedAt: 120, importOperationId: 'account-import-123',
+    };
+    localStorage.setItem('ky_conf_v1@probe4', JSON.stringify(accountFence));
+    localStorage.setItem('ky_conf_v1', JSON.stringify({
+      deck: 'core', progressAt: 1000, overwritePending: true, overwriteMode: 'clear', resetAt: 900,
+      serverFenceAt: 900, serverFenceMode: 'clear', serverFenceOperationId: 'guest-op-900',
+      importStartedAt: 900, importOperationId: 'guest-import-900',
+    }));
+    adoptGuestProgress('probe4');
+    const conf4 = JSON.parse(localStorage.getItem('ky_conf_v1@probe4') || '{}');
+    out.adopt_preserves_account_fence = conf4.overwritePending === true
+      && conf4.overwriteMode === 'import' && Number(conf4.resetAt) === 0
+      && Number(conf4.serverFenceAt) === 123 && conf4.serverFenceMode === 'import'
+      && conf4.serverFenceOperationId === 'account-op-123'
+      && Number(conf4.importStartedAt) === 120 && conf4.importOperationId === 'account-import-123';
+
+    chapterData['core:0'] = { order: ['alpha'], pos: 5, posWord: 'alpha', t: 1 };
+    chapterData['core:1'] = { order: ['beta'], pos: 0, posWord: 'beta', t: 2 };
+    activeDeck = 'core'; curChapter = 1; queue = [{ word: 'beta' }]; idx = 0;
+    localStorage.setItem(LS_POS, JSON.stringify({ 'core:0': { pos: 5, posWord: 'alpha', t: 1 } }));
+    savePos(true);
+    const positionsAfter = JSON.parse(localStorage.getItem(LS_POS) || '{}');
+    out.position_cross_tab_merge = positionsAfter['core:0'] && positionsAfter['core:0'].pos === 5
+      && positionsAfter['core:0'].posWord === 'alpha'
+      && positionsAfter['core:1'] && positionsAfter['core:1'].pos === 0;
   } catch (e) {
     out.error = e.stack || e.message;
   }
@@ -1101,9 +1146,13 @@ setTimeout(async function(){
         check("旧账号进度迁移到 shard generation", data.get("adopt2_generation_sharded") is True,
               "实际=%s" % data.get("adopt2_generation_sharded"))
         check("游客清空标志不串账号", data.get("adopt_drops_guest_reset") is True)
+        check("账号破坏性 fence 不被游客覆盖", data.get("adopt_preserves_account_fence") is True,
+              "实际=%s" % data.get("adopt_preserves_account_fence"))
         check("云端快照校验生效", data.get("validate_state") is True)
         check("应用云端快照不报未定义函数", data.get("apply_snapshot") is True, "error=%s" % data.get("error"))
         check("导入事务保留墓碑并覆盖进度", data.get("import_atomic") is True)
+        check("导入持久化稳定操作 ID", data.get("import_operation") is True)
+        check("多标签位置只更新当前章节", data.get("position_cross_tab_merge") is True)
         check("导入拒绝畸形数组", data.get("import_rejects_array") is True)
     finally:
         server.terminate()
@@ -1253,6 +1302,7 @@ queue = [{ word: 'alpha' }, { word: 'beta' }, { word: 'gamma' }];
 idx = 1;
 const chapterBefore = JSON.stringify(chapterData);
 localStorage.setItem('ky_chapter_v1', chapterBefore);
+localStorage.setItem(LS_POS, JSON.stringify({ 'core:1': { pos: 1, t: 777, posWord: 'epsilon' } }));
 writeLog.length = 0;
 savePos(true);
 out.posWriteKeys = writeLog.slice();
@@ -1260,7 +1310,10 @@ out.chapterDataNotRewritten = localStorage.getItem('ky_chapter_v1') === chapterB
 const posStore = JSON.parse(localStorage.getItem(LS_POS) || '{}');
 out.posSmallRecord = posStore['core:0'] && posStore['core:0'].pos === 1
   && posStore['core:0'].posWord === 'beta' && !('order' in posStore['core:0'])
-  && posStore['core:1'] && !('order' in posStore['core:1']);
+  && posStore['core:1'] && posStore['core:1'].pos === 1
+  && posStore['core:1'].posWord === 'epsilon' && !('order' in posStore['core:1']);
+out.posPreservesOtherChapter = posStore['core:1'] && posStore['core:1'].pos === 1
+  && posStore['core:1'].t === 777;
 
 const refreshBase = { 'core:0': { order: ['alpha', 'beta', 'gamma'], pos: 0, posWord: 'alpha', t: 1 } };
 localStorage.setItem('ky_chapter_v1', JSON.stringify(refreshBase));
@@ -1801,24 +1854,59 @@ remoteText = JSON.stringify({
   state: {
     alpha: { del: 1, t: clearAt },
     beta: { del: 1, t: clearAt },
+    between: { t: now - 30000, mastered: true },
   },
   chapterData: {}, daily: {},
   conf: { resetAt: clearAt, serverFenceAt: clearAt, serverFenceMode: 'clear' },
 });
-const imported = await sync({
-  payload: {
-    state: {
-      alpha: { t: clearAt - 3 * 86400000, mastered: true },
-      gamma: { t: now - 60000, mastered: true },
-    },
-    chapterData: {}, daily: {}, conf: {},
+const importStartedAt = now - 60000;
+const importOperationId = 'import-operation-20261029';
+const importPayload = {
+  state: {
+    alpha: { t: clearAt - 3 * 86400000, mastered: true },
+    gamma: { t: importStartedAt, mastered: true },
   },
-  reset: true, mode: 'import', resetAt: now,
+  chapterData: {}, daily: {}, conf: {},
+};
+const imported = await sync({
+  payload: importPayload,
+  reset: true, mode: 'import', importStartedAt, operationId: importOperationId,
 });
 const importedPayload = imported.data.payload || {};
 out.importStatus = imported.status;
 out.importSelectedLive = !!(importedPayload.state && importedPayload.state.alpha && importedPayload.state.alpha.mastered === true && !importedPayload.state.alpha.del);
+out.importBetweenPreserved = !!(importedPayload.state && importedPayload.state.between && importedPayload.state.between.mastered === true && !importedPayload.state.between.del);
 out.importMode = importedPayload.conf && importedPayload.conf.serverFenceMode === 'import' && Number(importedPayload.conf.resetAt || 0) === 0;
+out.importOperation = importedPayload.conf && importedPayload.conf.serverFenceOperationId === importOperationId;
+out.importStableFence = importedPayload.conf && Number(importedPayload.conf.serverFenceAt) === importStartedAt;
+out.importTransientStripped = importedPayload.conf && !('overwritePending' in importedPayload.conf)
+  && !('overwriteMode' in importedPayload.conf) && !('importStartedAt' in importedPayload.conf)
+  && !('importOperationId' in importedPayload.conf);
+const between = await sync({
+  payload: {
+    state: { postImport: { t: importStartedAt + 20000, mastered: true } },
+    chapterData: {}, daily: {}, conf: {},
+  },
+});
+out.postImportLive = !!(between.data.payload && between.data.payload.state && between.data.payload.state.postImport && between.data.payload.state.postImport.mastered === true);
+const retried = await sync({
+  payload: importPayload,
+  reset: true, mode: 'import', importStartedAt, operationId: importOperationId,
+});
+out.importRetryIdempotent = retried.status === 200 && retried.data.merged === false
+  && !!(retried.data.payload && retried.data.payload.state.postImport && retried.data.payload.state.postImport.mastered === true)
+  && retried.data.payload.conf && Number(retried.data.payload.conf.serverFenceAt) === importStartedAt;
+const stale = await sync({
+  payload: {
+    state: { staleDevice: { t: importStartedAt - 30000, mastered: true } },
+    chapterData: {}, daily: {}, conf: {},
+  },
+  reset: true, mode: 'import', importStartedAt: importStartedAt - 10000,
+  operationId: 'stale-import-operation-1',
+});
+out.staleImportSuperseded = stale.status === 200
+  && !!(stale.data.payload && stale.data.payload.state.postImport && stale.data.payload.state.postImport.mastered === true)
+  && !(stale.data.payload && stale.data.payload.state.staleDevice);
 const follow = await sync({
   payload: {
     state: { delta: { t: clearAt - 3600000, mastered: true } },
@@ -1843,6 +1931,16 @@ console.log('RESULT:' + JSON.stringify(out));
     check("import 不留下长期 clear 栅栏", data.get("importMode") is True,
           json.dumps(data, ensure_ascii=False))
     check("import fence 拦截旧设备复活", data.get("importFenceBlocksOld") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("\u5bfc\u5165\u4fdd\u7559\u53d1\u8d77\u540e\u7684\u5e76\u53d1\u8fdb\u5ea6", data.get("importBetweenPreserved") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("\u5bfc\u5165\u4f7f\u7528\u70b9\u51fb\u65f6\u523b fence", data.get("importStableFence") is True and data.get("importOperation") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("\u5bfc\u5165\u4e0d\u6c61\u67d3\u4e91\u7aef\u4e34\u65f6\u72b6\u6001", data.get("importTransientStripped") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("\u5bfc\u5165\u91cd\u8bd5\u5e42\u7b49", data.get("importRetryIdempotent") is True and data.get("postImportLive") is True,
+          json.dumps(data, ensure_ascii=False))
+    check("\u8fc7\u671f\u7834\u574f\u64cd\u4f5c\u4e0d\u8d8a\u8fc7\u65b0 fence", data.get("staleImportSuperseded") is True,
           json.dumps(data, ensure_ascii=False))
 
 
@@ -1959,6 +2057,19 @@ def runtime_checks():
     check("删除用墓碑表达", "function isTombstone(" in worker_text and "del: 1" in worker_text)
     check("服务端补全清空墓碑", "mergeDestructiveSnapshot(local, remote, mergeOptions)" in worker_text)
     check("reset 以客户端快照为准", "mergeDestructiveSnapshot(local, remote, mergeOptions)" in worker_text and "function mergeDestructiveSnapshot" in io.open(os.path.join(ROOT, "shared", "merge.js"), encoding="utf-8").read())
+    audio_source = io.open(os.path.join(ROOT, "software", "src", "app", "40-audio.js"), encoding="utf-8").read()
+    check("\u97f3\u9891\u7f13\u5b58\u6807\u8bb0\u53ea\u8ba4\u670d\u52a1\u7aef\u786e\u8ba4",
+          "if (source === 'cached') rememberAudio" not in audio_source)
+    import importlib.util
+    deploy_path = os.path.join(ROOT, "scripts", "deploy.py")
+    deploy_spec = importlib.util.spec_from_file_location("ky_deploy_checks", deploy_path)
+    deploy_module = importlib.util.module_from_spec(deploy_spec)
+    deploy_spec.loader.exec_module(deploy_module)
+    check("\u53d1\u5e03\u5b58\u5728 10 \u5206\u949f\u4e92\u65a5\u7a97\u53e3",
+          deploy_module.RELEASE_COOLDOWN_SECONDS == 600
+          and "recent_release_activity()" in io.open(deploy_path, encoding="utf-8").read())
+    check("\u6570\u636e\u5e93\u8fc1\u79fb\u6709\u5df2\u6267\u884c\u8d26\u672c", not deploy_module.pending_migrations(),
+          str([str(path) for path in deploy_module.pending_migrations()]))
     check("合并键序规范化后比较", "const mergedText = stableJson(merged);" in worker_text
           and "mergedText === row.payload" in worker_text)
     check("版本号严格单调", "MAX(?, updated_at + 1)" in worker_text)

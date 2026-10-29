@@ -31,6 +31,9 @@ PROJECT = "kaoyan2-words"
 PUBLIC_URL = "https://kaoyan2-words.pages.dev"
 LOCK = ROOT / "deploy.publish.lock"
 LOCK_STALE_SECONDS = 30 * 60
+RELEASE_COOLDOWN_SECONDS = 10 * 60
+LAST_RELEASE = ROOT / ".git" / "ky-last-release.json"
+MIGRATIONS_LEDGER = ROOT / "backend" / "migrations" / "applied.json"
 EDGE_CANDIDATES = (
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
@@ -85,9 +88,70 @@ def release_lock(fd):
         pass
 
 
+def migration_sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def applied_migration_hashes():
+    try:
+        payload = json.loads(MIGRATIONS_LEDGER.read_text(encoding="utf-8"))
+        applied = payload.get("applied", {})
+        return applied if isinstance(applied, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def pending_migrations():
     folder = ROOT / "backend" / "migrations"
-    return sorted(folder.glob("*.sql")) if folder.is_dir() else []
+    if not folder.is_dir():
+        return []
+    applied = applied_migration_hashes()
+    pending = []
+    for path in sorted(folder.glob("*.sql")):
+        entry = applied.get(path.name)
+        expected = entry.get("sha256") if isinstance(entry, dict) else ""
+        if not expected or expected != migration_sha256(path):
+            pending.append(path)
+    return pending
+
+
+def recent_release_activity():
+    now = time.time()
+    blocked = []
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%ct %H"],
+            cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            stamp, commit = result.stdout.strip().split(None, 1)
+            age = now - float(stamp)
+            if age < RELEASE_COOLDOWN_SECONDS:
+                blocked.append("commit %s 仅 %.0f 秒前" % (commit[:12], max(0, age)))
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("无法检查最近提交时间：" + str(exc))
+    try:
+        marker = json.loads(LAST_RELEASE.read_text(encoding="utf-8"))
+        released_at = float(marker.get("releasedAt", 0)) / 1000
+        age = now - released_at
+        if released_at > 0 and age < RELEASE_COOLDOWN_SECONDS:
+            blocked.append("上次发布仅 %.0f 秒前" % max(0, age))
+    except (OSError, ValueError, TypeError):
+        pass
+    return blocked
+
+
+def record_release(meta, deployment_id, deployment_url):
+    marker = {
+        "releasedAt": int(time.time() * 1000),
+        "commit": meta.get("commit", ""),
+        "build": meta.get("build", ""),
+        "deploymentId": deployment_id or "",
+        "deploymentUrl": deployment_url,
+    }
+    LAST_RELEASE.parent.mkdir(parents=True, exist_ok=True)
+    LAST_RELEASE.write_text(json.dumps(marker, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def output_value(text, pattern):
@@ -646,6 +710,7 @@ def main():
     skip_test = "--skip-test" in sys.argv
     allow_migrations = "--allow-pending-migrations" in sys.argv
     allow_dirty = "--allow-dirty-release" in sys.argv
+    allow_recent = "--allow-recent-release" in sys.argv
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
@@ -667,6 +732,16 @@ def main():
             return 2
         if changes:
             print("工作区不干净；已按 --allow-dirty-release 继续。")
+
+        recent = recent_release_activity()
+        if recent and not allow_recent:
+            print("最近 10 分钟存在提交或发布，默认拒绝部署：")
+            for item in recent:
+                print("  - " + item)
+            print("确认没有其他会话在发布后，追加 --allow-recent-release。")
+            return 2
+        if recent:
+            print("最近 10 分钟存在发布活动；已按 --allow-recent-release 继续。")
 
         migrations = pending_migrations()
         if migrations and not allow_migrations:
@@ -749,6 +824,11 @@ def main():
                 print("%s 验收失败：%s" % (label, detail))
                 return 1
 
+        try:
+            record_release(meta, deployment_id, deployment_base)
+        except OSError as exc:
+            print("线上验收通过，但无法写入本地发布互斥标记：" + str(exc))
+            return 1
         print("deployment_id=%s" % (deployment_id or "unknown"))
         print("deployment_url=%s" % deployment_base)
         print("public_url=%s" % public_base)

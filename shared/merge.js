@@ -41,6 +41,11 @@ function copyRecord(records) {
   return out;
 }
 
+function normalizeOperationId(value) {
+  const id = typeof value === 'string' ? value.trim() : '';
+  return /^[A-Za-z0-9._:-]{8,96}$/.test(id) ? id : '';
+}
+
 // fence 时间只接受正数；客户端时钟超前时最多夹到服务端当前时刻。
 // 关键：不能反过来用 now - 24h 抬高低界。设备离线超过一天再同步时，
 // 那会把合法的 resetAt 改成更晚时刻，连带删掉清空之后的新学习记录。
@@ -242,14 +247,22 @@ function mergeConf(local, cloud, localChapters, cloudChapters, localActivityAt, 
   const explicitB = serverTimestamp(b.serverFenceAt);
   const explicit = explicitA || explicitB
     ? (explicitA > explicitB
-      ? { at: explicitA, mode: a.serverFenceMode === 'import' ? 'import' : 'clear' }
-      : { at: explicitB, mode: b.serverFenceMode === 'import' ? 'import' : 'clear' })
+      ? { at: explicitA, mode: a.serverFenceMode === 'import' ? 'import' : 'clear',
+        operationId: normalizeOperationId(a.serverFenceOperationId) }
+      : { at: explicitB, mode: b.serverFenceMode === 'import' ? 'import' : 'clear',
+        operationId: normalizeOperationId(b.serverFenceOperationId) })
     : { at: 0, mode: '' };
   if (explicit.at) {
     out.serverFenceAt = explicit.at;
     out.serverFenceMode = explicit.mode;
-    if (explicit.mode === 'import') out.resetAt = 0;
-    else out.resetAt = explicit.at;
+    if (explicit.mode === 'import') {
+      out.resetAt = 0;
+      if (explicit.operationId) out.serverFenceOperationId = explicit.operationId;
+      else delete out.serverFenceOperationId;
+    } else {
+      out.resetAt = explicit.at;
+      delete out.serverFenceOperationId;
+    }
   } else {
     const legacyReset = Math.max(serverTimestamp(a.resetAt), serverTimestamp(b.resetAt));
     if (legacyReset) out.resetAt = legacyReset;
@@ -301,25 +314,30 @@ function readServerFence(snapshot) {
     return {
       at: explicit,
       mode: conf.serverFenceMode === 'import' ? 'import' : 'clear',
+      operationId: normalizeOperationId(conf.serverFenceOperationId),
     };
   }
   const legacy = serverTimestamp(conf.resetAt);
-  return { at: legacy, mode: legacy ? 'clear' : '' };
+  return { at: legacy, mode: legacy ? 'clear' : '', operationId: '' };
 }
 
 // fence 只能前进不能回退；同毫秒的连续操作由 serverFenceMode 表示最新类型，
 // 不再人为 +1，避免把紧接着 import 写入的新记录误判成 fence 之前的数据。
-function nextServerFence(cloud, mode, resetAt, now) {
+function nextServerFence(cloud, mode, resetAt, now, importStartedAt, operationId) {
   const current = serverTimestamp(now) || Date.now();
   const existing = readServerFence(cloud);
-  const requested = mode === 'import' ? current : resolveResetFence(resetAt, current);
+  const importAt = serverTimestamp(importStartedAt, current);
+  const requested = mode === 'import'
+    ? (importAt || current)
+    : resolveResetFence(resetAt, current);
   return {
     at: Math.max(requested, existing.at),
     mode: mode === 'import' ? 'import' : 'clear',
+    operationId: mode === 'import' ? normalizeOperationId(operationId) : '',
   };
 }
 
-function withServerFence(snapshot, at, mode) {
+function withServerFence(snapshot, at, mode, operationId) {
   const source = isRecord(snapshot) ? snapshot : {};
   const fenceAt = serverTimestamp(at);
   if (!fenceAt) return source;
@@ -328,6 +346,11 @@ function withServerFence(snapshot, at, mode) {
   const fenceMode = mode === 'import' ? 'import' : 'clear';
   conf.serverFenceAt = fenceAt;
   conf.serverFenceMode = fenceMode;
+  delete conf.serverFenceOperationId;
+  if (fenceMode === 'import') {
+    const id = normalizeOperationId(operationId);
+    if (id) conf.serverFenceOperationId = id;
+  }
   // import 的权威数据可以保留旧 t，因此不能复用 resetAt 作为记录时间过滤器。
   // resetAt 专门表示 clear；import 只使用独立的 serverFenceAt/Mode。
   if (fenceMode === 'clear') {
@@ -476,10 +499,19 @@ function mergeDestructiveSnapshot(local, cloud, options) {
   const opt = isRecord(options) ? options : {};
   const mode = opt.mode === 'import' ? 'import' : 'clear';
   const now = serverTimestamp(opt.now) || Date.now();
-  const fence = nextServerFence(cloud, mode, opt.resetAt, now);
+  const operationId = mode === 'import' ? normalizeOperationId(opt.operationId) : '';
+  const existing = readServerFence(cloud);
+  if (mode === 'import' && operationId
+      && existing.mode === 'import' && existing.operationId === operationId) return copyRecord(cloud);
+  const requestedAt = mode === 'import'
+    ? serverTimestamp(opt.importStartedAt, now)
+    : serverTimestamp(opt.resetAt, now);
+  // ?????????????????? clear/import fence?
+  if (existing.at && requestedAt && existing.at > requestedAt) return copyRecord(cloud);
+  const fence = nextServerFence(cloud, mode, opt.resetAt, now, opt.importStartedAt, operationId);
   if (mode === 'import') {
     const imported = mergeImportSnapshot(local, cloud, fence.at);
-    return withServerFence(imported, fence.at, 'import');
+    return withServerFence(imported, fence.at, 'import', fence.operationId);
   }
   const incoming = applyResetFence(local, fence, cloud);
   const base = tombstoneAll(cloud, fence.at);
@@ -500,5 +532,5 @@ function mergeSyncSnapshot(local, cloud, options) {
   if (!fence.at) return mergeSnapshots(local, cloud);
   const incoming = applyResetFence(local, fence, cloud);
   const merged = mergeSnapshots(incoming, cloud);
-  return withServerFence(merged, fence.at, fence.mode);
+  return withServerFence(merged, fence.at, fence.mode, fence.operationId);
 }

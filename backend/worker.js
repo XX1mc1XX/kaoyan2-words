@@ -274,7 +274,13 @@ function withoutClientServerFence(snapshot) {
   const conf = copyRecord(out.conf);
   delete conf.serverFenceAt;
   delete conf.serverFenceMode;
+  delete conf.serverFenceOperationId;
   delete conf.resetAt;
+  delete conf.overwritePending;
+  delete conf.overwriteMode;
+  delete conf.importStartedAt;
+  delete conf.importOperationId;
+  delete conf.forceAt;
   out.conf = conf;
   return out;
 }
@@ -655,6 +661,8 @@ async function handleApi(request, env, ctx) {
           reset: wantsReset,
           mode: body.mode === 'import' ? 'import' : 'clear',
           resetAt: body.resetAt,
+          importStartedAt: body.importStartedAt,
+          operationId: body.operationId,
           now,
         };
         const merged = wantsReset

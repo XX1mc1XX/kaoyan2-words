@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "applied": {
+    "002_username_nocase.sql": {
+      "sha256": "bd22777db41b2dfc4d5b3bf56866c6d5b72a3e1838754d1d61626668c0971012",
+      "appliedAt": "2026-10-29T12:00:00Z",
+      "verifiedBy": "remote D1 users_username_nocase index confirmed"
+    }
+  }
+}

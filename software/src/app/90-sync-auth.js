@@ -325,9 +325,15 @@ function validateConfStore(store) {
   if (serverFenceAt) {
     out.serverFenceAt = serverFenceAt;
     out.serverFenceMode = store.serverFenceMode === 'import' ? 'import' : 'clear';
+    const operationId = normalizeOperationId(store.serverFenceOperationId);
+    if (out.serverFenceMode === 'import' && operationId) out.serverFenceOperationId = operationId;
   }
   if (store.overwritePending === true) out.overwritePending = true;
   if (store.overwriteMode === 'import' || store.overwriteMode === 'clear') out.overwriteMode = store.overwriteMode;
+  const importStartedAt = safeTimestamp(store.importStartedAt, now, 0);
+  if (importStartedAt) out.importStartedAt = importStartedAt;
+  const importOperationId = normalizeOperationId(store.importOperationId);
+  if (importOperationId) out.importOperationId = importOperationId;
   return out;
 }
 // 只把和默认值不同的字段写进 payload。全量写 w:0 / mastered:false / due:0
@@ -375,6 +381,9 @@ function snapshot() {
       resetAt: Number(conf.resetAt) || 0,
       serverFenceAt: Number(conf.serverFenceAt) || 0,
       serverFenceMode: conf.serverFenceMode === 'import' ? 'import' : (conf.serverFenceMode === 'clear' ? 'clear' : ''),
+      serverFenceOperationId: normalizeOperationId(conf.serverFenceOperationId),
+      importStartedAt: Number(conf.importStartedAt) || 0,
+      importOperationId: normalizeOperationId(conf.importOperationId),
     },
   };
   snapshotCacheRevision = localRevision;
@@ -545,9 +554,15 @@ function adoptGuestProgress(username) {
     // 位置（哪本词书 / 第几章）按合并规则定，不能整份覆盖：
     // 用游客 conf 直接覆盖账号 conf，会把账号侧的 deckChapter、图标、朗读设置全丢掉。
     const accountConf = parseStore(localStorage.getItem(confKey));
+    const guestConf = parseStore(localStorage.getItem(LS_CONF));
+    const destructiveKeys = [
+      'overwritePending', 'overwriteMode', 'resetAt', 'serverFenceAt', 'serverFenceMode',
+      'serverFenceOperationId', 'importStartedAt', 'importOperationId', 'forceAt',
+    ];
+    for (const key of destructiveKeys) delete guestConf[key];
     const mergedConf = mergeConf(
       accountConf,
-      parseStore(localStorage.getItem(LS_CONF)),
+      guestConf,
       accountChapterStore,
       guestChapterStore,
       latestActivity(accountStateStore, accountDailyStore),
@@ -557,10 +572,10 @@ function adoptGuestProgress(username) {
     // 登录进来不该顺手清掉账号的云端进度。账号自己攒下的标志要保留，
     // 所以按「账号这一侧是否真的待同步」判断值，而不是判断键存不存在
     // （账号清过一次时会留着 overwritePending: false，按键判断会把它误认成待同步）。
-    if (!accountConf.overwritePending) { delete mergedConf.overwritePending; delete mergedConf.overwriteMode; }
-    // 游客的 reset/import fence 不能带入账号；账号自己的服务端 fence 必须保留。
-    if (!Number(accountConf.resetAt)) delete mergedConf.resetAt;
-    if (!Number(accountConf.serverFenceAt)) { delete mergedConf.serverFenceAt; delete mergedConf.serverFenceMode; }
+    for (const key of destructiveKeys) {
+      if (Object.prototype.hasOwnProperty.call(accountConf, key)) mergedConf[key] = accountConf[key];
+      else delete mergedConf[key];
+    }
     localStorage.setItem(confKey, JSON.stringify(mergedConf));
   } catch {}
 }
@@ -765,7 +780,8 @@ function progressKey(c) {
   return [x.deck || '', Number(x.chapter) || 0, x.deckChapter || {}, Number(x.progressAt) || 0,
     x.showByDefault === true, x.speak !== false, x.speakLang === 'zh' ? 'zh' : 'en',
     x.icon || null, Number(x.iconAt) || 0, Number(x.resetAt) || 0,
-    Number(x.serverFenceAt) || 0, x.serverFenceMode || ''];
+    Number(x.serverFenceAt) || 0, x.serverFenceMode || '', normalizeOperationId(x.serverFenceOperationId),
+    Number(x.importStartedAt) || 0, normalizeOperationId(x.importOperationId)];
 }
 function applyMergedSnapshot(merged, local) {
   const changedLocally = !sameJson(
@@ -792,8 +808,13 @@ async function syncWithServer(local, guard, reset) {
     body.reset = true;
     // 带上本机的重置时刻，墓碑时间取它与服务端 now 的较早者；
     // 否则客户端时钟慢几秒时，「清空之后马上又背的词」会被判成旧记录删掉。
-    body.resetAt = Number(conf.resetAt) || Date.now();
     body.mode = conf.overwriteMode === 'import' ? 'import' : 'clear';
+    if (body.mode === 'import') {
+      body.importStartedAt = Number(conf.importStartedAt) || Date.now();
+      body.operationId = normalizeOperationId(conf.importOperationId);
+    } else {
+      body.resetAt = Number(conf.resetAt) || Date.now();
+    }
   }
   const result = await api('/state/sync', {
     method: 'POST',
@@ -851,6 +872,8 @@ async function syncNow(quiet) {
         // 用 delete 而不是置 false：留着 false 会让「按值判断」的地方以为它存在过。
         delete conf.overwritePending;
         delete conf.overwriteMode;
+        delete conf.importStartedAt;
+        delete conf.importOperationId;
         try { localStorage.setItem(scopedKey(LS_CONF), JSON.stringify(conf)); } catch {}
       }
       result = synced.skipped ? 'unchanged' : (synced.changedLocally ? 'merged' : 'pushed');

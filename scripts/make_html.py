@@ -54,9 +54,9 @@ INPUT_MANIFEST = (
     ("meanings_curated", "data/meanings_curated.json", False, True, "file", "上游释义来源，仅用于来源指纹"),
     ("meanings_final", "data/meanings_final.json", False, True, "file", "上游释义来源，仅用于来源指纹"),
     ("meaning_corrections", "data/meaning_corrections.json", False, True, "file", "上游释义修正，仅用于来源指纹"),
-    ("ecdict", "data/ecdict.csv", False, True, "file", "完整 ECDICT 重建源；常规构建不再依赖 66MB 原表"),
+    ("ecdict", "data/ecdict.csv", False, False, "file", "完整 ECDICT 重建源；常规构建不再依赖 66MB 原表"),
     ("ecdict_subset", "data/ecdict_subset.json", True, True, "file", "详情生成所需的可复现 ECDICT 子集"),
-    ("lemma", "data/lemma.en.txt", False, True, "file", "上游词形还原来源，仅用于来源指纹"),
+    ("lemma", "data/lemma.en.txt", False, False, "file", "上游词形还原来源，仅用于来源指纹"),
     ("manifest", "software/manifest.webmanifest", True, False, "file", "PWA manifest"),
     ("icon_192", "software/icon-192.png", True, False, "file", "PWA 图标 192"),
     ("icon_512", "software/icon-512.png", True, False, "file", "PWA 图标 512"),
@@ -266,6 +266,19 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+TEXT_DIGEST_SUFFIXES = {
+    ".css", ".csv", ".html", ".js", ".json", ".md", ".py", ".sql", ".txt", ".webmanifest",
+}
+
+
+def source_sha256(path: Path) -> str:
+    """对文本输入统一换行后再哈希，避免 Windows/Linux checkout 产生不同 build。"""
+    if path.suffix.lower() in TEXT_DIGEST_SUFFIXES:
+        data = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        return hashlib.sha256(data).hexdigest()
+    return sha256(path)
+
+
 def source_digest_entries():
     entries = []
     for key, rel_path, required, include_digest, kind, _role in INPUT_MANIFEST:
@@ -275,36 +288,36 @@ def source_digest_entries():
         if path is None:
             continue
         if kind == "file":
-            entries.append(rel_path + ":" + sha256(path))
+            entries.append(rel_path + ":" + source_sha256(path))
         elif kind == "dir":
             for child in sorted((item for item in path.rglob("*") if item.is_file()), key=lambda item: item.as_posix()):
                 child_rel = child.relative_to(ROOT).as_posix()
-                entries.append(child_rel + ":" + sha256(child))
+                entries.append(child_rel + ":" + source_sha256(child))
     return entries
 
 source_files = []
-for exam, input_key in (("english_2", "ky2_ref"), ("english_1", "ky1_ref")):
-    folder_path = get_input_path(input_key)
-    if folder_path is None:
-        # 真题原件是可选的来源元数据；缺失不影响词库和网页构建。
-        continue
-    paths = sorted(folder_path.rglob("*.pdf"))
-    if exam == "english_1":
-        # 与 build_freq_ky1 的真实输入保持一致：合订本 + 2022-2024 的真题原件，
-        # 解析 PDF 只是参考资料，不能伪装成计频来源。
-        combined = [path for path in paths if "2010-2021" in path.name]
-        selected = combined[:1]
-        for year in (2022, 2023, 2024):
-            candidates = [path for path in paths if str(year) in path.name]
-            if candidates:
-                selected.append(min(candidates, key=lambda item: item.stat().st_size))
-        paths = selected
-    for path in paths:
-        source_files.append({
-            "exam": exam,
-            "name": path.relative_to(folder_path).as_posix(),
-            "sha256": sha256(path),
-        })
+# 可选的 ref/ 原件只用于人工追溯。默认不读取它，否则本地存在 PDF、
+# 干净 CI 不存在 PDF 时，同一 commit 会生成不同 HTML 和 build 号。
+if os.environ.get("KY_INCLUDE_REF_METADATA") == "1":
+    for exam, input_key in (("english_2", "ky2_ref"), ("english_1", "ky1_ref")):
+        folder_path = get_input_path(input_key)
+        if folder_path is None:
+            continue
+        paths = sorted(folder_path.rglob("*.pdf"))
+        if exam == "english_1":
+            combined = [path for path in paths if "2010-2021" in path.name]
+            selected = combined[:1]
+            for year in (2022, 2023, 2024):
+                candidates = [path for path in paths if str(year) in path.name]
+                if candidates:
+                    selected.append(min(candidates, key=lambda item: item.stat().st_size))
+            paths = selected
+        for path in paths:
+            source_files.append({
+                "exam": exam,
+                "name": path.relative_to(folder_path).as_posix(),
+                "sha256": sha256(path),
+            })
 
 meta = dict(freq.get("meta", {}))
 meta.update({

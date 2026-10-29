@@ -1,17 +1,19 @@
-const BUILD_VERSION = '786a412c1f5a';
+const BUILD_VERSION = 'f25e2dd7e675';
 const SHELL_CACHE = 'ky-shell-' + BUILD_VERSION;
-const AUDIO_CACHE = 'ky-audio-v1';
-// 四本词库合计三千多词，「下载全部」要能一次装下，条数上限不能再卡在 1500；
-// 真正卡体积的还是下面的配额检查。
-const AUDIO_CACHE_MAX = 4000;
+const AUDIO_CACHE = 'ky-audio-v2';
+// 四本词库合计三千多词，中英文各一条音频，「下载全部」要能一次装下。
+// 真正卡体积的是下面的配额检查。
+const AUDIO_CACHE_MAX = 8000;
 // 导航请求的 network-first 超时：超过就先用缓存顶，避免弱网白屏
 const NAV_TIMEOUT_MS = 3000;
 // 配额吃到 80% 或剩余不到 8MB 就不再缓存新音频
 const AUDIO_BUDGET_RATIO = 0.8;
 const AUDIO_BUDGET_MIN_FREE = 8 * 1024 * 1024;
 // 只缓存根路径一份页面：'./' 在部署环境里就是 index.html，重复缓存会白占一倍空间
-const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.2351651ac5f8.js"];
-const SHELL = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png', ...DATA_ASSETS];
+const DATA_ASSETS = ["./data/words.b5ef547ac5fc.json", "./data/derivatives.47bc601b592b.json", "./data/basic.c44eb02808ef.json", "./data/insurance.ed6ab2b6e23c.json", "./app.7bbc27a2254e.js"];
+// 首装只等页面壳这几个小文件。四本词库和主程序五百多 KB 放到激活后再补，
+// 否则第一次打开会一直卡在 SW 安装，浏览器标签上的进度条也停不下来。
+const SHELL_CORE = ['./', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 // 写缓存一律允许失败：配额满时 cache.put 会 reject，
 // 让它冒泡会把一个明明已经拿到的响应变成 503。
@@ -26,7 +28,7 @@ self.addEventListener('install', event => {
     const cache = await caches.open(SHELL_CACHE);
     // 用 all 而不是 allSettled：任一资源 404 都该让安装失败并等浏览器重试，
     // 否则会激活一个半成品的壳，离线时直接白屏而且不会自己恢复。
-    await Promise.all(SHELL.map(url => cache.add(new Request(url, { cache: 'reload' }))));
+    await Promise.all(SHELL_CORE.map(url => cache.add(new Request(url, { cache: 'reload' }))));
     await self.skipWaiting();
   })());
 });
@@ -40,6 +42,9 @@ self.addEventListener('activate', event => {
       || (name.startsWith('ky-audio-') && name !== AUDIO_CACHE),
     ).map(name => caches.delete(name)));
     await self.clients.claim();
+    // 激活后再补词库分片和主程序：这时页面已经能用了，慢一点不影响首屏
+    const shellCache = await caches.open(SHELL_CACHE);
+    await Promise.allSettled(DATA_ASSETS.map(url => shellCache.add(new Request(url, { cache: 'reload' }))));
     if (!hadOldShell) return;
     // 新版本接管后主动刷新已打开的页面，避免用户长期看到旧缓存。
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -73,6 +78,8 @@ async function cacheFirstAudio(request) {
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
+  // 走到这里的只有自家的 /api/audio：同源响应，ok 能如实反映成败。
+  // 失败的响应一旦进缓存，那个词就永久没声音，所以只存 200。
   if (response.ok && await audioBudgetOk()) {
     await safePut(cache, request, response.clone());
     const keys = await cache.keys();
@@ -137,6 +144,9 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  // 有道发音是跨域响应，浏览器只会给 opaque：既读不到内容也判断不出成功与否，
+  // 一旦把错误响应缓存进去，那个词就永久没声音。宁可播放时直连（0.2s），
+  // 离线副本统一走自家 worker（能判断 200）。
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes('/api/audio')) {
     event.respondWith(cacheFirstAudio(request).catch(() => new Response('', { status: 503 })));

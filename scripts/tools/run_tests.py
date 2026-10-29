@@ -71,10 +71,11 @@ def static_checks():
     check("含恢复原序按钮", "restoreOrder" in t)
     check("每词唯一权重", "displayWeightOf" in t and '"weight":' in t and "综合权重" not in t)
     check("含鼠标滚轮翻词", "wheelLockedUntil" in t and "addEventListener('wheel'" in t)
-    check("含发音代理", "/api/audio?word=" in t)
+    check("含发音代理", "/api/audio?" in t)
     check("朗读可切中英文", all(x in t for x in ("speakLang", "zhVoice", "toggleSpeakLang", "meaningForSpeech")))
     check("朗读键长按切换语言", "speakLongFired" in t and "pointerdown" in t and "pointercancel" in t)
-    check("中文语音状态如实展示", "zhVoiceStat" in t and "zhVoiceStatus" in t and "localService" in t)
+    check("中文语音状态如实展示", "zhVoiceStat" in t and "zhVoiceStatus" in t and "AUDIO_PROXY_READY" in t)
+    check("中文朗读走百度可缓存音频", all(x in t for x in ("lang=zh", "offlineZhTexts", "AUDIO_PROXY_READY")))
     check("卡片顶部锚定不随释义跳动", "justify-content:flex-start" in t and "clamp(34px,10vh,88px)" in t)
     check("发音预加载可秒播", all(x in t for x in ("AUDIO_PRELOAD_AHEAD", "audioPlayers", "readyState >= 2")))
     check("发音 Blob 内存缓存", "audioBlobUrls" in t and "URL.createObjectURL(blob)" in t)
@@ -117,7 +118,14 @@ def static_checks():
     check("SW 注册禁缓存", "updateViaCache: 'none'" in t and "registration.update()" in t)
     check("头像弹窗带全量下载入口",
           all(x in t for x in ("offlineStart", "offlineStop", "runOfflineDownload")))
-    check("SW 音频缓存放得下全量", "AUDIO_CACHE_MAX = 4000" in sw)
+    check("SW 音频缓存放得下全量", "AUDIO_CACHE_MAX = 8000" in sw)
+    # SW 换音频缓存名会清空已下好的音频；前端那两个「已下载」标记必须跟着换版本，
+    # 否则会以为全都下过了，后台补下载永远不再启动，用户就一直走慢路径
+    check("前端音频标记与 SW 缓存版本对齐",
+          "AUDIO_CACHE_VERSION = 'v2'" in t and "AUDIO_CACHE = 'ky-audio-v2'" in sw
+          and "'ky_audio_words_v1'" not in t and "'ky_auto_offline_v1'" not in t)
+    check("SW 音频缓存只存成功响应",
+          "response.ok && await audioBudgetOk()" in sw and "response.type === 'opaque'" not in sw)
     check("SW 新版本自动刷新", "hadOldShell" in sw and "client.navigate(client.url)" in sw)
     mf_path = os.path.join(ROOT, "software", "manifest.webmanifest")
     mf = io.open(mf_path, encoding="utf-8").read() if os.path.exists(mf_path) else ""
@@ -134,6 +142,13 @@ def static_checks():
         extra = sorted(x for x in set(os.listdir(deploy)) - allowed if not re.fullmatch(r"app\.[0-9a-f]{12}\.js", x))
         check("部署目录无多余文件", not extra, str(extra[:5]))
         check("部署含 _worker.js", os.path.exists(os.path.join(deploy, "_worker.js")))
+        worker_js = io.open(os.path.join(deploy, "_worker.js"), encoding="utf-8").read() \
+            if os.path.exists(os.path.join(deploy, "_worker.js")) else ""
+        check("worker 支持中文 TTS 代理",
+              "fanyi.baidu.com/gettts" in worker_js and "AUDIO_ZH_RE" in worker_js)
+        # 释义里就有「...」「…」「《》」，正则漏一个字符，那条中文朗读就是 400 没声音
+        check("中文 TTS 正则放行释义符号",
+              "，、。；;:：.…《》" in worker_js)
         web_path = os.path.join(deploy, "index.html")
         web_html = io.open(web_path, encoding="utf-8").read() if os.path.exists(web_path) else ""
         web_gzip = len(gzip.compress(web_html.encode("utf-8"), 9)) if web_html else 0

@@ -203,9 +203,13 @@ async function readStateBody(request) {
 
 const USER_RE = /^[A-Za-z0-9_一-龥]{3,24}$/;
 const AUDIO_WORD_RE = /^[A-Za-z][A-Za-z'-]{1,40}$/;
+// 中文释义走百度 TTS：任意中文文本都能合成，英文词典接口只认词条
+// 释义里会有「...」「…」「《》」这些符号，漏掉就会让整条中文朗读被判 400 而没声音
+const AUDIO_ZH_RE = /^[一-鿿A-Za-z0-9，、。；;:：.…《》\s]{1,60}$/;
 // 音频请求量远高于其它接口，不走 D1 限流（每词一次写库太贵），
 // 用 isolate 内的轻量计数挡住随机刷词；命中缓存的请求不计数。
-// 额度按「一次全量离线缓存」估算：四本词库三千多词，400/10 分钟会让下载要跑一个多小时。
+// 额度按「一次全量离线缓存」估算：四本词库三千多词，中英文各一条音频，
+// 合计约六千多次请求，上限要能一次跑完。命中缓存的请求不计数。
 // 跨站调用由 handleAudio 的 Sec-Fetch-Site 拦在前面，这里只兜随机刷词。
 const audioHits = new Map();
 function audioBudget(ip) {
@@ -220,7 +224,7 @@ function audioBudget(ip) {
     audioHits.set(ip, { n: 1, resetAt: now + 600000 });
     return true;
   }
-  if (cur.n >= 4000) return false;
+  if (cur.n >= 20000) return false;
   cur.n += 1;
   return true;
 }
@@ -231,7 +235,10 @@ async function handleAudio(request, env, ctx) {
   if (site && site !== 'same-origin') return json({ error: '不允许跨站调用' }, 403);
   const url = new URL(request.url);
   const word = url.searchParams.get('word') || '';
-  if (!AUDIO_WORD_RE.test(word)) return json({ error: '发音词格式不对' }, 400);
+  const isZh = url.searchParams.get('lang') === 'zh';
+  if (isZh ? !AUDIO_ZH_RE.test(word) : !AUDIO_WORD_RE.test(word)) {
+    return json({ error: '发音词格式不对' }, 400);
+  }
 
   const cacheKey = new Request(url.toString());
   if (request.method === 'GET') {
@@ -242,9 +249,13 @@ async function handleAudio(request, env, ctx) {
   if (!audioBudget(ip)) return json({ error: '请求过于频繁，请稍后再试' }, 429);
 
   try {
-    const target = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2';
+    const target = isZh
+      ? 'https://fanyi.baidu.com/gettts?lan=zh&text=' + encodeURIComponent(word) + '&spd=7&source=web'
+      : 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2';
     const upstream = await fetch(target, {
-      headers: { 'user-agent': 'Mozilla/5.0', 'referer': 'https://dict.youdao.com/' },
+      headers: isZh
+        ? { 'user-agent': 'Mozilla/5.0', 'referer': 'https://fanyi.baidu.com/' }
+        : { 'user-agent': 'Mozilla/5.0', 'referer': 'https://dict.youdao.com/' },
       cf: { cacheEverything: true, cacheTtl: 31536000 },
     });
     const type = upstream.headers.get('content-type') || '';

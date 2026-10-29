@@ -1155,7 +1155,10 @@ let audioFallbackTimer = null;
 let offlineCacheTimer = null;
 let pronunciationAudio = null;
 let activePronunciationAudio = null;
-const AUDIO_WORDS_KEY = 'ky_audio_words_v1';
+// 必须与 sw.template.js 的 AUDIO_CACHE 版本号一致：SW 换缓存名会清空旧音频，
+// 前端这两个「已经下载过」的标记要是还留着，就会以为全都下过了、永远不再补。
+const AUDIO_CACHE_VERSION = 'v2';
+const AUDIO_WORDS_KEY = 'ky_audio_words_' + AUDIO_CACHE_VERSION;
 const AUDIO_PRELOAD_AHEAD = 6;
 // 整章 200 个词的音频都要留在内存里，否则预热完立刻被回收，等于白做
 const AUDIO_PLAYER_LIMIT = 260;
@@ -1175,12 +1178,19 @@ function audioUrl(text, lang) {
   return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2';
 }
 function cachedAudioUrl(text, lang) {
-  return '/api/audio?' + (lang === 'zh' ? 'lang=zh&' : '') + 'word=' + encodeURIComponent(text);
+  // 中文带 v=2：换语速后旧音频要靠这个版本号自然失效，否则会一直播慢的那版
+  return '/api/audio?' + (lang === 'zh' ? 'lang=zh&v=2&' : '') + 'word=' + encodeURIComponent(text);
 }
-// 有 Service Worker 代理就一律走 /api/audio：命中本地缓存几毫秒就返回，
-// 全量下载过之后，拖进度条跳到任何词都能立刻出声；file:// 没有代理才直连。
+// 播放：已下载过的走 /api/audio，命中 SW 缓存几毫秒返回；
+// 没下载过的英文直连有道（0.2s），中文必须走 worker（百度带错 referer 会返回空音频）。
 function playSrcFor(text, lang) {
-  return AUDIO_PROXY_READY ? cachedAudioUrl(text, lang) : audioUrl(text, lang);
+  if (lang === 'zh') return cachedAudioUrl(text, 'zh');
+  if (AUDIO_PROXY_READY && audioCachedWords.has(text)) return cachedAudioUrl(text, 'en');
+  return audioUrl(text, 'en');
+}
+// 离线副本一律经 worker：只有那条路能确认真的拿到音频，跨域直连看不出成败
+function offlineAudioUrl(text, lang) {
+  return cachedAudioUrl(text, lang);
 }
 function rememberAudio(word) {
   audioCachedWords.add(word);
@@ -1256,7 +1266,7 @@ function systemSpeak(text, token, notify, reason, lang) {
   if (synth.paused) { try { synth.resume(); } catch {} }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang || 'en-US';
-  u.rate = isZh ? 0.92 : 0.95;
+  u.rate = isZh ? 1.1 : 0.95;
   u.pitch = 1;
   u.volume = 1;
   if (isZh) { if (zhVoice) u.voice = zhVoice; }
@@ -1316,7 +1326,7 @@ function cachePronunciationForOffline(text, lang) {
   if (!text || navigator.onLine === false || location.protocol === 'file:') return;
   if (audioCachedWords.has(text) || audioFetching.has(text)) return;
   audioFetching.add(text);
-  fetch(cachedAudioUrl(text, lang)).then(response => {
+  fetch(offlineAudioUrl(text, lang)).then(response => {
     if (!response.ok) throw new Error('audio cache failed');
     return response.blob();
   }).then(blob => {
@@ -2219,15 +2229,32 @@ card.addEventListener('mousedown', event => {
 card.addEventListener('mouseup', stopPress);
 card.addEventListener('mouseleave', stopPress);
 
-// 鼠标滚轮翻词：向下滚下一个，向上滚上一个；节流避免触控板一次跳过多个词。
+// 鼠标滚轮翻词：挂到 document，卡片外的页眉缝隙和留白也能翻；
+// 累加归一化后的 delta 再判定，普通鼠标一格≈100px 直接翻一个词，
+// 高精度滚轮/触控板的小 delta 也能攒出来（旧的 "<3 直接丢弃" 会毫无反应）。
+let wheelAcc = 0;
+let wheelDir = 0;
 let wheelLockedUntil = 0;
-card.addEventListener('wheel', event => {
-  if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 3) return;
-  event.preventDefault();
+const WHEEL_STEP = 40;      // 翻一个词所需的滚动量
+const WHEEL_COOLDOWN = 30;  // 只防同一帧里的连发，限速交给上面的累积阈值
+document.addEventListener('wheel', event => {
+  if (event.ctrlKey || event.metaKey) return;              // Ctrl/⌘ + 滚轮 = 缩放
+  if ($('viewStudy').classList.contains('hidden')) return; // 词表/统计页有自己的滚动条
+  if (!$('detailMask').classList.contains('hidden')) return;
+  if (!$('authModal').classList.contains('hidden')) return;
+  if (event.target.closest && event.target.closest('input, textarea, select')) return;
+  if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+  const dy = event.deltaY * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 800 : 1);
+  const dir = dy > 0 ? 1 : -1;
+  if (dir !== wheelDir) { wheelAcc = 0; wheelDir = dir; }  // 反向立刻响应，不等冷却
+  wheelAcc += dy;
+  if (Math.abs(wheelAcc) < WHEEL_STEP) return;
   const now = Date.now();
-  if (now < wheelLockedUntil) return;
-  wheelLockedUntil = now + 320;
-  navigate(event.deltaY > 0 ? 1 : -1);
+  if (now < wheelLockedUntil) return;  // 冷却期内的滚动先攒着，到期后接着用，不丢
+  event.preventDefault();
+  wheelLockedUntil = now + WHEEL_COOLDOWN;
+  wheelAcc = 0;
+  navigate(dir);
 }, { passive: false });
 let dragWarmTimer = null;
 $('progressBar').oninput = event => {
@@ -2562,8 +2589,7 @@ window.addEventListener('keydown', event => {
 updateDeckMeta();
 loadChapter(resumePosition());
 renderChapters();
-updateStats();
-renderIconSettings();
+// 统计和图标设置在各自页面/面板打开时才看得见，启动时算它们是纯浪费 CPU
 syncFavicon(currentIcon());
 $('chapterSelect').onchange = event => gotoChapter(Number(event.target.value));
 $('meaningToggle').onclick = () => {
@@ -2577,12 +2603,14 @@ function toggleSpeakLang() {
   refreshVoice();
   save(LS_CONF, conf);
   lastSpoken = '';          // 清掉去重标记，让 renderStudy 立刻用新语言念一次
+  const warn = $('speakWarn');
+  if (warn) warn.classList.add('hidden');   // 上一门语言的报错不该留到这一门
   renderStudy();
-  if (conf.speakLang === 'zh' && !zhVoice) {
-    const el = $('speakWarn');
-    if (el) {
-      el.textContent = '没检测到中文语音。中文释义靠系统语音朗读，请在系统设置里安装中文语音包。';
-      el.classList.remove('hidden');
+  // 中文释义走百度音频，只有单文件版没有代理时才依赖系统中文语音包
+  if (conf.speakLang === 'zh' && !AUDIO_PROXY_READY && !zhVoice) {
+    if (warn) {
+      warn.textContent = '这个版本没有联网代理，中文释义要靠系统语音，请在系统设置里安装中文语音包。';
+      warn.classList.remove('hidden');
     }
   }
 }
@@ -3313,6 +3341,7 @@ $('accountBtn').onclick = () => {
   authSay('');
   loadWechatLogin();
   refreshAuth();
+  renderIconSettings();
   refreshOfflineStat();
 };
 $('authClose').onclick = () => $('authModal').classList.add('hidden');
@@ -3496,9 +3525,8 @@ function updateOfflineStatus() {
 // 缓存写入交给 Service Worker：页面只发请求，持久化和淘汰策略都在 sw.js 里。
 // 页面壳和四本词库在 SW 安装时就已存好，这里补的是全部真人发音 + 词典详情分片。
 // 音频都很小（10KB 上下），并发开满，只在单条卡住时超时跳过，不做任何限速。
-const OFFLINE_CONCURRENCY = 12;
-const OFFLINE_FETCH_TIMEOUT = 8000;
-const OFFLINE_AUDIO_CACHE = 'ky-audio-v1';
+const OFFLINE_CONCURRENCY = 16;
+const OFFLINE_FETCH_TIMEOUT = 20000;
 let offlineJob = null;
 
 async function offlineWordList() {
@@ -3538,8 +3566,17 @@ function renderOfflineJob() {
   const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
   $('offlineFill').style.width = pct + '%';
   const tail = job.failed ? '，失败 ' + job.failed : '';
-  const elapsed = (Date.now() - (job.startedAt || Date.now())) / 1000;
-  const rate = elapsed > 3 && job.done ? ' · ' + (job.done / elapsed).toFixed(1) + '/秒' : '';
+  // 用最近几秒的滑动速度，别用全程平均：跳过已缓存那一段会把速度算得虚高
+  const now = Date.now();
+  if (job.sampleT && now - job.sampleT >= 3000) {
+    job.rate = (job.done - job.sampleDone) / ((now - job.sampleT) / 1000);
+    job.sampleT = now;
+    job.sampleDone = job.done;
+  } else if (!job.sampleT) {
+    job.sampleT = now;
+    job.sampleDone = job.done;
+  }
+  const rate = job.rate > 0 ? ' · ' + job.rate.toFixed(0) + '/秒' : '';
   if (job.cancelled) $('offlineStat').textContent = '已停止：缓存了 ' + job.done + ' / ' + job.total + ' 个' + tail;
   else if (job.done >= job.total) $('offlineStat').textContent = '完成：' + job.total + ' 条发音和词典都存好了' + tail;
   else $('offlineStat').textContent = job.phase + ' ' + job.done + ' / ' + job.total + '（' + pct + '%）' + rate + tail;
@@ -3588,7 +3625,7 @@ async function fetchOfflineAudio(text, lang) {
     let response;
     const timeout = makeTimeout();
     try {
-      response = await fetch(cachedAudioUrl(text, lang), timeout ? { signal: timeout } : {});
+      response = await fetch(offlineAudioUrl(text, lang), timeout ? { signal: timeout } : {});
     } catch (err) {
       // 超时或断连：按普通失败退避重试，别让整批卡在这一条上
       if (attempt === waits.length) throw err;
@@ -3596,7 +3633,8 @@ async function fetchOfflineAudio(text, lang) {
       continue;
     }
     if (response.status !== 429) {
-      if (!response.ok) throw new Error('audio ' + response.status);
+      // 跨域直连拿到的是 opaque，ok 恒为 false、status 恒为 0，不能当失败处理
+      if (!response.ok && response.type !== 'opaque') throw new Error('audio ' + response.status);
       return response;
     }
     if (attempt === waits.length) break;
@@ -3637,16 +3675,26 @@ async function runOfflineDownload(opts) {
   if (urgent.size) {
     targets = targets.filter(t => urgent.has(t.key)).concat(targets.filter(t => !urgent.has(t.key)));
   }
+  // 已经在本机的不用再下一遍
+  const pending = targets.filter(t => !audioCachedWords.has(t.key));
+  // 自动模式分批：一次最多 800 条，跑完就收工，下次打开接着来。
+  // 否则每次打开都在后台拖几分钟，页面和朗读都被它拖慢。
+  targets = auto ? pending.slice(0, 800) : pending;
+  if (!targets.length) {
+    if (auto) { try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {} }
+    $('offlineStat').textContent = '全部发音都已经存在本机了。';
+    startBtn.disabled = false;
+    return;
+  }
   offlineJob = {
     total: targets.length, done: 0, failed: 0, cancelled: false,
     startedAt: Date.now(),
-    phase: auto ? '后台自动缓存' : '正在下载发音',
+    phase: auto ? '后台自动缓存（每次最多 800 条）' : '正在下载发音',
   };
   stopBtn.classList.remove('hidden');
   renderOfflineJob();
   try {
     await navigator.serviceWorker.ready;
-    const audioCache = await caches.open(OFFLINE_AUDIO_CACHE);
     // 词典详情的分片按首字母拆过，26 个小文件，先拿完离线也能长按看详情
     const details = (DATA_META && DATA_META.assets && DATA_META.assets.details) || {};
     for (const url of Object.values(details)) {
@@ -3663,9 +3711,9 @@ async function runOfflineDownload(opts) {
         if (index >= targets.length) return;
         const target = targets[index];
         try {
-          if (!(await audioCache.match(cachedAudioUrl(target.key, target.lang)))) {
-            await fetchOfflineAudio(target.key, target.lang);
-          }
+          // 不在这里查 Cache API：缓存堆到几千条后主线程 match 会明显变慢，
+          // 判定交给 SW 的 cache-first，命中缓存同样是秒回。
+          await fetchOfflineAudio(target.key, target.lang);
           audioCachedWords.add(target.key);
           consecutiveFailures = 0;
         } catch {
@@ -3690,15 +3738,15 @@ async function runOfflineDownload(opts) {
     startBtn.disabled = false;
     stopBtn.classList.add('hidden');
     updateOfflineStatus();
-    // 自动模式只在整批都成功时才算完成；有失败就下次启动接着补，已缓存的不重复下
-    if (auto && finished && !finished.cancelled && !finished.failed && finished.done >= finished.total) {
+    // 只有这一批就把剩下的全下完了，才算彻底完成；分批模式下留着下次继续
+    if (auto && finished && !finished.cancelled && !finished.failed && pending.length <= 800) {
       try { localStorage.setItem(AUTO_OFFLINE_KEY, 'done'); } catch {}
     }
   }
 }
 
 // 后台自动缓存：首屏稳定后自己跑全量，用户不用点任何按钮
-const AUTO_OFFLINE_KEY = 'ky_auto_offline_v1';
+const AUTO_OFFLINE_KEY = 'ky_auto_offline_' + AUDIO_CACHE_VERSION;
 let autoOfflineStarted = false;
 function autoOfflineAllowed() {
   try { if (localStorage.getItem(AUTO_OFFLINE_KEY) === 'done') return false; } catch { return false; }
@@ -3735,16 +3783,22 @@ window.addEventListener('beforeinstallprompt', event => {
   const stat = $('appStat');
   if (stat && !isStandalone()) stat.textContent = '可以安装到桌面了，点左边按钮。';
 });
+const installHint = () => {
+  const ua = navigator.userAgent;
+  if (/MicroMessenger/i.test(ua)) return '微信里没有安装入口：点右上角「…」→「在浏览器打开」，再照下面的步骤装。';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'iPhone/iPad：点 Safari 底部「分享」→「添加到主屏幕」。';
+  return '安卓：点浏览器右上角「⋮」菜单 →「添加到主屏幕」或「安装应用」。';
+};
 $('installApp').onclick = async () => {
   const stat = $('appStat');
   if (isStandalone()) { stat.textContent = '已经在桌面图标里运行了。'; return; }
   if (!installPrompt) {
-    stat.textContent = '这个浏览器没给安装入口：安卓用 Edge/Chrome 菜单里的「添加到主屏幕」，iOS 用 Safari 分享→「添加到主屏幕」。';
+    stat.textContent = installHint();
     return;
   }
   installPrompt.prompt();
   const choice = await installPrompt.userChoice;
-  stat.textContent = choice && choice.outcome === 'accepted' ? '已安装，去桌面找图标。' : '已取消安装。';
+  stat.textContent = choice && choice.outcome === 'accepted' ? '已安装，去桌面找图标。' : '已取消。' + installHint();
   installPrompt = null;
 };
 $('checkUpdate').onclick = async () => {
@@ -3774,7 +3828,15 @@ updateOfflineStatus();
 if ('serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(async registration => {
-      registration.update().catch(() => {});
+      // 每次打开都查更新要拉一次 sw.js，还可能触发整壳重装；一天查一次足够，
+      // 想要最新版时点头像里的「检查更新」。
+      const KEY = 'ky_update_check_v1';
+      let last = 0;
+      try { last = Number(localStorage.getItem(KEY)) || 0; } catch {}
+      if (Date.now() - last > 86400000) {
+        try { localStorage.setItem(KEY, String(Date.now())); } catch {}
+        registration.update().catch(() => {});
+      }
       await navigator.serviceWorker.ready;
       updateOfflineStatus();
     }).catch(() => updateOfflineStatus());

@@ -26,8 +26,8 @@ Phase 0–5 的工程交付已闭合。当前没有“全部未开始”或“�
 
 | 项 | 事实 |
 |---|---|
-| HEAD | `2d2eaa5b6f9db8879a20447edee3cbe2eb655a09` |
-| 本地构建 | build `76060d85d857`，app `./app.4defd52cb022.js` |
+| HEAD | `4368766` |
+| 本地构建 | build `c18904c08771`，app `./app.4defd52cb022.js` |
 | 公共域名 | app `./app.9775dd28fffb.js`，SW `4e120f40cd87` |
 | `/build-meta.json` | 公共域名未返回有效构建元数据 |
 | `/api/health` | 200，`{"ok":true,"database":true}` |

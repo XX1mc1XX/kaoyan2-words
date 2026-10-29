@@ -159,9 +159,9 @@ python scripts/deploy.py
 
 截至 **2026-10-29 20:41 +08:00**：
 
-- 当前 HEAD：`2d2eaa5b6f9db8879a20447edee3cbe2eb655a09`；本地 `deploy/build-meta.json` 为 build `76060d85d857`、app `./app.4defd52cb022.js`。
+- 当前 HEAD：`4368766`；本地 `deploy/build-meta.json` 为 build `c18904c08771`、app `./app.4defd52cb022.js`。
 - 公共域名在本轮部署前仍返回旧 app `./app.9775dd28fffb.js`、SW build `4e120f40cd87`；`/api/health` 返回 `{"ok":true,"database":true}`。
-- 因此本轮候选 `76060d85d857` 尚未确认上线；发布后必须用 `deploy.py` 的双域名和 fresh Edge 验收结果覆盖本节。
+- 因此本轮候选 `c18904c08771` 尚未确认上线；发布后必须用 `deploy.py` 的双域名和 fresh Edge 验收结果覆盖本节。
 - 仓库当前没有配置远程；`.github/workflows/ci.yml` 已定义 Windows CI，但本地没有 GitHub Actions 运行记录。不能把“workflow 已提交”说成“托管 CI 已全绿”。
 
 ## 数据规则

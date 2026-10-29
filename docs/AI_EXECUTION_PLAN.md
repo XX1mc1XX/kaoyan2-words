@@ -153,10 +153,10 @@ python scripts/deploy.py
 
 截至 2026-10-29 20:41 +08:00：
 
-- HEAD：`2d2eaa5b6f9db8879a20447edee3cbe2eb655a09`；
-- 本地构建：build `76060d85d857`，app `./app.4defd52cb022.js`；
+- HEAD：`4368766`；
+- 本地构建：build `c18904c08771`，app `./app.4defd52cb022.js`；
 - 公共域名在本轮部署前仍返回旧 app `./app.9775dd28fffb.js`、SW `4e120f40cd87`；
 - 公共 `/build-meta.json` 未返回有效 JSON，健康检查正常；
-- 因此候选 build `76060d85d857` 尚未确认上线；发布后必须写回双域名实际结果。
+- 因此候选 build `c18904c08771` 尚未确认上线；发布后必须写回双域名实际结果。
 
 下一次发布必须让 `deploy.py` 的 deployment URL + public URL 双域名验收全部通过，并在提交信息中记录对应 `app.<hash>.js`。

@@ -2174,10 +2174,16 @@ def metrics_checks(worker_url):
         "const errors = [];"
         "const health = await call('https://example.com/api/health');"
         "if (health.status !== 503) errors.push('health status ' + health.status);"
-        "const logRes = await call('https://example.com/api/log', {"
+        "const log = (src) => call('https://example.com/api/log', {"
         "method:'POST', headers:{'content-type':'application/json','cf-connecting-ip':'7.7.7.7'},"
-        "body: JSON.stringify({message:'boom', source:'attacker-chosen'})});"
+        "body: JSON.stringify({message:'boom', source: src})});"
+        # source 的真实取值是脚本 URL 或 unhandledrejection 字面量，
+        # 不是固定分类名——这四种形态都要归到各自桶里
+        "const logRes = await log('https://kaoyan2-words.pages.dev/app.4defd52cb022.js');"
         "if (logRes.status !== 200) errors.push('log status ' + logRes.status);"
+        "await log('unhandledrejection');"
+        "await log('');"
+        "await log('attacker-chosen');"
         "const noToken = await call('https://example.com/api/metrics');"
         "if (noToken.status !== 404) errors.push('metrics without token=' + noToken.status);"
         # 未配置 METRICS_TOKEN 时即使带对了猜测也必须当作不存在
@@ -2194,8 +2200,11 @@ def metrics_checks(worker_url):
         "if (good.headers.get('cache-control') !== 'no-store') errors.push('metrics cacheable');"
         "await Promise.all(pending);"
         "if (writes.indexOf('d1.health_fail') < 0) errors.push('missing d1.health_fail [' + writes.join(',') + ']');"
-        "if (writes.indexOf('client.error:other') < 0) errors.push('missing client.error:other [' + writes.join(',') + ']');"
-        "if (writes.length !== 2) errors.push('unexpected metric writes [' + writes.join(',') + ']');"
+        "const wanted = ['client.error:app', 'client.error:rejection', 'client.error:inline', 'client.error:other'];"
+        "for (const name of wanted) {"
+        "  if (writes.indexOf(name) < 0) errors.push('missing ' + name + ' [' + writes.join(',') + ']');"
+        "}"
+        "if (writes.length !== 5) errors.push('unexpected metric writes [' + writes.join(',') + ']');"
         "if (errors.length) { console.error(errors.join(' | ')); process.exit(1); }"
         % worker_url
     )

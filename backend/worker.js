@@ -115,6 +115,18 @@ function metricDay(offsetDays = 0) {
   return new Date(Date.now() - offsetDays * 86400_000).toISOString().slice(0, 10);
 }
 
+// 前端上报的 source 是「哪个脚本报的」（window.error 的 filename）或
+// unhandledrejection 这个字面量，不是固定分类名。按字面白名单匹配会让
+// 所有记录都落进 other，等于没有分类。
+function clientErrorBucket(source) {
+  const raw = String(source || '').toLowerCase();
+  if (!raw) return 'inline';
+  if (raw.indexOf('rejection') >= 0) return 'rejection';
+  if (raw.indexOf('sw.js') >= 0) return 'sw';
+  if (raw.indexOf('app.') >= 0) return 'app';
+  return 'other';
+}
+
 function bumpMetric(env, ctx, name) {
   try {
     if (!env || !env.DB || typeof name !== 'string') return;
@@ -583,10 +595,9 @@ async function handleApi(request, env, ctx) {
       if (body && typeof body.message === 'string') {
         const clip = v => String(v == null ? '' : v).replace(/[\r\n]+/g, ' ').slice(0, 400);
         console.error('[client]', clip(body.message), clip(body.source), clip(body.stack));
-        // 只接受已知来源，其余归 other：客户端给什么就存什么，等于让它把指标表基数任意撑大。
-        const source = clip(body.source);
-        const known = ['app', 'audio', 'sync', 'ui'];
-        bumpMetric(env, ctx, 'client.error:' + (known.includes(source) ? source : 'other'));
+        // 只按归一化后的来源分类计数，不落 message 原文：
+        // 客户端给什么就存什么，等于让它把指标表基数任意撑大。
+        bumpMetric(env, ctx, 'client.error:' + clientErrorBucket(body.source));
       }
       return json({ ok: true });
     }

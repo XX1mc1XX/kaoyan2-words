@@ -2096,10 +2096,11 @@ def runtime_checks():
           and "recent_release_activity()" in io.open(deploy_path, encoding="utf-8").read())
     check("\u6570\u636e\u5e93\u8fc1\u79fb\u6709\u5df2\u6267\u884c\u8d26\u672c", not deploy_module.pending_migrations(),
           str([str(path) for path in deploy_module.pending_migrations()]))
-    check("\u53ea\u5728\u672c\u5730\u6267\u884c\u8fc7\u7684\u8fc1\u79fb\u4f1a\u62e6\u4f4f\u53d1\u5e03",
+    # \u53ea\u65ad\u8a00\u300c\u5177\u5907\u8fd9\u4e2a\u80fd\u529b\u300d\uff0c\u4e0d\u8981\u65ad\u8a00\u67d0\u6761\u8fc1\u79fb\u6b64\u523b\u8fd8\u6807\u7740 remotePending\uff1a
+    # \u90a3\u6837\u4e00\u65e6\u771f\u7684\u5728\u751f\u4ea7\u6267\u884c\u5b8c\uff0c\u6d4b\u8bd5\u5c31\u4f1a\u56e0\u4e3a\u6570\u636e\u53d8\u5316\u800c\u7ea2\u3002
+    check("\u53d1\u5e03\u80fd\u8bc6\u522b\u53ea\u5728\u672c\u5730\u6267\u884c\u8fc7\u7684\u8fc1\u79fb",
           hasattr(deploy_module, "remote_pending_migrations")
-          and "remotePending" in io.open(
-              os.path.join(ROOT, "backend", "migrations", "applied.json"), encoding="utf-8").read())
+          and "remotePending" in io.open(deploy_path, encoding="utf-8").read())
     deploy_text = io.open(deploy_path, encoding="utf-8").read()
     check("发布 HTTP 验收使用系统网络栈",
           "Invoke-WebRequest" in deploy_text and "browser_detail" in deploy_text)

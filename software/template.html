@@ -96,9 +96,13 @@ main{flex:1;min-height:0;width:100%;max-width:760px;margin:0 auto;padding:12px 1
 .card.swipe-ok{border-color:var(--ok)}
 .card.swipe-bad{border-color:var(--bad)}
 .badges{position:absolute;top:10px;left:10px;display:flex;gap:5px;align-items:center;z-index:2}
-.weight-badge{font:inherit;font-size:11px;font-weight:800;color:var(--bad);
+.weight-badge{font:inherit;font-size:10px;font-weight:800;color:var(--bad);
   background:color-mix(in srgb,var(--bad) 15%,transparent);border:0;border-radius:999px;
-  padding:4px 8px;line-height:1.1;min-width:22px;text-align:center;cursor:pointer}
+  padding:2px 6px;line-height:1.15;min-width:17px;text-align:center;cursor:pointer;
+  position:relative}
+/* 视觉缩到 17px 左右仍然是个可点按钮，点中热区用伪元素补回来，
+   否则手机上拇指根本压不中。 */
+.weight-badge::after{content:"";position:absolute;inset:-9px;border-radius:inherit}
 .weight-badge:active{transform:scale(.92)}
 @keyframes pulseW{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
 .weight-badge.pulse{animation:pulseW .45s ease}

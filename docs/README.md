@@ -38,8 +38,9 @@
 | 测试 | 数据 14/14、回归 321/321、离线 20/20（2026-10-30 本地实测） |
 | 性能 | 首屏 HTML gzip 11,813 B、主程序 gzip 37,131 B；首卡 p50/p95 120/154.8 ms；详见根 README |
 | CI | `.github/workflows/ci.yml` 定义 Windows 构建、数据测试、回归、离线、性能测量；远程 `XX1mc1XX/kaoyan2-words` 已跑通（run `40903352211`） |
-| 发布 | 已上线 build `c18904c08771` / app `app.4defd52cb022.js`；tag `v1.0.0` + GitHub Release 附 SHA-256 归档 |
-| 剩余 | 真机矩阵、音频 soak、生产 D1 恢复与回滚演练、监控告警闭环未完成（均需 Cloudflare 凭据或真机）；Worker 侧指标与 `/api/metrics` 已实现并本地验证，但生产 D1 未执行 `003_metrics.sql`、`METRICS_TOKEN` 未注入；详见 `PHASES.md` |
+| 发布 | 已上线 build `edbd90984455` / app `app.4defd52cb022.js`；`deploy.py` 打印 `release=ok`，双域名 fresh Edge 验收通过；tag `v1.0.0` + GitHub Release 附 SHA-256 归档 |
+| 监控 | Worker `metrics` 表 + `/api/metrics`（`METRICS_TOKEN` 保护）已在生产生效，记 5xx / D1 / 音频 / 同步冲突 / 客户端错误；`uptime_watch.py --metrics-token` 可按阈值告警 |
+| 剩余 | 真机矩阵、音频 soak、生产 D1 远程恢复与回滚演练、版本分布、告警 webhook 未完成（需真机或人工演练）；详见 `PHASES.md` |
 
 ## 开工硬门禁
 

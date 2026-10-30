@@ -22,18 +22,18 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 
 ## 当前发布状态
 
-截至 **2026-10-29 21:11 +08:00**：
+截至 **2026-10-30 08:29 +08:00**：
 
 | 项 | 事实 |
 |---|---|
-| 发布源码 | `4368766` |
-| 线上构建 | build `c18904c08771`，app `./app.4defd52cb022.js` |
-| 公共域名 | app `./app.4defd52cb022.js`，SW build `c18904c08771` |
+| 发布源码 | `521d71d` |
+| 线上构建 | build `edbd90984455`，app `./app.4defd52cb022.js` |
+| 公共域名 | app `./app.4defd52cb022.js`，SW build `edbd90984455` |
 | `/build-meta.json` | 200 JSON，与本地 build/source/app 完全一致 |
 | `/api/health` | 200，`{"ok":true,"database":true}` |
-| 结论 | 已上线；public URL + deployment URL 双域名 fresh Edge 验收通过 |
-
-本地构建已包含尚未部署的改动（Worker 侧指标、卡片权重徽章尺寸），**尚未部署**：线上仍是 `c18904c08771`。本地与线上的 build 不同是预期状态，不是漂移。
+| 生产 D1 | 已执行 `003_metrics.sql`，`sqlite_master` 确认 `metrics` 表，`num_tables=6` |
+| `/api/metrics` | 200（带 `x-ky-metrics-token`）；错 token 与缺 token 均 401。实测 `POST /api/log` 后落库 `client.error:app` |
+| 结论 | 已上线；`deploy.py` 打印 `release=ok`，public URL + deployment URL 双域名 fresh Edge 验收通过 |
 
 本轮发布闭环已完成；下次发布仍必须重跑 10 分钟互斥、构建、回归、离线与双域名 fresh Edge 验收。
 ## 两个发布地址的区别
@@ -41,7 +41,7 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 | 名称 | 当前地址 | 用途 | 是否给普通用户 |
 |---|---|---|---|
 | public URL | `https://kaoyan2-words.pages.dev/` | Cloudflare Pages 项目的稳定生产入口；以后发布新版本时通常继续使用这个地址 | 是，唯一正式入口 |
-| deployment URL | `https://138572ea.kaoyan2-words.pages.dev/` | 某一次具体 deployment 的技术地址；用于确认本次上传的精确产物，并排除“上传成功但生产别名还没切过去” | 否，仅验收、排障和追溯 |
+| deployment URL | `https://8a9a2b59.kaoyan2-words.pages.dev/` | 某一次具体 deployment 的技术地址；用于确认本次上传的精确产物，并排除“上传成功但生产别名还没切过去” | 否，仅验收、排障和追溯 |
 
 两个地址现在打开一样是正常现象：production 已经指向本次 deployment，所以稳定入口和本次 deployment 地址返回同一套 HTML、app、SW 和数据。必须同时验收两者，是为了证明：
 
@@ -61,20 +61,20 @@ Phase 0–5 的功能工程已经闭合，但生产化验证和运维闭环尚�
 | P0 | D1 备份、恢复和 migration 回滚演练 | 已完成（本地） | `python scripts/tools/d1_drill.py` 全绿：导出→清空→导入→进度 payload 逐字节一致→clear+reimport 回滚路径验证，六张表（含 `metrics`）全部纳入计数前后一致；远程模式需 `CLOUDFLARE_API_TOKEN`，尚未在生产库执行 | 从明确备份点恢复测试库；账号、会话、进度完整；回滚步骤有真实命令和结果 |
 | P0 | 真实双设备生产同步演练 | 已完成（契约级） | `python scripts/tools/sync_two_device.py` 覆盖游客登录合并、旧设备重连、clear 不复活、重试幂等、乱序同步、过期会话 401；两个独立会话对同一 Worker，不是两台真实浏览器 | 覆盖 clear/import、响应丢失重试、游客登录、会话过期、旧设备重连和乱序请求；两端最终收敛 |
 | P0 | 旧 Service Worker 升级到新 build | 已完成（本地） | `python scripts/tools/sw_upgrade_check.py`：持久 profile 先被 build A 控制，改写 sw.js 后升级到 B，旧 shell 只保留一版，页面不白屏，升级后断网仍可启动 | 旧 profile 已由旧 SW 控制后升级到新 build，页面不白屏，旧 shell 淘汰，新版本断网仍可启动 |
-| P0 | 用修复后的 `deploy.py` 完整跑一次发布 | 未开始 | 本机 wrangler 认证已过期且非交互环境无法登录，也没有 `CLOUDFLARE_API_TOKEN`，无法执行部署；构建与测试在本地全绿 | 下次发布由修复后的 `deploy.py` 从构建到双域名验收一次跑完并打印 `release=ok` |
+| P0 | 用修复后的 `deploy.py` 完整跑一次发布 | 已完成 | build `edbd90984455` 由 `deploy.py` 从构建到双域名验收一次跑完，打印 `release=ok`；deployment `8a9a2b59` / public 域名 fresh Edge 验收均通过，`/api/health` 200 | 下次发布由修复后的 `deploy.py` 从构建到双域名验收一次跑完并打印 `release=ok` |
 | P1 | 真机与浏览器矩阵 | 未开始 | 无真实移动设备可用；当前仍是 Windows Edge headless + 本地 HTTP | 至少覆盖 iPhone Safari、Android Chrome、低端安卓和微信内置浏览器；首卡、滑动、音频、SW、断网和锁屏恢复通过 |
 | P1 | 真实音频服务 soak test | 未开始 | 代理、缓存状态和离线写入已测；真实英文源与中文 TTS 未做长时间限流测试 | 连续下载章节/词库、429/5xx、断网续传、Wi-Fi/移动网络切换均符合预期 |
 | P1 | 接近 512 KiB 的数据规模压测 | 已完成（本地） | `python scripts/tools/payload_soak.py`：137/266/499 KB 同步返回 200，576 KB 正确 413，11600 个词键重复同步不膨胀、回读一致 | 接近上限的真实账号仍可同步；400 天墓碑清理、重复导入导出和长期每日记录不造成 413 或存储膨胀 |
-| P2 | 线上监控和告警 | 进行中 | Worker 侧已落地 `metrics` 表（按 UTC 天聚合）与只读 `/api/metrics`（未配 `METRICS_TOKEN` 时当接口不存在，配了则 token 校验）：记 `http.5xx`、`d1.health_fail`、`audio.upstream_fail`、`sync.conflict`、`client.error:<来源>`，写入走 `waitUntil` 且失败静默，表缺失时只降级不报错。客户端错误来自既有的 `software/src/app/95-events-errors.js`（`window.error` + `unhandledrejection` → `POST /api/log`），Worker 按真实 source 归一化成 `app`/`inline`/`rejection`/`sw`/`other`，本地 pages dev 实测三种形态各自归类正确。`uptime_watch.py --metrics-token` 已能按阈值告警，本地实测注入 `d1.health_fail=5` 后输出 `["d1.health_fail=5>1"]` 并 exit 1。剩余：生产 D1 未执行 `003_metrics.sql`（`applied.json` 标了 `remotePending`，`deploy.py` 会因此拒绝发布）、`METRICS_TOKEN` 未注入、版本分布还没有数据源（错误上报不带 build，要做分布得单独加 boot 上报，本轮未做）、`KY_ALERT_WEBHOOK` 未配置。实测本机到生产首页偶发读超时（3 次中 2 次），已内置重试 | Worker 5xx、D1 错误、音频失败、前端未捕获错误、同步冲突和版本分布有监控与告警 |
+| P2 | 线上监控和告警 | 进行中 | Worker 侧已落地 `metrics` 表（按 UTC 天聚合）与只读 `/api/metrics`（未配 `METRICS_TOKEN` 时当接口不存在，配了则 token 校验）：记 `http.5xx`、`d1.health_fail`、`audio.upstream_fail`、`sync.conflict`、`client.error:<来源>`，写入走 `waitUntil` 且失败静默，表缺失时只降级不报错。客户端错误来自既有的 `software/src/app/95-events-errors.js`（`window.error` + `unhandledrejection` → `POST /api/log`），Worker 按真实 source 归一化成 `app`/`inline`/`rejection`/`sw`/`other`，本地 pages dev 实测三种形态各自归类正确。`uptime_watch.py --metrics-token` 已能按阈值告警，本地实测注入 `d1.health_fail=5` 后输出 `["d1.health_fail=5>1"]` 并 exit 1。生产侧已生效：build `edbd90984455` 部署后，`003_metrics.sql` 已在生产 D1 执行（`num_tables=6`）、`METRICS_TOKEN` 已作为 Pages secret 注入（值在本机 `dist/metrics-token.txt`，未入库），实测对首页发一次 `POST /api/log` 后 `/api/metrics` 返回 `client.error:app`，`uptime_watch.py --once --metrics-token` 对线上返回 ok。剩余：版本分布还没有数据源（错误上报不带 build，要做分布得单独加 boot 上报）、`KY_ALERT_WEBHOOK` 未配置所以告警只能走 stdout。实测本机到生产首页偶发读超时（3 次中 2 次），已内置重试 | Worker 5xx、D1 错误、音频失败、前端未捕获错误、同步冲突和版本分布有监控与告警 |
 | P2 | 正式回滚演练 | 未开始 | 有构建/发布检查，没有线上回滚演练记录；回退 deployment 需要 Cloudflare 凭据 | 能从 Cloudflare Pages 回退到上一个 deployment；旧前端与当前 Worker 兼容；D1 数据不丢失 |
 
 ## 下次执行顺序
 
-已完成（2026-10-30）：remote + 托管 CI、release tag 与 SHA-256 归档、D1 本地备份/恢复/回滚演练、双设备语义收敛演练、旧 SW 升级演练、512 KiB 同步上限压测。
+已完成（2026-10-30）：remote + 托管 CI、release tag 与 SHA-256 归档、D1 本地备份/恢复/回滚演练、双设备语义收敛演练、旧 SW 升级演练、512 KiB 同步上限压测、生产 D1 建表、`METRICS_TOKEN` 注入、由 `deploy.py` 跑通一次完整发布（`release=ok`）。
 
-剩下的事项都卡在“本机没有 Cloudflare 凭据或没有真机”：
+剩下的事项卡在“没有真机”或“需要真人配置/演练”：
 
-1. **拿到 `CLOUDFLARE_API_TOKEN` 后**：先 `npx wrangler d1 execute kaoyan2-users --remote --file backend/migrations/003_metrics.sql`（跑完删掉 `applied.json` 里 `003_metrics.sql` 的 `remotePending`，否则 `deploy.py` 会一直拒绝发布），再给 Pages 项目注入 `METRICS_TOKEN`；然后 `python scripts/tools/d1_drill.py --remote` 导出生产库；再按 `deploy.py` 完整跑一次发布，确认 `release=ok`；随后演练回退到上一个 deployment。
+1. **生产 D1 远程演练**：`python scripts/tools/d1_drill.py --remote` 导出生产库做一次备份确认；再演练回退到上一个 deployment（`8a9a2b59` 之前那一版），确认旧前端与当前 Worker 兼容、D1 数据不丢。
 2. **补真机矩阵**：iPhone Safari、Android Chrome、低端安卓、微信内置浏览器；记录首卡、第一章 200 词、音频、SW、锁屏恢复和弱网表现。
 3. **验证音频与数据上限的生产侧**：真实音频源 soak test；生产 D1 上构造接近 512 KiB 的测试账号。
 4. **补监控闭环**：Worker 侧 5xx / D1 / 音频 / 同步冲突 / 客户端错误计数已完成（见 P2 行）。剩下配 `KY_ALERT_WEBHOOK` 再把探活挂到计划任务：
